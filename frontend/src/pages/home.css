@@ -1,0 +1,285 @@
+.home-container {
+  min-height: 100vh;
+  background: #f6f3ed;
+  color: #18332d;
+}
+
+.home-hero {
+  padding: 76px 24px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(120deg, #173b34, #24594b 62%, #d88b55 62.1%);
+}
+
+.home-logo-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto 18px;
+}
+
+.home-logo-image {
+  display: block;
+  width: min(180px, 42vw);
+  height: auto;
+  max-width: 180px;
+  filter: drop-shadow(0 14px 24px rgba(15, 28, 24, 0.18));
+}
+
+.home-title {
+  margin: 0 auto 16px;
+  max-width: 850px;
+  font-size: clamp(34px, 6vw, 64px);
+  line-height: 1.1;
+}
+
+.home-subtitle {
+  max-width: 620px;
+  margin: 0 auto 28px;
+  color: #d9e7df;
+  font-size: 19px;
+}
+
+.home-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.home-btn {
+  display: inline-block;
+  padding: 13px 22px;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: 800;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.home-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 42, 36, 0.25);
+}
+
+.home-btn-primary { background: #e6a15e; color: #173b34; }
+.home-btn-secondary { border: 1px solid #d9e7df; color: #fff; }
+
+.home-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 20px 10px;
+}
+
+.home-feature-card {
+  padding: 28px 22px;
+  text-align: center;
+  background: #fff8ea;
+  border: 1px solid #e7ded0;
+  border-radius: 8px;
+}
+
+.home-feature-icon { font-size: 34px; margin-bottom: 10px; }
+.home-feature-title { margin: 0 0 8px; color: #18332d; }
+.home-feature-desc { margin: 0; color: #60736c; }
+
+/* ===== የተረጋገጡ ቤቶች ክፍል ===== */
+.home-properties-section {
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 56px 20px 40px;
+}
+
+.home-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.home-section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.home-view-all {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.home-view-all:hover {
+  color: #5a67d8;
+  text-decoration: underline;
+}
+
+/* ===== የጫኛ ===== */
+.home-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 40px;
+  color: #718096;
+}
+
+.home-loading-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid #e2e8f0;
+  border-top: 3px solid #667eea;
+  border-radius: 50%;
+  animation: homeSpin 0.8s linear infinite;
+}
+
+@keyframes homeSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== ባዶ ሁኔታ ===== */
+.home-empty {
+  text-align: center;
+  padding: 40px;
+  color: #718096;
+  font-size: 18px;
+}
+
+/* ===== የቤት ካርዶች ፍርግር ===== */
+.home-properties-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+/* ===== የቤት ካርድ ===== */
+.home-property-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.home-property-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.home-property-image {
+  height: 180px;
+  background: #edf2f7;
+  position: relative;
+  overflow: hidden;
+}
+
+.home-property-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-property-no-image {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  font-size: 40px;
+  color: #a0aec0;
+}
+
+.home-property-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(72, 187, 120, 0.9);
+  color: white;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.home-property-info {
+  padding: 16px;
+}
+
+.home-property-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 4px;
+}
+
+.home-property-location {
+  color: #718096;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.home-property-price {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2b6cb0;
+  margin-bottom: 12px;
+}
+
+.home-property-btn {
+  display: inline-block;
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.home-property-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* ===== ለሞባይል ===== */
+@media (max-width: 768px) {
+  .home-features {
+    grid-template-columns: 1fr;
+  }
+
+  .home-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .home-section-title {
+    font-size: 20px;
+  }
+
+  .home-properties-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-hero {
+    padding: 56px 18px;
+  }
+
+  .home-title {
+    font-size: 34px;
+  }
+
+  .home-properties-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-property-image {
+    height: 160px;
+  }
+}

@@ -1,0 +1,351 @@
+/* ===== የላይኛው ሜኑ ባር (Navbar) ===== */
+
+.navbar {
+  background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+  padding: 14px 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  border-bottom: 3px solid #667eea;
+}
+
+.navbar-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+/* ===== ሎጎ ===== */
+.navbar-logo {
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 800;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.3s ease;
+}
+
+.navbar-logo:hover {
+  transform: scale(1.05);
+}
+
+.navbar-logo-icon {
+  font-size: 28px;
+}
+
+.navbar-logo-text {
+  background: linear-gradient(135deg, #667eea 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ===== የሊንኮች ዝርዝር ===== */
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+/* ===== የተለመደ ሊንክ ===== */
+.navbar-link {
+  color: #cbd5e0;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.navbar-link:hover {
+  background-color: rgba(102, 126, 234, 0.2);
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+.navbar-link.active {
+  background-color: rgba(102, 126, 234, 0.3);
+  color: #ffffff;
+}
+
+/* ===== የተመዝገብ ቁልፍ ===== */
+.navbar-register-btn {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: #ffffff !important;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+}
+
+.navbar-register-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(72, 187, 120, 0.4);
+  background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+}
+
+/* ===== የተጠቃሚ መረጃ ===== */
+.navbar-user-info {
+  color: #e2e8f0;
+  padding: 8px 16px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.navbar-user-role {
+  font-size: 11px;
+  color: #a0aec0;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 10px;
+  border-radius: 12px;
+  margin-left: 4px;
+}
+
+.navbar-user-role.landlord {
+  background: rgba(237, 137, 54, 0.3);
+  color: #ed8936;
+}
+
+.navbar-user-role.admin {
+  background: rgba(229, 62, 62, 0.3);
+  color: #fc8181;
+}
+
+.navbar-user-role.tenant {
+  background: rgba(72, 187, 120, 0.3);
+  color: #48bb78;
+}
+
+/* ===== የመውጫ ቁልፍ ===== */
+.navbar-notification-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.navbar-notification-link:hover,
+.navbar-notification-link.active {
+  background: rgba(102, 126, 234, 0.28);
+}
+
+.navbar-notification-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.navbar-notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(229, 62, 62, 0.35);
+}
+
+.navbar-logout-btn {
+  background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+  color: #ffffff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(229, 62, 62, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.navbar-logout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(229, 62, 62, 0.4);
+}
+
+/* ===== የሞባይል ሜኑ ቁልፍ (Hamburger) ===== */
+.navbar-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: transform 0.3s ease;
+}
+
+.navbar-hamburger:hover {
+  transform: rotate(90deg);
+}
+
+/* ===== ለሞባይል (Responsive) ===== */
+@media (max-width: 820px) {
+  .navbar-links {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    padding: 16px 0 8px 0;
+    gap: 6px;
+    flex-wrap: wrap;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 8px;
+  }
+
+  .navbar-link {
+    width: auto;
+    padding: 10px 16px;
+    justify-content: center;
+  }
+
+  .navbar-user-info {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .navbar-logout-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .navbar-register-btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .navbar-container {
+    padding: 0 16px;
+  }
+
+  .navbar-logo {
+    font-size: 20px;
+  }
+}
+
+/* ===== ለትናንሽ ስክሪኖች ===== */
+@media (max-width: 480px) {
+  .navbar {
+    padding: 10px 0;
+  }
+
+  .navbar-logo {
+    font-size: 18px;
+  }
+
+  .navbar-logo-icon {
+    font-size: 22px;
+  }
+
+  .navbar-link {
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+
+  .navbar-logout-btn {
+    font-size: 13px;
+    padding: 6px 16px;
+  }
+
+  .navbar-user-info {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+}
+
+/* ===== ለመግቢያ ቁልፍ (Login) ===== */
+.navbar-login-btn {
+  color: #cbd5e0;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.navbar-login-btn:hover {
+  background-color: rgba(102, 126, 234, 0.2);
+  color: #ffffff;
+}
+
+/* ===== የማሳወቂያ (Badge) ===== */
+.navbar-badge {
+  background-color: #e53e3e;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 4px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* ===== የመገለጫ ምስል (Avatar) ===== */
+.navbar-avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #667eea;
+}

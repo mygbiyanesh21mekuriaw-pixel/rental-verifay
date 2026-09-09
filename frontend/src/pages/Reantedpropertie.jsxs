@@ -1,0 +1,327 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+
+const RentedProperties = () => {
+  const navigate = useNavigate();
+
+  const [properties, setProperties] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const loadRentedProperties = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const token = localStorage.getItem('token');
+
+        const response = await axios.get(
+          'http://localhost:5000/api/properties',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = Array.isArray(response.data)
+          ? response.data
+          : response.data?.properties || [];
+
+        const rented = data.filter(
+          (property) =>
+            property.status === 'rented' ||
+            property.isRented === true ||
+            property.rented === true
+        );
+
+        setProperties(rented);
+      } catch (err) {
+        setError(
+          err.response?.data?.message ||
+            'Unable to load rented properties'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRentedProperties();
+  }, []);
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <div>
+          <h1 style={styles.title}>🏘️ Rented Properties</h1>
+          <p style={styles.subtitle}>
+            View properties that are currently rented.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate('/landlord-dashboard')}
+          style={styles.backButton}
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
+
+      {loading && (
+        <div style={styles.message}>
+          Loading rented properties...
+        </div>
+      )}
+
+      {!loading && error && (
+        <div style={styles.error}>
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && properties.length === 0 && (
+        <div style={styles.message}>
+          <div style={styles.emptyIcon}>🏠</div>
+          <h2>No Rented Properties</h2>
+          <p>
+            You currently do not have any rented properties.
+          </p>
+        </div>
+      )}
+
+      {!loading && !error && properties.length > 0 && (
+        <div style={styles.grid}>
+          {properties.map((property) => (
+            <div
+              key={property._id || property.id}
+              style={styles.card}
+            >
+              {property.images?.length > 0 ? (
+                <img
+                  src={property.images[0]}
+                  alt={property.title || 'Property'}
+                  style={styles.image}
+                />
+              ) : (
+                <div style={styles.imagePlaceholder}>
+                  🏠
+                </div>
+              )}
+
+              <div style={styles.cardBody}>
+                <div style={styles.cardHeader}>
+                  <h2 style={styles.propertyTitle}>
+                    {property.title || 'Untitled Property'}
+                  </h2>
+
+                  <span style={styles.badge}>
+                    Rented
+                  </span>
+                </div>
+
+                <p style={styles.location}>
+                  📍 {property.location || 'Location not available'}
+                </p>
+
+                <p style={styles.price}>
+                  💰 {property.price || 0} ETB
+                </p>
+
+                {property.bedrooms !== undefined && (
+                  <p style={styles.details}>
+                    🛏️ {property.bedrooms} bedroom
+                    {property.bedrooms === 1 ? '' : 's'}
+                  </p>
+                )}
+
+                {property.tenant && (
+                  <div style={styles.tenantBox}>
+                    <strong>Tenant</strong>
+                    <div>
+                      {property.tenant.name ||
+                        property.tenant.fullName ||
+                        property.tenant.email ||
+                        'Tenant information available'}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/property/${property._id}`
+                    )
+                  }
+                  style={styles.detailsButton}
+                >
+                  View Details
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const styles = {
+  container: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '30px 20px',
+    minHeight: '100vh',
+  },
+
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '20px',
+    marginBottom: '30px',
+    flexWrap: 'wrap',
+  },
+
+  title: {
+    margin: 0,
+    color: '#2d3748',
+    fontSize: '30px',
+  },
+
+  subtitle: {
+    margin: '8px 0 0',
+    color: '#718096',
+  },
+
+  backButton: {
+    padding: '10px 16px',
+    border: 'none',
+    borderRadius: '8px',
+    backgroundColor: '#edf2f7',
+    color: '#2b6cb0',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+
+  grid: {
+    display: 'grid',
+    gridTemplateColumns:
+      'repeat(auto-fill, minmax(300px, 1fr))',
+    gap: '20px',
+  },
+
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+  },
+
+  image: {
+    width: '100%',
+    height: '190px',
+    objectFit: 'cover',
+    display: 'block',
+  },
+
+  imagePlaceholder: {
+    width: '100%',
+    height: '190px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#edf2f7',
+    fontSize: '48px',
+  },
+
+  cardBody: {
+    padding: '20px',
+  },
+
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '10px',
+  },
+
+  propertyTitle: {
+    margin: 0,
+    color: '#2d3748',
+    fontSize: '20px',
+  },
+
+  badge: {
+    backgroundColor: '#805ad5',
+    color: '#ffffff',
+    borderRadius: '20px',
+    padding: '4px 10px',
+    fontSize: '12px',
+    fontWeight: '700',
+    whiteSpace: 'nowrap',
+  },
+
+  location: {
+    color: '#4a5568',
+    margin: '12px 0 6px',
+  },
+
+  price: {
+    color: '#2b6cb0',
+    fontWeight: '700',
+    fontSize: '18px',
+    margin: '6px 0',
+  },
+
+  details: {
+    color: '#4a5568',
+    margin: '8px 0',
+  },
+
+  tenantBox: {
+    marginTop: '15px',
+    padding: '12px',
+    backgroundColor: '#faf5ff',
+    borderRadius: '8px',
+    color: '#553c9a',
+    lineHeight: '1.6',
+  },
+
+  detailsButton: {
+    width: '100%',
+    marginTop: '16px',
+    padding: '10px',
+    border: 'none',
+    borderRadius: '8px',
+    backgroundColor: '#4299e1',
+    color: '#ffffff',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+
+  message: {
+    textAlign: 'center',
+    padding: '60px 20px',
+    color: '#718096',
+    backgroundColor: '#ffffff',
+    borderRadius: '12px',
+  },
+
+  emptyIcon: {
+    fontSize: '48px',
+    marginBottom: '10px',
+  },
+
+  error: {
+    padding: '15px',
+    backgroundColor: '#fed7d7',
+    color: '#9b2c2c',
+    borderRadius: '8px',
+  },
+};
+
+export default RentedProperties;
