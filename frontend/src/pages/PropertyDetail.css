@@ -1,0 +1,795 @@
+/* ===== የቤት ዝርዝር ገፅ - ዘመናዊ ስሪት ===== */
+
+/* ===== ዋና መያዣ ===== */
+.property-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 30px 20px;
+  animation: propertyFadeIn 0.5s ease;
+}
+
+@keyframes propertyFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== የመመለሻ ቁልፍ ===== */
+.property-back-btn {
+  background: #e2e8f0;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.property-back-btn:hover {
+  background: #cbd5e0;
+  transform: translateX(-4px);
+}
+
+/* ===== ጫኛ ===== */
+.property-loading {
+  text-align: center;
+  font-size: 20px;
+  padding: 60px 20px;
+  color: #718096;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.property-loading-spinner {
+  display: inline-block;
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: propertySpin 0.8s linear infinite;
+}
+
+@keyframes propertySpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== ስህተት ===== */
+.property-error {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.property-error-icon {
+  font-size: 60px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.property-error-title {
+  font-size: 28px;
+  color: #e53e3e;
+  margin-bottom: 8px;
+}
+
+.property-error-desc {
+  color: #718096;
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+/* ===== ካርድ ===== */
+.property-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-wrap: wrap;
+}
+
+/* ===== የምስል ክፍል ===== */
+.property-image-section {
+  flex: 1;
+  min-width: 300px;
+  height: 500px;
+  max-height: 500px;
+  background: #edf2f7;
+  position: relative;
+}
+
+.property-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.property-no-image {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+  font-size: 24px;
+  color: #a0aec0;
+}
+
+@media (max-width: 700px) {
+  .property-image-section {
+    height: 320px;
+    max-height: 320px;
+  }
+}
+
+/* ===== የመረጃ ክፍል ===== */
+.property-info {
+  flex: 1;
+  min-width: 300px;
+  padding: 30px;
+}
+
+/* ===== ርእስ ===== */
+.property-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.property-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0;
+}
+
+.property-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ===== ባጅ ===== */
+.property-badge {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.property-badge-verified {
+  background: rgba(72, 187, 120, 0.15);
+  color: #38a169;
+}
+
+.property-badge-pending {
+  background: rgba(237, 137, 54, 0.15);
+  color: #ed8936;
+}
+
+/* ===== የተወዳጅ ቁልፍ ===== */
+.property-fav-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 4px 8px;
+  border-radius: 50%;
+}
+
+.property-fav-btn:hover {
+  transform: scale(1.15);
+}
+
+.property-fav-btn.active {
+  animation: favPop 0.3s ease;
+}
+
+@keyframes favPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+
+/* ===== መረጃ ===== */
+.property-location {
+  font-size: 18px;
+  color: #4a5568;
+  margin-bottom: 8px;
+}
+
+.property-price {
+  font-size: 32px;
+  font-weight: 700;
+  color: #2b6cb0;
+  margin-bottom: 4px;
+}
+
+.property-bedrooms {
+  font-size: 16px;
+  color: #4a5568;
+  margin-bottom: 16px;
+}
+
+.property-divider {
+  border-top: 1px solid #e2e8f0;
+  margin: 20px 0;
+}
+
+.property-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.property-description {
+  font-size: 16px;
+  color: #4a5568;
+  line-height: 1.8;
+}
+
+.property-landlord {
+  font-size: 16px;
+  color: #4a5568;
+  margin-bottom: 4px;
+}
+
+/* ===== የመገናኛ ክፍል ===== */
+.property-contact-section {
+  margin-top: 16px;
+}
+
+.property-contact-btn {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(72, 187, 120, 0.3);
+}
+
+.property-contact-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(72, 187, 120, 0.4);
+}
+
+.property-contact-info {
+  margin-top: 12px;
+  padding: 16px;
+  background: #f7fafc;
+  border-radius: 10px;
+  border-left: 4px solid #48bb78;
+}
+
+.property-contact-info p {
+  margin: 4px 0;
+  color: #2d3748;
+}
+
+.property-contact-info small {
+  color: #718096;
+}
+
+/* ===== የኪራይ ጥያቄ ክፍል ===== */
+.property-rent-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-radius: 12px;
+  border: 2px dashed #48bb78;
+}
+
+.property-rent-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(72, 187, 120, 0.35);
+}
+
+.property-rent-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(72, 187, 120, 0.5);
+}
+
+.property-rent-btn:active {
+  transform: scale(0.97);
+}
+
+.property-contact-section > .property-modal-btn-cancel {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.35);
+}
+
+.property-contact-section > .property-modal-btn-cancel:hover {
+  transform: translateY(-3px);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 8px 30px rgba(239, 68, 68, 0.5);
+}
+
+.property-contact-section > .property-modal-btn-cancel:active {
+  transform: scale(0.97);
+}
+
+.property-rent-info {
+  margin-top: 8px;
+  color: #22543d;
+  font-size: 14px;
+  text-align: center;
+}
+
+.property-rental-message {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.property-rental-message.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.property-rental-message.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ===== ሞዳል (Modal) ===== */
+.property-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.property-modal {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.property-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 4px;
+}
+
+.property-modal-subtitle {
+  color: #6b7280;
+  font-size: 15px;
+  margin-bottom: 20px;
+}
+
+.property-modal-subtitle strong {
+  color: #2d3748;
+}
+
+.property-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.property-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.property-modal-label {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 14px;
+}
+
+.property-modal-input {
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.property-modal-input:focus {
+  outline: none;
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.15);
+}
+
+.property-modal-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.property-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.property-modal-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.property-modal-btn-cancel {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.property-modal-btn-cancel:hover {
+  background: #cbd5e0;
+}
+
+.property-modal-btn-submit {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+  box-shadow: 0 4px 20px rgba(72, 187, 120, 0.3);
+}
+
+.property-modal-btn-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(72, 187, 120, 0.4);
+}
+
+.property-modal-btn-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* ===== ግምገማ ክፍል ===== */
+.property-reviews-section {
+  margin-top: 8px;
+}
+
+.property-reviews-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.property-review-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.property-review-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* ===== የግምገማ ቅጽ ===== */
+.property-review-form {
+  background: #f7fafc;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.property-rating {
+  margin-bottom: 12px;
+}
+
+.property-rating label {
+  display: block;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 6px;
+}
+
+.property-stars {
+  display: flex;
+  gap: 4px;
+}
+
+.property-star {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #a0aec0;
+}
+
+.property-star:hover {
+  transform: scale(1.15);
+}
+
+.property-star.active {
+  color: #f6ad55;
+}
+
+.property-review-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 16px;
+  min-height: 80px;
+  resize: vertical;
+  margin-bottom: 12px;
+  font-family: inherit;
+}
+
+.property-review-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+}
+
+.property-submit-review {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.property-submit-review:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* ===== የቀደሙ ግምገማዎች ===== */
+.property-reviews-list {
+  margin-top: 12px;
+}
+
+.property-no-reviews {
+  color: #718096;
+  font-size: 15px;
+  text-align: center;
+  padding: 16px;
+}
+
+.property-review-item {
+  background: #f7fafc;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.property-review-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.property-review-header strong {
+  color: #2d3748;
+}
+
+.property-review-rating {
+  color: #f6ad55;
+}
+
+.property-review-date {
+  color: #a0aec0;
+  font-size: 12px;
+}
+
+.property-review-comment {
+  color: #4a5568;
+  margin: 4px 0 0 0;
+}
+
+/* ===== ተዛማጅ አገናኝ ===== */
+.property-related {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.property-related-btn {
+  display: inline-block;
+  padding: 10px 24px;
+  background: #e2e8f0;
+  color: #4a5568;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.property-related-btn:hover {
+  background: #cbd5e0;
+  transform: translateY(-2px);
+}
+
+/* ===== ለሞባይል ===== */
+@media (max-width: 768px) {
+  .property-container {
+    padding: 16px;
+  }
+
+  .property-image-section {
+    max-height: 300px;
+  }
+
+  .property-info {
+    padding: 20px;
+  }
+
+  .property-title {
+    font-size: 22px;
+  }
+
+  .property-price {
+    font-size: 26px;
+  }
+
+  .property-header {
+    flex-direction: column;
+  }
+
+  .property-modal {
+    padding: 24px;
+  }
+
+  .property-modal-title {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .property-container {
+    padding: 12px;
+  }
+
+  .property-info {
+    padding: 16px;
+  }
+
+  .property-title {
+    font-size: 20px;
+  }
+
+  .property-price {
+    font-size: 22px;
+  }
+
+  .property-image-section {
+    max-height: 220px;
+  }
+
+  .property-modal {
+    padding: 20px;
+  }
+
+  .property-modal-actions {
+    flex-direction: column;
+  }
+
+  .property-rent-btn {
+    font-size: 16px;
+    padding: 12px;
+  }
+
+  .property-stars {
+    gap: 2px;
+  }
+
+  .property-star {
+    font-size: 24px;
+  }
+
+  .property-reviews-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .property-review-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+.property-landlord-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.property-landlord-photo,
+.property-landlord-photo-fallback {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.property-landlord-photo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e2e8f0;
+  font-size: 32px;
+}

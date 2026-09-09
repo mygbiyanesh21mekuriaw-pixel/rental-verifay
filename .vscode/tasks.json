@@ -1,0 +1,39 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start rental backend",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"start"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Start rental backend from backend",
+			"type": "shell",
+			"command": "Set-Location 'C:\\Users\\User\\rental-verification-portal\\backend'; npm start",
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "rental-backend",
+				"pattern": {
+					"regexp": "^$"
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^$",
+					"endsPattern": "Server running on port"
+				}
+			}
+		},
+		{
+			"label": "Start rental frontend from frontend",
+			"type": "shell",
+			"command": "Set-Location 'C:\\Users\\User\\rental-verification-portal\\frontend'; npm install; npm start",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}

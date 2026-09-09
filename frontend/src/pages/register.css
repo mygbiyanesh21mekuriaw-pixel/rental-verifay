@@ -1,0 +1,254 @@
+/* ===== የምዝገባ ገፅ ===== */
+
+.register-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.register-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 40px;
+  width: 100%;
+  max-width: 480px;
+  animation: slideUp 0.5s ease;
+}
+
+/* የእንቅስቃሴ (Animation) */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ርዕስ */
+.register-title {
+  text-align: center;
+  color: #2d3748;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.register-subtitle {
+  text-align: center;
+  color: #718096;
+  font-size: 14px;
+  margin-bottom: 30px;
+}
+
+/* የስህተት መልዕክት */
+.register-error {
+  background-color: #fed7d7;
+  color: #9b2c2c;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  border-left: 4px solid #e53e3e;
+}
+
+/* ቅጽ (Form) */
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* የእያንዳንዱ መስክ ክፍል */
+.register-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.register-label {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.register-label .required {
+  color: #e53e3e;
+  font-size: 16px;
+}
+
+/* የግቤት (Input) ቦታዎች */
+.register-input {
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background-color: #f7fafc;
+  color: #2d3748;
+}
+
+.register-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+  background-color: #ffffff;
+}
+
+.register-input::placeholder {
+  color: #a0aec0;
+  font-size: 14px;
+}
+
+/* የሚመረጥ (Select) */
+.register-select {
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 16px;
+  background-color: #f7fafc;
+  color: #2d3748;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234a5568' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+
+.register-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+}
+
+/* የመመዝገቢያ ቁልፍ */
+.register-button {
+  padding: 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+}
+
+.register-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.register-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.register-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* የግርጌ ጽሁፍ */
+.register-footer {
+  text-align: center;
+  margin-top: 24px;
+  color: #718096;
+  font-size: 15px;
+}
+
+.register-footer a {
+  color: #667eea;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.register-footer a:hover {
+  color: #5a67d8;
+  text-decoration: underline;
+}
+
+/* ===== ለሞባይል (Responsive) ===== */
+@media (max-width: 640px) {
+  .register-card {
+    padding: 24px;
+    border-radius: 16px;
+  }
+
+  .register-title {
+    font-size: 22px;
+  }
+
+  .register-input,
+  .register-select {
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+
+  .register-button {
+    font-size: 16px;
+    padding: 12px;
+  }
+}
+
+/* ===== የእንቅስቃሴ ማሳወቂያ (Loading Spinner) ===== */
+.register-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #ffffff;
+  animation: spin 0.8s ease-in-out infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== የስኬት መልዕክት ===== */
+.register-success {
+  background-color: #c6f6d5;
+  color: #22543d;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  border-left: 4px solid #48bb78;
+}
+
+/* ===== የመስክ አይነት ልዩነቶች ===== */
+.register-input[type="tel"] {
+  direction: ltr;
+}
+
+.register-input[type="password"] {
+  letter-spacing: 2px;
+}
+
+/* ===== ፎከስ ለሞባይል ===== */
+@media (max-width: 480px) {
+  .register-container {
+    padding: 10px;
+  }
+  
+  .register-card {
+    padding: 20px;
+  }
+}

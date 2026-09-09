@@ -1,0 +1,430 @@
+/* ===== የአጠቃላይ መተግበሪያ ስታይል ===== */
+
+/* ===== የገፅ መሠረታዊ ውቅር ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  background-color: #f7fafc;
+  color: #2d3748;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ===== የመተግበሪያ ዋና መያዣ ===== */
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== ዋና ይዘት (Main Content) ===== */
+.app-main {
+  flex: 1;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ===== የግርጌ (Footer) ===== */
+.app-footer {
+  background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+  color: #a0aec0;
+  text-align: center;
+  padding: 20px;
+  margin-top: 40px;
+  border-top: 3px solid #667eea;
+}
+
+.app-footer p {
+  font-size: 14px;
+  margin: 0;
+}
+
+.app-footer a {
+  color: #667eea;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: #a78bfa;
+  text-decoration: underline;
+}
+
+/* ===== የጫኛ (Loading) ስፒነር ===== */
+.app-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  font-size: 20px;
+  color: #718096;
+}
+
+.app-loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: appSpin 0.8s linear infinite;
+  margin-right: 16px;
+}
+
+@keyframes appSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ===== የገፅ ርዕሶች ===== */
+.app-page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.app-page-subtitle {
+  font-size: 16px;
+  color: #718096;
+  margin-bottom: 24px;
+}
+
+/* ===== የመልዕክት ሳጥኖች ===== */
+.app-alert {
+  padding: 16px 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: appSlideDown 0.3s ease;
+}
+
+@keyframes appSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-alert-success {
+  background-color: #c6f6d5;
+  color: #22543d;
+  border-left: 4px solid #48bb78;
+}
+
+.app-alert-error {
+  background-color: #fed7d7;
+  color: #9b2c2c;
+  border-left: 4px solid #e53e3e;
+}
+
+.app-alert-info {
+  background-color: #bee3f8;
+  color: #2a4365;
+  border-left: 4px solid #4299e1;
+}
+
+.app-alert-warning {
+  background-color: #feebc8;
+  color: #7b341e;
+  border-left: 4px solid #ed8936;
+}
+
+.app-alert-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+/* ===== የቁልፍ ዘይቤዎች ===== */
+.app-btn {
+  display: inline-block;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  text-align: center;
+}
+
+.app-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.app-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.app-btn-primary:hover {
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+}
+
+.app-btn-success {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+
+.app-btn-success:hover {
+  box-shadow: 0 4px 20px rgba(72, 187, 120, 0.4);
+}
+
+.app-btn-danger {
+  background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+  color: white;
+}
+
+.app-btn-danger:hover {
+  box-shadow: 0 4px 20px rgba(229, 62, 62, 0.4);
+}
+
+.app-btn-outline {
+  background: transparent;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.app-btn-outline:hover {
+  background: #667eea;
+  color: white;
+}
+
+.app-btn-sm {
+  padding: 6px 16px;
+  font-size: 14px;
+}
+
+.app-btn-lg {
+  padding: 14px 32px;
+  font-size: 18px;
+}
+
+/* ===== የካርድ ዘይቤ ===== */
+.app-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+  transition: box-shadow 0.3s ease;
+}
+
+.app-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+.app-card-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 8px;
+}
+
+.app-card-subtitle {
+  font-size: 14px;
+  color: #718096;
+  margin-bottom: 16px;
+}
+
+/* ===== የፍርግር (Grid) ዘይቤ ===== */
+.app-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.app-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.app-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.app-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* ===== የቅጽ (Form) ዘይቤ ===== */
+.app-form-group {
+  margin-bottom: 20px;
+}
+
+.app-form-label {
+  display: block;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.app-form-label .required {
+  color: #e53e3e;
+  margin-left: 4px;
+}
+
+.app-form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  background-color: #f7fafc;
+  color: #2d3748;
+}
+
+.app-form-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+  background-color: white;
+}
+
+.app-form-input::placeholder {
+  color: #a0aec0;
+}
+
+.app-form-textarea {
+  min-height: 120px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.app-form-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234a5568' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  cursor: pointer;
+}
+
+/* ===== ለሞባይል (Responsive) ===== */
+@media (max-width: 1024px) {
+  .app-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .app-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .app-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .app-main {
+    padding: 16px;
+  }
+  
+  .app-page-title {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-grid-4 {
+    grid-template-columns: 1fr;
+  }
+  
+  .app-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  
+  .app-main {
+    padding: 12px;
+  }
+  
+  .app-page-title {
+    font-size: 20px;
+  }
+  
+  .app-card {
+    padding: 16px;
+  }
+  
+  .app-btn {
+    padding: 8px 18px;
+    font-size: 14px;
+  }
+}
+
+/* ===== የተጠቃሚ ሚና ባጅ (Role Badge) ===== */
+.app-role-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.app-role-badge-landlord {
+  background: rgba(237, 137, 54, 0.15);
+  color: #ed8936;
+}
+
+.app-role-badge-admin {
+  background: rgba(229, 62, 62, 0.15);
+  color: #e53e3e;
+}
+
+.app-role-badge-tenant {
+  background: rgba(72, 187, 120, 0.15);
+  color: #48bb78;
+}
+
+/* ===== የማረጋገጫ ባጅ (Verification Badge) ===== */
+.app-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-verified-badge-true {
+  background: rgba(72, 187, 120, 0.15);
+  color: #38a169;
+}
+
+.app-verified-badge-false {
+  background: rgba(237, 137, 54, 0.15);
+  color: #ed8936;
+}
+
+/* ===== የስክሮል ባር ዘይቤ ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #edf2f7;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #667eea;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5a67d8;
+}
