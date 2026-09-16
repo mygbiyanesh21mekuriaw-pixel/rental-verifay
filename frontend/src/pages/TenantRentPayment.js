@@ -1,11 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import BackToDashboard from '../components/BackToDashboard';
 import './rentPayment.css';
 
-const formatStatus = (status) => status.charAt(0).toUpperCase() + status.slice(1);
+const formatStatus = (status) => {
+  const normalizedStatus = typeof status === 'string' && status.trim() ? status.trim() : 'pending';
+  return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
+};
 const PAYMENT_REQUEST_TIMEOUT_MS = 20000;
+const PAYMENT_RETURN_KEY = 'rentalVerifyPaymentReturn';
+const PAYMENT_SUCCESS_DELAY_SECONDS = 3;
+
+const getDefaultPaymentPeriod = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
 
 const readablePaymentMessage = (value, fallback) => {
   if (typeof value === 'string' && value.trim()) return value;
@@ -30,16 +42,33 @@ const readablePaymentMessage = (value, fallback) => {
 
 const TenantRentPayment = () => {
   const { propertyId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [context, setContext] = useState(null);
-  const [paymentPeriod, setPaymentPeriod] = useState('');
+  const [paymentPeriod, setPaymentPeriod] = useState(getDefaultPaymentPeriod);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [paymentReturnState, setPaymentReturnState] = useState(null);
+  const [returnCountdown, setReturnCountdown] = useState(PAYMENT_SUCCESS_DELAY_SECONDS);
 
   useEffect(() => {
     let cancelled = false;
     let refreshTimer;
+    let returnTimer;
+    let returnPollTimer;
+
+    const storedReturn = localStorage.getItem(PAYMENT_RETURN_KEY);
+    let paymentReturn = null;
+    try {
+      paymentReturn = storedReturn ? JSON.parse(storedReturn) : null;
+    } catch (parseError) {
+      localStorage.removeItem(PAYMENT_RETURN_KEY);
+    }
+
+    const isCurrentPaymentReturn = paymentReturn?.propertyId === propertyId;
+    if (!isCurrentPaymentReturn) setPaymentReturnState(null);
 
     const loadContext = async (showLoading = false) => {
       try {
@@ -49,8 +78,13 @@ const TenantRentPayment = () => {
           timeout: PAYMENT_REQUEST_TIMEOUT_MS,
         });
         if (cancelled) return null;
-        setContext(response.data);
-        return response.data;
+        const payload = {
+          ...response.data,
+          payments: Array.isArray(response.data.payments) ? response.data.payments : [],
+          currentPayment: response.data.currentPayment || response.data.latestPayment || response.data.payments?.[0] || null,
+        };
+        setContext(payload);
+        return payload;
       } catch (requestError) {
         if (cancelled) return null;
         setError(readablePaymentMessage(
@@ -63,8 +97,66 @@ const TenantRentPayment = () => {
       }
     };
 
+    const handleFocusRefresh = () => {
+      loadContext();
+    };
+
+    const finishPaymentReturn = (status) => {
+      if (cancelled) return;
+      setPaymentReturnState(status);
+      if (status === 'success') {
+        setReturnCountdown(PAYMENT_SUCCESS_DELAY_SECONDS);
+        let remaining = PAYMENT_SUCCESS_DELAY_SECONDS;
+        returnTimer = window.setInterval(() => {
+          remaining -= 1;
+          setReturnCountdown(remaining);
+          if (remaining <= 0) {
+            window.clearInterval(returnTimer);
+            localStorage.removeItem(PAYMENT_RETURN_KEY);
+            navigate(`/tenant/rent-payment/${propertyId}?payment=confirmed`, { replace: true });
+          }
+        }, 1000);
+      } else {
+        localStorage.removeItem(PAYMENT_RETURN_KEY);
+      }
+    };
+
+    const findReturnedPayment = (payload) => {
+      if (!paymentReturn?.paymentReference) return null;
+      return payload?.payments?.find((payment) => [
+        payment.paymentReference,
+        payment.providerReference,
+        payment.providerPaymentId,
+      ].filter(Boolean).includes(paymentReturn.paymentReference)) || null;
+    };
+
+    const pollReturnedPayment = async (attempt = 0) => {
+      if (!isCurrentPaymentReturn || cancelled) return;
+      const refreshedContext = await loadContext();
+      const returnedPayment = findReturnedPayment(refreshedContext);
+      if (returnedPayment?.status === 'paid') {
+        finishPaymentReturn('success');
+        return;
+      }
+      if (returnedPayment?.status === 'failed' || returnedPayment?.status === 'cancelled') {
+        setError(`Payment ${returnedPayment.status}.`);
+        finishPaymentReturn('failure');
+        return;
+      }
+      if (attempt >= 14) {
+        setError('Payment is still being confirmed. Please check the payment status again shortly.');
+        finishPaymentReturn('failure');
+        return;
+      }
+      returnPollTimer = window.setTimeout(() => pollReturnedPayment(attempt + 1), 1000);
+    };
+
     loadContext(true).then((initialContext) => {
-      if (cancelled || !initialContext?.payments?.some(payment => payment.status === 'pending')) return;
+      if (isCurrentPaymentReturn) {
+        pollReturnedPayment();
+      }
+      const pendingPayment = initialContext?.payments?.some(payment => payment.status === 'pending');
+      if (cancelled || !pendingPayment) return;
 
       let attempts = 0;
       refreshTimer = window.setInterval(async () => {
@@ -77,15 +169,22 @@ const TenantRentPayment = () => {
       }, 2000);
     });
 
+    window.addEventListener('focus', handleFocusRefresh);
+
     return () => {
       cancelled = true;
       if (refreshTimer) window.clearInterval(refreshTimer);
+      if (returnTimer) window.clearInterval(returnTimer);
+      if (returnPollTimer) window.clearTimeout(returnPollTimer);
+      window.removeEventListener('focus', handleFocusRefresh);
     };
-  }, [propertyId]);
+  }, [location.key, navigate, propertyId]);
 
   const submitPayment = async (event) => {
     event.preventDefault();
-    if (!paymentPeriod.trim() || submitting) return;
+    const normalizedPaymentPeriod = (paymentPeriod || '').trim() || getDefaultPaymentPeriod();
+    if (!normalizedPaymentPeriod || submitting) return;
+    setPaymentPeriod(normalizedPaymentPeriod);
     setSubmitting(true);
     setError('');
     setSuccess('');
@@ -93,12 +192,16 @@ const TenantRentPayment = () => {
       const token = localStorage.getItem('token');
       const response = await axios.post('http://localhost:5000/api/payments', {
         propertyId,
-        paymentPeriod: paymentPeriod.trim(),
+        paymentPeriod: normalizedPaymentPeriod,
       }, {
         headers: { Authorization: `Bearer ${token}` },
         timeout: PAYMENT_REQUEST_TIMEOUT_MS,
       });
       if (response.data.checkoutUrl) {
+        localStorage.setItem(PAYMENT_RETURN_KEY, JSON.stringify({
+          propertyId,
+          paymentReference: response.data.payment?.paymentReference,
+        }));
         window.location.assign(response.data.checkoutUrl);
         return;
       }
@@ -119,9 +222,15 @@ const TenantRentPayment = () => {
   if (error && !context) return <div className="payment-page payment-page-state"><p className="payment-error">{error}</p><BackToDashboard /></div>;
   if (!context) return <div className="payment-page-state">Loading rent payment details...</div>;
 
-  const latestPayment = context.payments[0];
+  const latestPayment = context.currentPayment || context.latestPayment || context.payments[0] || null;
   return (
     <div className="payment-page">
+      {paymentReturnState === 'success' && (
+        <div className="payment-return-success" role="status">
+          <strong>Payment Successful</strong>
+          <span>Your payment was completed successfully. Returning to your rented property in {returnCountdown} seconds...</span>
+        </div>
+      )}
       <div className="payment-page-header">
         <div>
           <p className="payment-eyebrow">Tenant payments</p>

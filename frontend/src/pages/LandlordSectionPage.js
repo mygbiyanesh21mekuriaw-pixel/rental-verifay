@@ -146,6 +146,9 @@ const LandlordSectionPage = ({ type }) => {
               </div>
               <p style={styles.cardLocation}>📍 {property.location}</p>
               <p style={styles.cardPrice}>💰 ETB {property.price.toLocaleString()}</p>
+              {type === 'rented' && property.rentedBy?.name && (
+                <p style={styles.cardLocation}>👤 Tenant: {property.rentedBy.name}</p>
+              )}
               {property.verificationDocument && (
                 <div style={styles.documentSection}>
                   <strong>📄 Proof of Ownership</strong>

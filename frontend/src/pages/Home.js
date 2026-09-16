@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import logo from '../logo.svg';
 import './home.css';
 
 const Home = () => {
@@ -11,12 +10,13 @@ const Home = () => {
     <div className="home-container">
       {/* ===== የራስ ገፅ (Hero) ===== */}
       <div className="home-hero">
-        <div className="home-logo-wrap" aria-label="RentalVerify logo">
+        <div className="home-logo-wrap" aria-label="MAU logo">
           <img
-            src={logo}
-            alt="RentalVerify logo"
+            src="/mekdela-amba-logo.jpeg"
+            alt="Mekdela Amba University logo"
             className="home-logo-image"
           />
+          <span className="home-logo-text">RentalVerify</span>
         </div>
 
         <h1 className="home-title">🏠 Rental Property Verification Portal</h1>

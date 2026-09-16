@@ -31,9 +31,11 @@ const uniqueProperties = (propertyList) => {
 
 const isApprovedRequest = (request) => request.status === 'approved' || request.status === 'confirmed';
 
-const isActiveRental = (request, userId) => isApprovedRequest(request)
+const isConfirmedRental = (request, userId) => ['approved', 'confirmed'].includes(request.status)
   && request.property?.availabilityStatus === 'rented'
   && String(request.property?.rentedBy) === String(userId);
+
+const isActiveRental = (request, userId) => isConfirmedRental(request, userId);
 
 const resolveAssetUrl = (assetPath) => {
   if (!assetPath || /^https?:\/\//i.test(assetPath)) return assetPath;
@@ -41,9 +43,13 @@ const resolveAssetUrl = (assetPath) => {
 };
 
 const displayRequestStatus = (status, isRented = false) => {
-  if (isRented && (status === 'approved' || status === 'confirmed')) return 'Rented';
-  if (status === 'approved' || status === 'confirmed') return 'Approved';
-  return status.charAt(0).toUpperCase() + status.slice(1);
+  const normalizedStatus = typeof status === 'string' && status.trim()
+    ? status.trim().toLowerCase()
+    : 'pending';
+
+  if (isRented && (normalizedStatus === 'approved' || normalizedStatus === 'confirmed')) return 'Rented';
+  if (normalizedStatus === 'approved' || normalizedStatus === 'confirmed') return 'Approved';
+  return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
 };
 
 const sectionConfig = {
@@ -121,7 +127,6 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
       const token = localStorage.getItem('token');
       const response = await axios.post('http://localhost:5000/api/messages/conversations/open', {
         propertyId: request.property?._id,
-        landlordId: request.landlord?._id,
       }, { headers: { Authorization: `Bearer ${token}` } });
       navigate(`/tenant/messages?conversationId=${response.data._id}`);
     } catch (error) {
@@ -181,7 +186,7 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
               </Link>
             );
           })()}
-          {showActiveRentalActions && isActiveRental(request, userId) && (
+          {showActiveRentalActions && isConfirmedRental(request, userId) && (
             <>
               <button type="button" className="tenant-request-message-btn" onClick={() => openMessage(request)} disabled={openingRequestId === request._id}>
                 {openingRequestId === request._id ? 'Opening...' : '✉️ Message Landlord'}

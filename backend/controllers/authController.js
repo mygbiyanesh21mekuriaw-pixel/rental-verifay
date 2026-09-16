@@ -2,6 +2,13 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createSystemLog } = require('./systemLogController');
+const { listChapaBanks } = require('../utils/payoutProvider');
+
+const maskAccountNumber = (value) => {
+  const accountNumber = String(value || '');
+  if (!accountNumber) return '';
+  return `${'*'.repeat(Math.max(0, accountNumber.length - 4))}${accountNumber.slice(-4)}`;
+};
 
 const serializeUser = (user) => ({
   id: user._id ? user._id.toString() : user.id,
@@ -10,6 +17,14 @@ const serializeUser = (user) => ({
   phone: user.phone || '',
   profilePhoto: user.profilePhoto || '',
   role: user.role,
+  adminType: user.role === 'admin'
+    ? user.adminType || (user.adminAreas?.length ? 'area' : 'platform')
+    : undefined,
+  adminAreas: user.role === 'admin' ? user.adminAreas || [] : undefined,
+  bankAccountName: user.role === 'landlord' ? user.bankAccountName || '' : undefined,
+  bankCode: user.role === 'landlord' ? user.bankCode || '' : undefined,
+  bankName: user.role === 'landlord' ? user.bankName || '' : undefined,
+  bankAccountMasked: user.role === 'landlord' ? maskAccountNumber(user.bankAccountNumber) : undefined,
 });
 
 // አዲስ ተጠቃሚ መመዝገብ
@@ -23,8 +38,8 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Name, email, password and role are required' });
     }
 
-    if (!['tenant', 'landlord', 'admin'].includes(role)) {
-      return res.status(400).json({ message: 'Role must be tenant, landlord or admin' });
+    if (!['tenant', 'landlord'].includes(role)) {
+      return res.status(400).json({ message: 'Public registration is limited to tenant or landlord accounts' });
     }
 
     if (password.length < 6) {
@@ -139,7 +154,7 @@ const getMe = async (req, res) => {
 // የተጠቃሚ መረጃ ማዘመን
 const updateProfile = async (req, res) => {
   try {
-    const { name, phone, profilePhoto } = req.body;
+    const { name, phone, profilePhoto, bankAccountName, bankAccountNumber, bankCode } = req.body;
     const userId = req.user.id;
 
     const user = await User.findById(userId);
@@ -150,6 +165,22 @@ const updateProfile = async (req, res) => {
     user.name = name || user.name;
     user.phone = phone || user.phone;
     user.profilePhoto = profilePhoto || user.profilePhoto;
+    if (user.role === 'landlord') {
+      if (bankAccountName !== undefined || bankAccountNumber !== undefined || bankCode !== undefined) {
+        if (!String(bankAccountName || '').trim() || !String(bankAccountNumber || '').trim() || !String(bankCode || '').trim()) {
+          return res.status(400).json({ message: 'Bank, account name and account number are required' });
+        }
+        const bankResult = await listChapaBanks();
+        const selectedBank = bankResult.banks.find((bank) => bank.code === String(bankCode).trim());
+        if (!bankResult.ok || !selectedBank) {
+          return res.status(400).json({ message: 'Select a valid Chapa-supported bank' });
+        }
+        user.bankAccountName = String(bankAccountName).trim();
+        user.bankAccountNumber = String(bankAccountNumber).trim();
+        user.bankCode = selectedBank.code;
+        user.bankName = selectedBank.name;
+      }
+    }
     await user.save();
 
     await createSystemLog({

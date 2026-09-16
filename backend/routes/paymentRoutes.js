@@ -6,9 +6,11 @@ const {
   getTenantPaymentContext,
   getLandlordPayments,
   chapaCallback,
+  getChapaBanks,
 } = require('../controllers/paymentController');
 
 router.post('/', auth, createPayment);
+router.get('/banks', auth, getChapaBanks);
 router.get('/callback/chapa', chapaCallback);
 router.post('/callback/chapa', chapaCallback);
 router.get('/tenant/property/:propertyId', auth, getTenantPaymentContext);

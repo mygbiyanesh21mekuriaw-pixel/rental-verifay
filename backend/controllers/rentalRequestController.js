@@ -102,201 +102,12 @@ const createRentRequest = async (req, res) => {
     }
 
     res.status(201).json({
-      message: '✅ Rental request submitted successfully! An admin will review it',
+      message: '✅ Rental request submitted successfully! The landlord will review it',
       rentRequest,
     });
   } catch (error) {
     console.error('Error creating rent request:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-// ===== ሁሉንም የኪራይ ጥያቄዎች ማግኘት (Admin ብቻ) =====
-const getAllRentRequests = async (req, res) => {
-  try {
-    const { status } = req.query;
-    
-    let filter = {};
-    if (status) {
-      filter.status = status;
-    }
-
-    const requests = await RentRequest.find(filter)
-      .populate('property', 'title location address price images availabilityStatus bedrooms')
-      .populate('tenant', 'name email phone')
-      .populate('landlord', 'name email phone')
-      .sort({ createdAt: -1 });
-
-    res.json(requests);
-  } catch (error) {
-    console.error('Error fetching rent requests:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// ===== የተወሰነ ጥያቄ ማግኘት =====
-const getRentRequestById = async (req, res) => {
-  try {
-    const request = await RentRequest.findById(req.params.id)
-      .populate('property', 'title location price images description address bedrooms rooms availabilityStatus')
-      .populate('tenant', 'name email phone')
-      .populate('landlord', 'name email phone');
-
-    if (!request) {
-      return res.status(404).json({ message: 'Request not found' });
-    }
-
-    res.json(request);
-  } catch (error) {
-    console.error('Error fetching rent request:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// ===== የኪራይ ጥያቄ ሁኔታ ማዘመን (Admin ብቻ) =====
-const updateRentRequestStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, adminComment } = req.body;
-    const approvedStatus = status === 'approved' || status === 'confirmed';
-
-    if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ message: 'Invalid rental request ID' });
-    }
-
-    const request = await RentRequest.findById(id)
-      .populate('property', 'title location price images availabilityStatus')
-      .populate('tenant', 'name email phone')
-      .populate('landlord', 'name email phone');
-
-    if (!request) {
-      return res.status(404).json({ message: 'Request not found' });
-    }
-
-    // ጊዜ ካለፈ አይቀየርም
-    if (request.expiresAt && new Date() > request.expiresAt && request.status === 'pending') {
-      request.status = 'expired';
-      await request.save();
-      return res.status(400).json({ 
-        message: 'This request has expired',
-        request 
-      });
-    }
-
-    if (!['approved', 'confirmed', 'rejected'].includes(status)) {
-      return res.status(400).json({ message: 'Status must be approved or rejected' });
-    }
-    if (request.status !== 'pending') {
-      return res.status(409).json({ message: 'Only pending requests can be reviewed' });
-    }
-    if (!request.tenant || !request.property) {
-      return res.status(409).json({ message: 'Rental request references missing user or property data' });
-    }
-
-    request.tenantName = request.tenantName || request.tenant.name;
-    request.tenantEmail = request.tenantEmail || request.tenant.email;
-    request.tenantPhone = request.tenantPhone || request.tenant.phone || '';
-
-    request.status = approvedStatus ? 'approved' : 'rejected';
-    if (adminComment) {
-      request.adminComment = adminComment;
-    }
-    request.reviewedBy = req.user.id;
-    request.reviewedAt = Date.now();
-    request.updatedAt = Date.now();
-
-    // ===== ለተከራይ ማሳወቂያ =====
-    let notificationMessage = '';
-    let notificationType = '';
-    let instructions = '';
-
-    if (approvedStatus) {
-      const property = await Property.findOneAndUpdate(
-        {
-          _id: request.property._id,
-          isVerified: true,
-          verificationStatus: 'approved',
-          availabilityStatus: { $in: ['available', null] },
-        },
-        {
-          availabilityStatus: 'rented',
-          rentedBy: request.tenant._id,
-          rentedAt: new Date(),
-        },
-        { new: true }
-      );
-      if (!property) {
-        return res.status(409).json({ message: 'This property has already been rented' });
-      }
-      notificationMessage = `Your rental request for "${request.property.title}" has been approved by the administrator.`;
-      notificationType = 'approved';
-      instructions = `
-📋 Rental instructions:
-1. 📞 Contact the landlord: ${request.landlord?.phone || 'No phone available'}
-2. 📧 Email: ${request.landlord?.email || 'No email available'}
-3. 📅 Confirm your move-in date
-4. 📝 Sign the rental agreement
-5. 💰 Make the initial payment
-      `;
-    } else if (status === 'rejected') {
-      notificationMessage = `Your rental request for "${request.property.title}" was rejected by the administrator.`;
-      notificationType = 'rejected';
-      instructions = `
-💡 Other options:
-1. 🔍 Search for other properties
-2. 📝 Submit a new request
-3. 📞 Contact us for more help
-      `;
-    }
-
-    await request.save();
-
-    // ===== ማሳወቂያ ወደ Notification Model ማስቀመጥ =====
-    if (notificationMessage) {
-      const notification = new Notification({
-        tenant: request.tenant._id,
-        property: request.property._id,
-        rentalRequest: request._id,
-        propertyTitle: request.property.title,
-        message: notificationMessage,
-        type: notificationType,
-        instructions: instructions,
-        read: false,
-      });
-      await notification.save();
-    }
-
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
-      action: approvedStatus ? 'RENTAL_REQUEST_APPROVED' : 'RENTAL_REQUEST_REJECTED',
-      description: approvedStatus
-        ? `Admin approved rental request for property "${request.property.title}".`
-        : `Admin rejected rental request for property "${request.property.title}".`,
-      property: request.property._id,
-      rentalRequest: request._id,
-      status: 'success',
-      ipAddress: req.ip || '',
-    });
-
-    res.json({
-      message: `Rental request status changed to "${status}"`,
-      notification: {
-        message: notificationMessage,
-        type: notificationType,
-        instructions: instructions,
-        propertyTitle: request.property.title,
-        landlord: {
-          name: request.landlord?.name,
-          phone: request.landlord?.phone,
-          email: request.landlord?.email,
-        },
-      },
-      request,
-    });
-  } catch (error) {
-    console.error('Error updating rent request:', error);
-    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -517,15 +328,10 @@ const getLandlordRentStats = async (req, res) => {
 
 module.exports = {
   createRentalRequest: createRentRequest,
-  getRentalRequests: getAllRentRequests,
   getMyRentalRequests: getMyRentRequests,
   getMyRentalRequestById,
   getLandlordRentalRequests: getLandlordRentRequests,
-  updateRentalRequestStatus: updateRentRequestStatus,
   createRentRequest,
-  getAllRentRequests,
-  getRentRequestById,
-  updateRentRequestStatus,
   getMyRentRequests,
   cleanExpiredRequests,
   getLandlordRentRequests,

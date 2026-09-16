@@ -7,7 +7,6 @@ import LandlordRequests from './LandlordRequests';
 import LandlordPayments from './LandlordPayments';
 import LandlordProfile from './LandlordProfile';
 import LandlordNotifications from './LandlordNotifications';
-import './landlordDashboard.css';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -41,7 +40,6 @@ export const landlordSidebarItems = [
   { key: 'rentalRequests', label: 'Rental Requests', icon: '📝', path: '/landlord/rental-requests' },
   { key: 'rented', label: 'Rented Properties', icon: '🏠', path: '/landlord/rented-properties' },
   { key: 'rentPayments', label: 'Rent Payments', icon: '💰', path: '/landlord/rent-payments' },
-  { key: 'messages', label: 'Messages', icon: '💬', path: '/landlord/messages' },
   { key: 'notifications', label: 'Notifications', icon: '🔔', path: '/landlord/notifications' },
   { key: 'profile', label: 'Profile', icon: '👤', path: '/landlord/profile' },
 ];
@@ -52,85 +50,92 @@ export const LandlordSidebar = ({ user, notificationCount = 0 }) => {
   const { logout } = useAuth();
 
   const getActiveKey = () => {
-    const match = landlordSidebarItems.find((item) => item.path === location.pathname);
-    return match ? match.key : 'myProperties';
+    const exactMatch = landlordSidebarItems.find((item) => {
+      if (item.path === location.pathname) return true;
+      if (item.path === '/landlord/add-property') {
+        return location.pathname.startsWith('/landlord/edit-property');
+      }
+      return false;
+    });
+
+    return exactMatch ? exactMatch.key : 'myProperties';
   };
 
   const activeSection = getActiveKey();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-slate-200 bg-white shadow-sm lg:shadow-md">
-      <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm">🏠</div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Workspace</p>
-          <h1 className="text-xl font-bold text-slate-900">RentalVerify</h1>
+    <aside className="fixed inset-y-0 left-0 z-40 flex w-[260px] translate-x-0 flex-col border-r border-slate-700 bg-slate-900 text-slate-200 shadow-lg">
+        <div className="flex items-center gap-3 border-b border-slate-700 px-5 py-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm">🏠</div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Workspace</p>
+            <h1 className="text-xl font-bold text-white">RentalVerify</h1>
+          </div>
         </div>
-      </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {landlordSidebarItems.map(({ key, label, icon, path }) => {
-          const isActive = activeSection === key;
-          const isNotifications = key === 'notifications';
+        <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4">
+          {landlordSidebarItems.map(({ key, label, icon, path }) => {
+            const isActive = activeSection === key;
+            const isNotifications = key === 'notifications';
 
-          return (
-            <Link
-              key={key}
-              to={path}
-              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200 ${
-                isActive
-                  ? 'bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-100'
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-base shadow-sm ring-1 ring-slate-200">
-                {icon}
-              </span>
-              <span className="flex-1 truncate">{label}</span>
-              {isNotifications && notificationCount > 0 && (
-                <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                  {notificationCount}
+            return (
+              <Link
+                key={key}
+                to={path}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-slate-800 text-white shadow-sm ring-1 ring-white/10'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-base shadow-sm ring-1 ring-slate-700">
+                  {icon}
                 </span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+                <span className="flex-1 truncate">{label}</span>
+                {isNotifications && notificationCount > 0 && (
+                  <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {notificationCount}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
 
-      <div className="border-t border-slate-200 p-4">
-        <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-bold text-slate-700">
-            {(user?.name || 'U').charAt(0).toUpperCase()}
+        <div className="border-t border-slate-700 p-4">
+          <div className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-slate-100">
+              {(user?.name || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-white">{user?.name || 'User'}</p>
+              <p className="truncate text-xs text-slate-400">{user?.email || 'user@example.com'}</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">👤 Landlord</p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-900">{user?.name || 'User'}</p>
-            <p className="truncate text-xs text-slate-500">{user?.email || 'user@example.com'}</p>
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">👤 Landlord</p>
-          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              navigate('/', { replace: true });
+            }}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+          >
+            <span>🚪</span>
+            <span>Logout</span>
+          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            logout();
-            navigate('/', { replace: true });
-          }}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100"
-        >
-          <span>🚪</span>
-          <span>Logout</span>
-        </button>
-      </div>
     </aside>
   );
 };
 
 export const LandlordLayout = ({ children, user = null, notificationCount = 0 }) => (
   <div className="min-h-screen bg-slate-50 text-slate-900">
-    <div className="lg:pl-72">
+    <div className="pl-[260px]">
       <LandlordSidebar user={user} notificationCount={notificationCount} />
       <main className="min-h-screen px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-        {children}
+        <div className="mx-auto max-w-[1440px]">{children}</div>
       </main>
     </div>
   </div>
@@ -503,28 +508,28 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
 
     return (
       <div className="space-y-6">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900">Landlord Dashboard</h2>
-          <p className="text-base text-slate-600">Welcome back, {user?.name || 'Landlord'}.</p>
+        <div className="flex flex-col gap-2 pb-1">
+          <h2 className="text-[32px] font-bold tracking-tight text-slate-900">Landlord Dashboard</h2>
+          <p className="text-base font-medium text-slate-600">Welcome back, {user?.name || 'Landlord'}.</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map((card) => (
             <button
               key={card.key}
               type="button"
-              className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+              className="group h-full min-h-[170px] rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
               onClick={() => {
                 setActiveSection(card.key);
                 navigate(card.path);
               }}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
+              <div className="flex h-full items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 flex-col justify-between">
                   <p className="text-sm font-medium text-slate-500">{card.label}</p>
-                  <p className="mt-3 text-3xl font-bold text-slate-900">{card.value}</p>
+                  <p className="mt-5 text-3xl font-bold tracking-tight text-slate-900">{card.value}</p>
                 </div>
-                <span className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${card.accent}`}>
+                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl shadow-sm ring-1 ring-slate-200 ${card.accent}`}>
                   {card.icon}
                 </span>
               </div>

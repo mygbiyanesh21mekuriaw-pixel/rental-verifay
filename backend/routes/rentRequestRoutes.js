@@ -4,17 +4,15 @@ const router = express.Router();
 
 const {
   createRentalRequest,
-  getRentalRequests,
   getMyRentalRequests,
   getMyRentalRequestById,
   getLandlordRentalRequests,
   getRentRequestForLandlord,
   getLandlordRentStats,
   landlordRespondToRequest,
-  updateRentalRequestStatus,
 } = require('../controllers/rentalRequestController');
 
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 
 // =====================================================
 // TENANT
@@ -134,26 +132,6 @@ router.put(
     next();
   },
   landlordRespondToRequest
-);
-
-// =====================================================
-// ADMIN
-// =====================================================
-
-// Get all rental requests
-router.get(
-  '/all',
-  auth,
-  adminOnly,
-  getRentalRequests
-);
-
-// Admin approve / reject rental request
-router.put(
-  '/:id/status',
-  auth,
-  adminOnly,
-  updateRentalRequestStatus
 );
 
 module.exports = router;

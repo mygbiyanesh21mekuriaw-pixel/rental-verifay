@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 // ተጠቃሚው መግቢያ መሆኑን ያረጋግጣል
 const auth = (req, res, next) => {
@@ -37,6 +38,24 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+const platformAdminOnly = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+    const user = await User.findById(req.user.id).select('role adminType adminAreas');
+    const isPlatformAdmin = user && user.role === 'admin' && (
+      user.adminType === 'platform' || (!user.adminType && (!user.adminAreas || user.adminAreas.length === 0))
+    );
+    if (!isPlatformAdmin) {
+      return res.status(403).json({ message: 'Platform Admin permission required.' });
+    }
+    next();
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to verify platform admin permission' });
+  }
+};
+
 // Landlord ብቻ መሆኑን ያረጋግጣል
 const landlordOnly = (req, res, next) => {
   if (req.user.role !== 'landlord' && req.user.role !== 'admin') {
@@ -52,4 +71,4 @@ const landlordCreateOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { auth, optionalAuth, adminOnly, landlordOnly, landlordCreateOnly };
+module.exports = { auth, optionalAuth, adminOnly, platformAdminOnly, landlordOnly, landlordCreateOnly };

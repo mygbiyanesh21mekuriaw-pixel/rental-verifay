@@ -9,7 +9,6 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -37,8 +36,6 @@ const Navbar = () => {
     navigate('/');
   };
 
-  const closeMenu = () => setMenuOpen(false);
-
   const getInitial = (name) => {
     return name?.charAt(0).toUpperCase() || '?';
   };
@@ -60,6 +57,8 @@ const Navbar = () => {
     return null;
   }
 
+  const isPlatformAdmin = user?.role === 'admin' && (user?.adminType === 'platform' || !user?.adminType);
+
   const sidebarLinks = user?.role === 'tenant'
     ? [
         ['📊', 'Dashboard', '/tenant-dashboard'],
@@ -75,8 +74,8 @@ const Navbar = () => {
           ['⚙️', 'Dashboard', '/admin-dashboard'],
           ['🏠', 'Properties', '/admin-dashboard/all-properties'],
           ['✅', 'Pending Verification', '/admin-dashboard/pending'],
-          ['📝', 'Rental Requests', '/admin-dashboard/rental-requests'],
-          ['👥', 'Users', '/admin-dashboard/all-users'],
+          ['', 'Users', '/admin-dashboard/all-users'],
+          ...(isPlatformAdmin ? [['🛡️', 'Admin Management', '/admin-dashboard/admin-management']] : []),
           ['🔔', 'Notifications', '/admin-dashboard/notifications'],
           ['📊', 'Analytics', '/admin-dashboard/analytics'],
           ['❌', 'Rejected', '/admin-dashboard/rejected'],
@@ -86,21 +85,15 @@ const Navbar = () => {
         ];
 
   return (
-    <nav className={`navbar ${user ? 'navbar-authenticated' : ''} ${menuOpen ? 'menu-open' : ''}`}>
+    <nav className={`navbar ${user ? 'navbar-authenticated' : ''}`}>
       <div className="navbar-container">
-        {user && (
-          <button
-            type="button"
-            className="navbar-mobile-toggle"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-label="Toggle navigation"
-          >
-            {menuOpen ? '×' : '☰'}
-          </button>
-        )}
         {/* ===== ሎጎ ===== */}
-        <Link to="/" className="navbar-logo" onClick={closeMenu}>
-          <span className="navbar-logo-icon">🏠</span>
+        <Link to="/" className="navbar-logo">
+          <img
+            src="/mekdela-amba-logo.jpeg"
+            alt="Mekdela Amba University logo"
+            className="navbar-logo-image"
+          />
           <span className="navbar-logo-text">RentalVerify</span>
         </Link>
 
@@ -111,7 +104,6 @@ const Navbar = () => {
               <Link 
                 to="/" 
                 className={`navbar-link ${location.pathname === '/' ? 'active' : ''}`}
-                onClick={closeMenu}
               >
                 🏠 Home
               </Link>
@@ -119,7 +111,6 @@ const Navbar = () => {
               <Link 
                 to="/about" 
                 className={`navbar-link ${location.pathname === '/about' ? 'active' : ''}`}
-                onClick={closeMenu}
               >
                 ℹ️ About Us
               </Link>
@@ -127,7 +118,6 @@ const Navbar = () => {
               <Link 
                 to="/contact" 
                 className={`navbar-link ${location.pathname === '/contact' ? 'active' : ''}`}
-                onClick={closeMenu}
               >
                 📞 Contact Us
               </Link>
@@ -135,14 +125,12 @@ const Navbar = () => {
               <Link 
                 to="/login" 
                 className={`navbar-link ${location.pathname === '/login' ? 'active' : ''}`}
-                onClick={closeMenu}
               >
                 🔐 Login
               </Link>
               <Link 
                 to="/register" 
                 className="navbar-link navbar-register-btn"
-                onClick={closeMenu}
               >
                 ✍️ Register
               </Link>
@@ -161,7 +149,6 @@ const Navbar = () => {
                         key={path}
                         to={path}
                         className={`navbar-link ${location.pathname === path ? 'active' : ''}`}
-                        onClick={closeMenu}
                       >
                         <span aria-hidden="true">{icon}</span> {label}
                         {isNotificationsItem && unreadCount > 0 && (
