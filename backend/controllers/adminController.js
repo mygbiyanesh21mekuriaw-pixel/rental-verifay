@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const Property = require('../models/Property');
 const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
@@ -30,6 +31,116 @@ const buildTrendSeries = (records, key = 'month') => {
       value: entry.count,
     }))
     .sort((left, right) => (left.label || '').localeCompare(right.label || ''));
+};
+
+const adminAreaFields = ['region', 'zone', 'wereda', 'city', 'subCity'];
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getAdminAreas = async (adminId) => {
+  const admin = await User.findById(adminId).select('adminAreas').lean();
+  return (admin?.adminAreas || []).filter((area) =>
+    adminAreaFields.some((field) => String(area?.[field] || '').trim())
+  );
+};
+
+const buildAdminAreaQuery = (areas) => ({
+  $or: areas.map((area) => ({
+    $and: adminAreaFields
+      .filter((field) => String(area?.[field] || '').trim())
+      .map((field) => ({
+        [field]: new RegExp(`^${escapeRegex(String(area[field]).trim())}$`, 'i'),
+      })),
+  })),
+});
+
+const applyAdminAreaScope = async (adminId, filter = {}) => {
+  const areas = await getAdminAreas(adminId);
+  if (areas.length === 0) return filter;
+
+  return {
+    ...filter,
+    $and: [
+      ...(filter.$and || []),
+      buildAdminAreaQuery(areas),
+    ],
+  };
+};
+
+const propertyMatchesAdminAreas = (property, areas) => {
+  if (areas.length === 0) return true;
+  return areas.some((area) => adminAreaFields
+    .filter((field) => String(area?.[field] || '').trim())
+    .every((field) => String(property[field] || '').trim().toLowerCase() === String(area[field]).trim().toLowerCase()));
+};
+
+const normalizeAdminAreas = (areas) => {
+  if (!Array.isArray(areas)) return null;
+
+  return areas
+    .filter((area) => area && typeof area === 'object')
+    .map((area) => Object.fromEntries(
+      adminAreaFields.map((field) => [field, String(area[field] || '').trim()])
+    ))
+    .filter((area) => adminAreaFields.some((field) => area[field]));
+};
+
+const adminRegionValues = new Set(['Addis Ababa', 'amhara', 'oromiya']);
+
+const normalizeAreaAdminFields = (adminAreas) => {
+  const normalizedAreas = normalizeAdminAreas(adminAreas);
+  if (!normalizedAreas || normalizedAreas.length !== 1) return null;
+
+  const [area] = normalizedAreas;
+  if (!area.region || !adminRegionValues.has(area.region)
+    || adminAreaFields.some((field) => field !== 'region' && area[field])) {
+    return null;
+  }
+
+  return [{ region: area.region }];
+};
+
+const createAdminAccount = async (req, res) => {
+  try {
+    const { name, email, phone, password, adminType = 'area', adminAreas = [] } = req.body;
+    const normalizedName = String(name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    if (!normalizedName || !normalizedEmail || !password) {
+      return res.status(400).json({ message: 'Name, email and password are required' });
+    }
+    if (!['platform', 'area'].includes(adminType)) {
+      return res.status(400).json({ message: 'Admin type must be platform or area' });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const normalizedAreas = normalizeAdminAreas(adminAreas);
+    if (adminType === 'area' && (!normalizedAreas || normalizedAreas.length === 0)) {
+      return res.status(400).json({ message: 'At least one assigned area is required for an area admin' });
+    }
+
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      return res.status(409).json({ message: 'A user with this email already exists' });
+    }
+
+    const admin = await User.create({
+      name: normalizedName,
+      email: normalizedEmail,
+      phone: String(phone || '').trim(),
+      password: await bcrypt.hash(String(password), 10),
+      role: 'admin',
+      adminType,
+      adminAreas: adminType === 'area' ? normalizedAreas : [],
+    });
+
+    const safeAdmin = admin.toObject();
+    delete safeAdmin.password;
+    res.status(201).json({ message: 'Admin account created successfully', user: safeAdmin });
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to create admin account' });
+  }
 };
 
 const getAdminAnalyticsSnapshot = async () => {
@@ -195,10 +306,12 @@ const getAdminAnalyticsSnapshot = async () => {
 // ያልተረጋገጡ ንብረቶችን ማግኘት
 const getPendingProperties = async (req, res) => {
   try {
-    const pendingProperties = await Property.find({
+    const filter = await applyAdminAreaScope(req.user.id, {
       verificationStatus: 'pending',
       isVerified: false,
-    }).populate('landlord', 'name email phone profilePhoto role');
+    });
+    const pendingProperties = await Property.find(filter)
+      .populate('landlord', 'name email phone profilePhoto role');
 
     res.json(pendingProperties);
   } catch (error) {
@@ -213,11 +326,12 @@ const getAdminProperties = async (req, res) => {
     const allowedStatuses = ['all', 'approved', 'pending', 'rejected'];
     const requestedStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
     const status = allowedStatuses.includes(requestedStatus) ? requestedStatus : 'all';
-    const filter = status === 'all'
+    let filter = status === 'all'
       ? {}
       : status === 'approved'
         ? { verificationStatus: 'approved', isVerified: true }
         : { verificationStatus: status, isVerified: false };
+    filter = await applyAdminAreaScope(req.user.id, filter);
     const properties = await Property.find(filter)
       .sort({ createdAt: -1 })
       .lean();
@@ -288,6 +402,11 @@ const verifyProperty = async (req, res) => {
       return res.status(404).json({ message: 'Property not found' });
     }
 
+    const adminAreas = await getAdminAreas(req.user.id);
+    if (!propertyMatchesAdminAreas(property, adminAreas)) {
+      return res.status(403).json({ message: 'This property is outside your assigned admin area' });
+    }
+
     property.isVerified = true;
     property.verificationStatus = 'approved';
     property.availabilityStatus = property.availabilityStatus || 'available';
@@ -338,6 +457,11 @@ const rejectProperty = async (req, res) => {
     
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
+    }
+
+    const adminAreas = await getAdminAreas(req.user.id);
+    if (!propertyMatchesAdminAreas(property, adminAreas)) {
+      return res.status(403).json({ message: 'This property is outside your assigned admin area' });
     }
 
     property.isVerified = false;
@@ -464,7 +588,7 @@ const deleteUser = async (req, res) => {
 const changeUserRole = async (req, res) => {
   try {
     const { id } = req.params;
-    const { role } = req.body;
+    const { role, adminAreas, adminType } = req.body;
 
     if (!['tenant', 'landlord', 'admin'].includes(role)) {
       return res.status(400).json({ message: 'Unknown role' });
@@ -476,11 +600,86 @@ const changeUserRole = async (req, res) => {
     }
 
     user.role = role;
+    if (role === 'admin' && adminAreas !== undefined) {
+      const normalizedAreas = normalizeAdminAreas(adminAreas);
+      if (!normalizedAreas) {
+        return res.status(400).json({ message: 'adminAreas must be an array of area objects' });
+      }
+      user.adminAreas = normalizedAreas;
+      user.adminType = adminType || (normalizedAreas.length > 0 ? 'area' : 'platform');
+    } else if (role === 'admin' && adminType !== undefined) {
+      if (!['platform', 'area'].includes(adminType)) {
+        return res.status(400).json({ message: 'Admin type must be platform or area' });
+      }
+      user.adminType = adminType;
+    } else if (role !== 'admin') {
+      user.adminAreas = [];
+      user.adminType = undefined;
+    }
     await user.save();
 
-    res.json({ message: 'Role changed successfully', user });
+    const safeUser = user.toObject();
+    delete safeUser.password;
+    res.json({ message: 'Role changed successfully', user: safeUser });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateAreaAdminAccount = async (req, res) => {
+  try {
+    const { name, email, phone, adminAreas } = req.body;
+    const normalizedName = String(name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedAreas = normalizeAreaAdminFields(adminAreas);
+
+    if (!normalizedName || !normalizedEmail || !normalizedAreas) {
+      return res.status(400).json({ message: 'Name, email and one valid assigned area are required' });
+    }
+
+    const admin = await User.findById(req.params.id);
+    if (!admin) return res.status(404).json({ message: 'Area Admin not found' });
+    if (admin.role !== 'admin' || admin.adminType !== 'area') {
+      return res.status(403).json({ message: 'Only Area Admin accounts can be edited here' });
+    }
+
+    const existingUser = await User.findOne({ email: normalizedEmail, _id: { $ne: admin._id } });
+    if (existingUser) return res.status(409).json({ message: 'A user with this email already exists' });
+
+    admin.set({
+      name: normalizedName,
+      email: normalizedEmail,
+      phone: String(phone || '').trim(),
+      role: 'admin',
+      adminType: 'area',
+      adminAreas: normalizedAreas,
+    });
+    await admin.save();
+
+    const safeAdmin = admin.toObject();
+    delete safeAdmin.password;
+    res.json({ message: 'Area Admin updated successfully', user: safeAdmin });
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to update Area Admin' });
+  }
+};
+
+const deleteAreaAdminAccount = async (req, res) => {
+  try {
+    if (req.params.id === req.user.id) {
+      return res.status(403).json({ message: 'The Platform Admin cannot be deleted here' });
+    }
+
+    const admin = await User.findById(req.params.id).select('name email role adminType');
+    if (!admin) return res.status(404).json({ message: 'Area Admin not found' });
+    if (admin.role !== 'admin' || admin.adminType !== 'area') {
+      return res.status(403).json({ message: 'Only Area Admin accounts can be deleted here' });
+    }
+
+    await User.deleteOne({ _id: admin._id });
+    res.json({ message: 'Area Admin deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to delete Area Admin' });
   }
 };
 
@@ -494,4 +693,7 @@ module.exports = {
   getAnalytics,
   deleteUser,
   changeUserRole,
+  createAdminAccount,
+  updateAreaAdminAccount,
+  deleteAreaAdminAccount,
 };

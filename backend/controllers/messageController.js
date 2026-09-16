@@ -8,29 +8,45 @@ const conversationView = (query) => query
   .populate('property', 'title location');
 
 const canUseConversation = async (conversation) => {
+  const propertyId = conversation.property?._id || conversation.property;
+  const tenantId = conversation.tenant?._id || conversation.tenant;
+  const landlordId = conversation.landlord?._id || conversation.landlord;
   const property = await Property.findOne({
-    _id: conversation.property,
+    _id: propertyId,
     availabilityStatus: 'rented',
-    rentedBy: conversation.tenant,
+    rentedBy: tenantId,
   }).select('_id landlord');
-  return property && String(property.landlord) === String(conversation.landlord);
+  return property && String(property.landlord) === String(landlordId);
 };
 
 const openConversation = async (req, res) => {
   try {
-    const { propertyId, landlordId } = req.body;
+    const { propertyId } = req.body;
+    const property = await Property.findOne({
+      _id: propertyId,
+      availabilityStatus: 'rented',
+      rentedBy: req.user.id,
+    }).select('_id landlord');
     const request = await RentalRequest.findOne({
       property: propertyId,
       tenant: req.user.id,
-      landlord: landlordId,
       status: { $in: ['approved', 'confirmed'] },
     });
-    const property = await Property.findOne({ _id: propertyId, availabilityStatus: 'rented', rentedBy: req.user.id });
-    if (!request || !property) return res.status(403).json({ message: 'Messaging is available for rented properties only' });
+    if (!request || !property || String(request.landlord) !== String(property.landlord)) {
+      return res.status(403).json({ message: 'Messaging is available for rented properties only' });
+    }
 
-    let conversation = await Conversation.findOne({ tenant: req.user.id, landlord: landlordId, property: propertyId });
+    let conversation = await Conversation.findOne({
+      tenant: req.user.id,
+      landlord: property.landlord,
+      property: propertyId,
+    });
     if (!conversation) {
-      conversation = await Conversation.create({ tenant: req.user.id, landlord: landlordId, property: propertyId });
+      conversation = await Conversation.create({
+        tenant: req.user.id,
+        landlord: property.landlord,
+        property: propertyId,
+      });
     }
     conversation = await conversationView(Conversation.findById(conversation._id));
     res.json(conversation);
@@ -103,7 +119,24 @@ const sendAdminMessage = async (req, res) => {
 const getLandlordConversations = async (req, res) => {
   try {
     const conversations = await conversationView(Conversation.find({ landlord: req.user.id }).sort({ updatedAt: -1 }));
-    res.json(conversations);
+    const validConversations = [];
+    for (const conversation of conversations) {
+      if (await canUseConversation(conversation)) validConversations.push(conversation);
+    }
+    res.json(validConversations);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getTenantConversations = async (req, res) => {
+  try {
+    const conversations = await conversationView(Conversation.find({ tenant: req.user.id }).sort({ updatedAt: -1 }));
+    const validConversations = [];
+    for (const conversation of conversations) {
+      if (await canUseConversation(conversation)) validConversations.push(conversation);
+    }
+    res.json(validConversations);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -125,5 +158,6 @@ module.exports = {
   sendMessage,
   sendAdminMessage,
   getLandlordConversations,
+  getTenantConversations,
   getAdminConversations,
 };

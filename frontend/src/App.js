@@ -15,7 +15,6 @@ import LandlordSectionPage from './pages/LandlordSectionPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminAnalytics from './pages/AdminAnalytics';
 import AdminSectionPage from './pages/AdminSectionPage';
-import AdminRentalRequestDetail from './pages/AdminRentalRequestDetail';
 import AdminNotifications from './pages/AdminNotifications';
 import AdminMessages from './pages/AdminMessages';
 import PropertyDetail from './pages/PropertyDetail';
@@ -285,15 +284,14 @@ function App() {
             <Route path="/admin-dashboard/pending" element={<PrivateRoute allowedRoles={['admin']}><AdminSectionPage type="pending" /></PrivateRoute>} />
             <Route path="/admin-dashboard/verified" element={<PrivateRoute allowedRoles={['admin']}><AdminSectionPage type="verified" /></PrivateRoute>} />
             <Route path="/admin-dashboard/rejected" element={<PrivateRoute allowedRoles={['admin']}><AdminSectionPage type="rejected" /></PrivateRoute>} />
-            <Route path="/admin-dashboard/rental-requests" element={<PrivateRoute allowedRoles={['admin']}><AdminSectionPage type="rentalRequests" /></PrivateRoute>} />
-            <Route path="/admin-dashboard/rental-requests/:requestId" element={<PrivateRoute allowedRoles={['admin']}><AdminRentalRequestDetail /></PrivateRoute>} />
             <Route path="/admin-dashboard/notifications" element={<PrivateRoute allowedRoles={['admin']}><AdminNotifications /></PrivateRoute>} />
             <Route path="/admin-dashboard/messages" element={<PrivateRoute allowedRoles={['admin']}><AdminMessages /></PrivateRoute>} />
             <Route path="/admin-dashboard/system-logs" element={<PrivateRoute allowedRoles={['admin']}><AdminSystemLogs /></PrivateRoute>} />
-            <Route path="/admin-dashboard/open" element={<PrivateRoute allowedRoles={['admin']}><Navigate to="/admin-dashboard/rental-requests" replace /></PrivateRoute>} />
+            <Route path="/admin-dashboard/open" element={<PrivateRoute allowedRoles={['admin']}><Navigate to="/admin-dashboard" replace /></PrivateRoute>} />
             <Route path="/admin-dashboard/properties-awaiting-verification" element={<PrivateRoute allowedRoles={['admin']}><AdminSectionPage type="awaitingVerification" /></PrivateRoute>} />
             <Route path="/admin-dashboard/all-properties" element={<PrivateRoute allowedRoles={['admin']}><AdminSectionPage type="allProperties" /></PrivateRoute>} />
             <Route path="/admin-dashboard/all-users" element={<PrivateRoute allowedRoles={['admin']}><AdminSectionPage type="allUsers" /></PrivateRoute>} />
+            <Route path="/admin-dashboard/admin-management" element={<PrivateRoute allowedRoles={['admin']}><AdminSectionPage type="adminManagement" /></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

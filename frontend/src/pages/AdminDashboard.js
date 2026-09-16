@@ -5,6 +5,7 @@ import './adminDashboard.css';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const adminLabel = user?.adminType === 'area' ? 'Area Admin' : 'Platform Admin';
 
   return (
     <div className="admin-container">
@@ -15,7 +16,7 @@ const AdminDashboard = () => {
               <span className="admin-title-icon">⚙️</span>
               <span className="admin-title-gradient">Admin Dashboard</span>
             </h1>
-            <p className="admin-subtitle">Welcome to the Admin Dashboard, <strong>{user?.name}</strong>!</p>
+            <p className="admin-subtitle">Welcome to the Admin Dashboard, <strong>{user?.name}</strong> ({adminLabel})!</p>
           </div>
         </div>
       </div>

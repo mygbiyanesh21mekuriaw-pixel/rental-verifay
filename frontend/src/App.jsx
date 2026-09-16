@@ -18,7 +18,6 @@ import LandlordDashboard from './pages/LandlordDashboard';
 import LandlordSectionPage from './pages/LandlordSectionPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminSectionPage from './pages/AdminSectionPage';
-import AdminRentalRequestDetail from './pages/AdminRentalRequestDetail';
 import AdminNotifications from './pages/AdminNotifications';
 import AdminMessages from './pages/AdminMessages';
 import PropertyDetail from './pages/PropertyDetail';
@@ -451,24 +450,6 @@ return ( <div className="app"> <Router> <Navbar />
         />
 
         <Route
-          path="/admin-dashboard/rental-requests"
-          element={
-            <PrivateRoute allowedRoles={['admin']}>
-              <AdminSectionPage type="rentalRequests" />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
-          path="/admin-dashboard/rental-requests/:requestId"
-          element={
-            <PrivateRoute allowedRoles={['admin']}>
-              <AdminRentalRequestDetail />
-            </PrivateRoute>
-          }
-        />
-
-        <Route
           path="/admin-dashboard/notifications"
           element={
             <PrivateRoute allowedRoles={['admin']}>
@@ -491,7 +472,7 @@ return ( <div className="app"> <Router> <Navbar />
           element={
             <PrivateRoute allowedRoles={['admin']}>
               <Navigate
-                to="/admin-dashboard/rental-requests"
+                to="/admin-dashboard"
                 replace
               />
             </PrivateRoute>
@@ -523,6 +504,15 @@ return ( <div className="app"> <Router> <Navbar />
           element={
             <PrivateRoute allowedRoles={['admin']}>
               <AdminSectionPage type="allUsers" />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/admin-dashboard/admin-management"
+          element={
+            <PrivateRoute allowedRoles={['admin']}>
+              <AdminSectionPage type="adminManagement" />
             </PrivateRoute>
           }
         />

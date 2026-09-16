@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import BackToDashboard from '../components/BackToDashboard';
@@ -8,6 +8,7 @@ import './TenantDashboard.css';
 const TenantMessages = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const conversationId = searchParams.get('conversationId');
   const [conversation, setConversation] = useState(null);
   const [body, setBody] = useState('');
@@ -16,14 +17,12 @@ const TenantMessages = () => {
   const [error, setError] = useState('');
 
   const loadConversation = useCallback(async () => {
-    if (!conversationId) {
-      setError('No conversation selected.');
-      setLoading(false);
-      return;
-    }
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/messages/conversations/${conversationId}`, {
+      const endpoint = conversationId
+        ? `http://localhost:5000/api/messages/conversations/${conversationId}`
+        : 'http://localhost:5000/api/messages/tenant/conversations';
+      const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setConversation(response.data);
@@ -36,8 +35,12 @@ const TenantMessages = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (!conversationId) {
+      navigate('/tenant/rented-property', { replace: true });
+      return;
+    }
     loadConversation();
-  }, [loadConversation]);
+  }, [conversationId, loadConversation, navigate]);
 
   const sendMessage = async (event) => {
     event.preventDefault();

@@ -139,10 +139,6 @@ body {
   transform: none;
 }
 
-.navbar-mobile-toggle {
-  display: none;
-}
-
 .navbar:not(.navbar-authenticated) {
   position: sticky;
   top: 0;
@@ -199,70 +195,6 @@ body {
 @keyframes rv-enter {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@media (max-width: 900px) {
-  .navbar-authenticated {
-    width: 100%;
-    height: 68px;
-    inset: 0 0 auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--rv-border);
-  }
-
-  .navbar-authenticated .navbar-container {
-    height: 68px;
-    padding: 0 18px;
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .navbar-authenticated .navbar-logo {
-    padding: 0;
-    border-bottom: 0;
-  }
-
-  .navbar-mobile-toggle {
-    display: inline-flex;
-    order: -1;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border: 1px solid var(--rv-border);
-    border-radius: 8px;
-    background: var(--rv-surface);
-    color: var(--rv-muted);
-    font-size: 20px;
-  }
-
-  .navbar-authenticated .navbar-links {
-    position: fixed;
-    top: 68px;
-    left: 0;
-    bottom: 0;
-    width: 260px;
-    padding: 20px 16px;
-    background: var(--rv-surface);
-    border-right: 1px solid var(--rv-border);
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
-  }
-
-  .navbar-authenticated.menu-open .navbar-links {
-    transform: translateX(0);
-  }
-
-  .app:has(.navbar-authenticated) .app-main,
-  .app:has(.navbar-authenticated) .app-footer {
-    margin-left: 0;
-  }
-
-  .app:has(.navbar-authenticated) .app-main {
-    width: 100%;
-    padding: 92px 18px 24px;
-  }
 }
 
 @media (max-width: 600px) {

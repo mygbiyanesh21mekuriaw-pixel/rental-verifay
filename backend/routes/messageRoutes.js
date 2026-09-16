@@ -7,6 +7,7 @@ const {
   sendMessage,
   sendAdminMessage,
   getLandlordConversations,
+  getTenantConversations,
   getAdminConversations,
 } = require('../controllers/messageController');
 
@@ -23,6 +24,10 @@ router.get('/conversations', auth, (req, res, next) => {
   if (req.user.role !== 'landlord') return res.status(403).json({ message: 'Landlords only' });
   next();
 }, getLandlordConversations);
+router.get('/tenant/conversations', auth, (req, res, next) => {
+  if (req.user.role !== 'tenant') return res.status(403).json({ message: 'Tenants only' });
+  next();
+}, getTenantConversations);
 router.get('/conversations/:id', auth, getConversation);
 router.post('/conversations/:id/messages', auth, sendMessage);
 

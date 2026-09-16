@@ -221,19 +221,6 @@ const TenantSearch = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   const fetchProperties = useCallback(async (nextFilters = defaultFilters) => {
-    const hasAnyInput = Object.entries(nextFilters).some(([key, value]) => {
-      if (['availability', 'sortPrice'].includes(key)) return false;
-      return String(value ?? '').trim() !== '';
-    });
-
-    if (!hasAnyInput) {
-      setProperties([]);
-      setSelectedPropertyId(null);
-      setErrorMessage('');
-      setHasSearched(false);
-      return;
-    }
-
     setLoading(true);
     setErrorMessage('');
     try {
@@ -297,28 +284,12 @@ const TenantSearch = () => {
 
   const handleSearch = (event) => {
     if (event) event.preventDefault();
-    const hasAnyInput = Object.entries(filters).some(([key, value]) => {
-      if (['availability', 'sortPrice'].includes(key)) return false;
-      return String(value ?? '').trim() !== '';
-    });
-
-    if (!hasAnyInput) {
-      setProperties([]);
-      setSelectedPropertyId(null);
-      setErrorMessage('');
-      setHasSearched(false);
-      return;
-    }
-
     fetchProperties(filters);
   };
 
   const handleClearFilters = () => {
     setFilters(defaultFilters);
-    setProperties([]);
-    setSelectedPropertyId(null);
-    setErrorMessage('');
-    setHasSearched(false);
+    fetchProperties(defaultFilters);
   };
 
   const handleFavoriteChange = () => {};
