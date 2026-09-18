@@ -531,7 +531,7 @@ return ( <div className="app"> <Router> <Navbar />
 
     <footer className="app-footer">
       <p>
-        🏠 Rental Property Verification Portal
+        🏠 House Rental Management System
         &copy; 2026
         <br />
         Built by <a href="/about">Internship Project</a>

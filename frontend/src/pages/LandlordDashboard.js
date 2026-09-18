@@ -71,7 +71,7 @@ export const LandlordSidebar = ({ user, notificationCount = 0 }) => {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm">🏠</div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Workspace</p>
-            <h1 className="text-xl font-bold text-white">RentalVerify</h1>
+            <h1 className="text-xl font-bold text-white">House Rental Management System</h1>
           </div>
         </div>
 

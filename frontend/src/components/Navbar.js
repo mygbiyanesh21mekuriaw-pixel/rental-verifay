@@ -112,7 +112,7 @@ const Navbar = () => {
             alt="Mekdela Amba University logo"
             className="navbar-logo-image"
           />
-          <span className="navbar-logo-text">RentalVerify</span>
+          <span className="navbar-logo-text">House Rental Management System</span>
         </Link>
 
         {/* ===== ሊንኮች ===== */}

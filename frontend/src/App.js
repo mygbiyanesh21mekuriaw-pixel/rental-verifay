@@ -305,7 +305,7 @@ function App() {
         {/* ===== የግርጌ (Footer) ===== */}
         <footer className="app-footer">
           <p>
-            🏠 Rental Property Verification Portal &copy; 2026
+            🏠 House Rental Management System &copy; 2026
             <br />
             Built by <a href="/about">Internship Project</a>
           </p>

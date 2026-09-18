@@ -21,7 +21,7 @@ test('renders only the public navigation before login', async () => {
   renderApp();
 
   const navbar = await screen.findByRole('navigation');
-  expect(await screen.findByRole('heading', { name: /rental property verification portal/i })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: /house rental management system/i })).toBeInTheDocument();
   expect(within(navbar).getByRole('link', { name: /home/i })).toBeInTheDocument();
   expect(within(navbar).getByRole('link', { name: /about us/i })).toBeInTheDocument();
   expect(within(navbar).getByRole('link', { name: /contact us/i })).toBeInTheDocument();

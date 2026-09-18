@@ -147,7 +147,7 @@ const AdminSystemLogs = () => {
           <span>System Logs</span>
         </h1>
         <p className="mt-2 text-slate-600">
-          View important activities and changes made in the RentalVerify platform.
+          View important activities and changes made in the House Rental Management System.
         </p>
       </div>
 

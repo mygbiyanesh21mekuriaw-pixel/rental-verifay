@@ -88,7 +88,7 @@ const Login = () => {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <span className="rv-kicker">RentalVerify</span>
+        <span className="rv-kicker">House Rental Management System</span>
         <h2>Welcome back</h2>
         <p className="auth-subtitle">Sign in to manage your verified rental journey.</p>
         

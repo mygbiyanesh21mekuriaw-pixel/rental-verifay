@@ -7,7 +7,7 @@ const About = () => {
       <div className="about-hero">
         <h1 className="about-title">ℹ️ About Us</h1>
         <p className="about-subtitle">
-          Rental property verification portal - secure and reliable
+          House Rental Management System - secure and reliable
         </p>
       </div>
 
