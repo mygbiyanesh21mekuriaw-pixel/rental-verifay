@@ -16,10 +16,10 @@ const Home = () => {
             alt="Mekdela Amba University logo"
             className="home-logo-image"
           />
-          <span className="home-logo-text">RentalVerify</span>
+          <span className="home-logo-text">House Rental Management System</span>
         </div>
 
-        <h1 className="home-title">🏠 Rental Property Verification Portal</h1>
+        <h1 className="home-title">🏠 House Rental Management System</h1>
         <p className="home-subtitle">
           Find and rent verified properties with confidence
         </p>
