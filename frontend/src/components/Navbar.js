@@ -57,7 +57,8 @@ const Navbar = () => {
     return null;
   }
 
-  const isPlatformAdmin = user?.role === 'admin' && (user?.adminType === 'platform' || !user?.adminType);
+  const isPlatformAdmin = user?.role === 'admin' && user?.adminType === 'platform';
+  const isAreaAdmin = user?.role === 'admin' && user?.adminType === 'area';
 
   const sidebarLinks = user?.role === 'tenant'
     ? [
@@ -70,19 +71,36 @@ const Navbar = () => {
       ]
     : user?.role === 'landlord'
       ? []
-      : [
-          ['⚙️', 'Dashboard', '/admin-dashboard'],
-          ['🏠', 'Properties', '/admin-dashboard/all-properties'],
-          ['✅', 'Pending Verification', '/admin-dashboard/pending'],
-          ['', 'Users', '/admin-dashboard/all-users'],
-          ...(isPlatformAdmin ? [['🛡️', 'Admin Management', '/admin-dashboard/admin-management']] : []),
-          ['🔔', 'Notifications', '/admin-dashboard/notifications'],
-          ['📊', 'Analytics', '/admin-dashboard/analytics'],
-          ['❌', 'Rejected', '/admin-dashboard/rejected'],
-          ['💬', 'Messages', '/admin-dashboard/messages'],
-          ['✅', 'Verification Properties', '/admin-dashboard/verified'],
-          ['📋', 'System Logs', '/admin-dashboard/system-logs'],
-        ];
+      : isPlatformAdmin
+        ? [
+            ['⚙️', 'Dashboard', '/admin-dashboard'],
+            ['🛡️', 'Admin Management', '/admin-dashboard/admin-management'],
+            ['📋', 'System Logs', '/admin-dashboard/system-logs'],
+            ['📊', 'Admin Analytics', '/admin-dashboard/analytics'],
+            ['👤', 'Users', '/admin-dashboard/all-users'],
+            ['💳', 'Payment Period', '/admin-dashboard/payment-period'],
+            ['🔔', 'Notifications', '/admin-dashboard/notifications'],
+            ['👤', 'Profile', '/admin-dashboard'],
+            ['🚪', 'Logout', 'logout'],
+          ]
+        : isAreaAdmin
+          ? [
+              ['🏠', 'Dashboard', '/admin-dashboard'],
+              ['🏠', 'Properties', '/admin-dashboard/all-properties'],
+              ['✅', 'Verified Properties', '/admin-dashboard/verified'],
+              ['❌', 'Rejected', '/admin-dashboard/rejected'],
+              ['📋', 'Rental Requests', '/admin-dashboard/rental-requests'],
+              ['🔎', 'Under Review', '/admin-dashboard/pending'],
+              ['🔔', 'Notifications', '/admin-dashboard/notifications'],
+              ['🚪', 'Logout', 'logout'],
+            ]
+          : [
+              ['⚙️', 'Dashboard', '/admin-dashboard'],
+              ['🏠', 'Properties', '/admin-dashboard/all-properties'],
+              ['🔔', 'Notifications', '/admin-dashboard/notifications'],
+              ['👤', 'Profile', '/admin-dashboard'],
+              ['🚪', 'Logout', 'logout'],
+            ];
 
   return (
     <nav className={`navbar ${user ? 'navbar-authenticated' : ''}`}>
@@ -144,6 +162,21 @@ const Navbar = () => {
                   <div className="navbar-section-label">Workspace</div>
                   {sidebarLinks.map(([icon, label, path]) => {
                     const isNotificationsItem = label === 'Notifications';
+                    const isLogoutItem = path === 'logout';
+
+                    if (isLogoutItem) {
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={handleLogout}
+                          className="navbar-link navbar-logout-link"
+                        >
+                          <span aria-hidden="true">{icon}</span> {label}
+                        </button>
+                      );
+                    }
+
                     return (
                       <Link
                         key={path}

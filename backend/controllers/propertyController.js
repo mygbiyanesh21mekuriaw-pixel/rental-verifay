@@ -7,6 +7,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { createSystemLog } = require('./systemLogController');
+const {
+  normalizeAdminAreaObject,
+  propertyMatchesAdminAreas,
+  buildAdminAreaQuery,
+} = require('../utils/adminArea');
 
 const hasCloudinaryCredentials = [
   process.env.CLOUDINARY_CLOUD_NAME,
@@ -58,7 +63,6 @@ const normalizeCoordinate = (value, fieldName) => {
 };
 
 const addressFields = ['region', 'zone', 'wereda', 'city', 'subCity', 'kebele', 'houseNumber'];
-
 const normalizeAddress = (body) => {
   const address = Object.fromEntries(addressFields.map(field => [field, String(body[field] || '').trim()]));
   const missingField = addressFields.find(field => !address[field]);
@@ -240,7 +244,18 @@ const getAllProperties = async (req, res) => {
     } else if (req.user?.role === 'landlord') {
       filter.landlord = req.user.id;
     } else if (req.user?.role === 'admin') {
-      filter = {};
+      const admin = await User.findById(req.user.id).select('adminType adminAreas').lean();
+      const isAreaAdmin = admin?.adminType === 'area';
+      if (isAreaAdmin) {
+        const adminAreas = (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+        if (adminAreas.length === 0) {
+          filter = { _id: null };
+        } else {
+          filter = { ...filter, ...buildAdminAreaQuery(adminAreas) };
+        }
+      } else {
+        filter = {};
+      }
     } else {
       filter = { ...publicVerifiedFilter };
     }
@@ -431,6 +446,16 @@ const getPropertyById = async (req, res) => {
       const canViewRequestedProperty = hasRentalRequest && String(property.rentedBy) === String(req.user.id);
       if (!hasValidLandlord || !property.isVerified || property.verificationStatus !== 'approved' || (!isAvailable && !canViewRequestedProperty) || !hasValidData) {
         return res.status(403).json({ message: 'This property is not available' });
+      }
+    }
+
+    if (req.user.role === 'admin') {
+      const admin = await User.findById(req.user.id).select('adminAreas adminType').lean();
+      if (admin?.adminType === 'area') {
+        const adminAreas = (admin?.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+        if (adminAreas.length === 0 || !propertyMatchesAdminAreas(property, adminAreas)) {
+          return res.status(403).json({ message: 'This property is outside your assigned admin area' });
+        }
       }
     }
 

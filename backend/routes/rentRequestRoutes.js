@@ -10,9 +10,14 @@ const {
   getRentRequestForLandlord,
   getLandlordRentStats,
   landlordRespondToRequest,
+  getAdminRentalRequests,
+  adminRespondToRentalRequest,
 } = require('../controllers/rentalRequestController');
 
-const { auth } = require('../middleware/auth');
+const { auth, adminOnly, areaAdminOnly } = require('../middleware/auth');
+
+router.get('/admin-requests', auth, adminOnly, getAdminRentalRequests);
+router.put('/admin-requests/:id/respond', auth, areaAdminOnly, adminRespondToRentalRequest);
 
 // =====================================================
 // TENANT

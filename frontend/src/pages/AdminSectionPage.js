@@ -6,25 +6,35 @@ import './adminDashboard.css';
 
 const sectionConfig = {
   awaitingVerification: { title: '⏳ Properties awaiting verification', endpoint: 'pending-properties' },
-  allProperties: { title: '📊 All properties', status: 'all' },
-  pending: { title: '⏳ Pending properties', status: 'pending' },
-  rejected: { title: '❌ Rejected properties', status: 'rejected' },
+  allProperties: { title: '🏠 Properties', status: 'all' },
+  pending: { title: '🔎 Under Review', endpoint: 'pending-properties' },
+  rentalRequests: { title: '📋 Rental Requests', endpoint: 'rental-requests/admin-requests' },
+  rejected: { title: '❌ Rejected', status: 'rejected' },
   allUsers: { title: '👤 All users', endpoint: 'users' },
   adminManagement: { title: '🛡️ Admin Management', endpoint: 'users' },
-  verified: { title: '✅ Verified properties', status: 'approved' },
+  paymentPeriod: { title: '💳 Payment Period', endpoint: 'payment-periods' },
+  verified: { title: '✅ Verified Properties', status: 'approved' },
 };
-
-const adminAreaOptions = [
-  { label: 'Addis Ababa', value: 'Addis Ababa' },
-  { label: 'Amhara', value: 'amhara' },
-  { label: 'Oromia', value: 'oromiya' },
-];
 
 const displayVerificationStatus = (property) => {
   if (property.isVerified && property.verificationStatus === 'approved') return 'Verified';
   if (!property.isVerified && property.verificationStatus === 'rejected') return 'Rejected';
   if (!property.isVerified && property.verificationStatus === 'pending') return 'Under Review';
   return property.verificationStatus || 'Unknown';
+};
+
+const getAdminAreaValue = (adminAreas) => {
+  const firstArea = Array.isArray(adminAreas) ? adminAreas[0] : null;
+  if (!firstArea) return '';
+  if (typeof firstArea === 'string') return firstArea;
+  return firstArea.city || firstArea.region || firstArea.zone || firstArea.wereda || firstArea.subCity || '';
+};
+
+const getPropertyImageUrl = (property) => {
+  const image = property?.images?.[0] || property?.image;
+  if (!image) return '';
+  if (/^https?:\/\//i.test(image)) return image;
+  return `http://localhost:5000/${String(image).replace(/\\/g, '/').replace(/^\/+/, '')}`;
 };
 
 const AdminSectionPage = ({ type }) => {
@@ -50,8 +60,14 @@ const AdminSectionPage = ({ type }) => {
   const [adminFormLoading, setAdminFormLoading] = useState(false);
   const [editingAdminId, setEditingAdminId] = useState(null);
   const [adminActionLoading, setAdminActionLoading] = useState(null);
+  const [selectedRentalRequest, setSelectedRentalRequest] = useState(null);
+  const [rentalRequestFeedback, setRentalRequestFeedback] = useState('');
   const isPlatformAdmin = currentUser?.role === 'admin'
     && (!currentUser.adminType || currentUser.adminType === 'platform');
+  const canManageVerification = currentUser?.role === 'admin'
+    && currentUser?.adminType === 'area'
+    && (type === 'pending' || type === 'awaitingVerification');
+  const canManageRentalRequests = currentUser?.role === 'admin' && currentUser?.adminType === 'area';
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -59,7 +75,9 @@ const AdminSectionPage = ({ type }) => {
     try {
       const token = localStorage.getItem('token');
       let endpoint = config.endpoint
-        ? `http://localhost:5000/api/admin/${config.endpoint}`
+        ? type === 'rentalRequests'
+          ? `http://localhost:5000/api/${config.endpoint}`
+          : `http://localhost:5000/api/admin/${config.endpoint}`
         : `http://localhost:5000/api/admin/properties?status=${config.status}`;
 
       const response = await axios.get(endpoint, {
@@ -74,7 +92,14 @@ const AdminSectionPage = ({ type }) => {
     } catch (error) {
       console.error('Error fetching admin section:', error);
       setItems([]);
-      setLoadError(error.response?.data?.message || 'Unable to load admin records.');
+      const responseStatus = error.response?.status;
+      const responseMessage = error.response?.data?.message;
+      const defaultMessage = type === 'rentalRequests'
+        ? 'Unable to load rental requests.'
+        : 'Unable to load admin records.';
+      setLoadError(type === 'rentalRequests' && responseStatus
+        ? `${responseMessage || defaultMessage} (HTTP ${responseStatus})`
+        : responseMessage || defaultMessage);
     } finally {
       setLoading(false);
     }
@@ -104,6 +129,48 @@ const AdminSectionPage = ({ type }) => {
     }
   };
 
+  const handleRentalRequestAction = async (requestId, status) => {
+    setActionLoading(requestId);
+    setRentalRequestFeedback('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `http://localhost:5000/api/rental-requests/admin-requests/${requestId}/respond`,
+        { status },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      await fetchItems();
+      setSelectedRentalRequest((current) => current && current._id === requestId
+        ? { ...current, status: response.data?.request?.status || status }
+        : current);
+      setRentalRequestFeedback(response.data?.message || `Rental request ${status}.`);
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Unable to update rental request';
+      setRentalRequestFeedback(message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const openRentalRequestDetails = async (request) => {
+    setSelectedRentalRequest(request);
+    setRentalRequestFeedback('');
+
+    if (!request.property?._id) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:5000/api/properties/${request.property._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSelectedRentalRequest((current) => current && current._id === request._id
+        ? { ...current, property: { ...current.property, ...response.data } }
+        : current);
+    } catch (error) {
+      console.warn('Unable to load full property details for rental request:', error);
+    }
+  };
+
   const handleAdminFormChange = (event) => {
     const { name, value } = event.target;
     setAdminForm((current) => ({ ...current, [name]: value }));
@@ -117,7 +184,7 @@ const AdminSectionPage = ({ type }) => {
       phone: admin.phone || '',
       password: '',
       adminType: 'area',
-      area: admin.adminAreas?.[0]?.region || '',
+      area: getAdminAreaValue(admin.adminAreas),
     });
     setAdminFormError('');
     setAdminFormMessage('');
@@ -141,7 +208,7 @@ const AdminSectionPage = ({ type }) => {
         email: adminForm.email,
         phone: adminForm.phone,
         adminType: 'area',
-        adminAreas: [{ region: adminForm.area }],
+        adminAreas: [adminForm.area],
       };
       if (!editingAdminId) payload.password = adminForm.password;
       const token = localStorage.getItem('token');
@@ -221,12 +288,14 @@ const AdminSectionPage = ({ type }) => {
             <input name="email" type="email" value={adminForm.email} onChange={handleAdminFormChange} placeholder="Email" required className="admin-card-detail" />
             <input name="phone" value={adminForm.phone} onChange={handleAdminFormChange} placeholder="Phone" className="admin-card-detail" />
             {!editingAdminId && <input name="password" type="password" value={adminForm.password} onChange={handleAdminFormChange} placeholder="Password" minLength="6" required className="admin-card-detail" />}
-            <select name="area" value={adminForm.area} onChange={handleAdminFormChange} required className="admin-card-detail">
-              <option value="" disabled>Select area</option>
-              {adminAreaOptions.map((area) => (
-                <option key={area.value} value={area.value}>{area.label}</option>
-              ))}
-            </select>
+            <input
+              name="area"
+              value={adminForm.area}
+              onChange={handleAdminFormChange}
+              placeholder="Assigned Area"
+              required
+              className="admin-card-detail"
+            />
             <div className="admin-card-detail" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               Admin Type: <strong style={{ marginLeft: 8 }}>Area Admin</strong>
             </div>
@@ -235,6 +304,32 @@ const AdminSectionPage = ({ type }) => {
             </button>
             {editingAdminId && <button type="button" onClick={handleCancelAdminEdit} className="admin-btn">Cancel</button>}
           </form>
+        </section>
+      )}
+
+      {type === 'paymentPeriod' && isPlatformAdmin && (
+        <section className="admin-detail-section admin-dedicated-content">
+          <h2 className="admin-card-title">Payment Period Overview</h2>
+          {loading ? (
+            <div className="admin-loading-small">⏳ Loading payment periods...</div>
+          ) : items.length === 0 ? (
+            <div className="admin-empty-text">No payment period data found.</div>
+          ) : (
+            <div className="admin-grid">
+              {items.map((payment) => (
+                <div key={payment._id} className="admin-card">
+                  <h4 className="admin-card-title">💳 {payment.paymentPeriod}</h4>
+                  <p className="admin-card-detail">👤 Tenant: {payment.tenant?.name || 'Unknown'}</p>
+                  <p className="admin-card-detail">🏠 Property: {payment.property?.title || 'Unknown property'}</p>
+                  <p className="admin-card-detail">📍 Area: {payment.property?.city || payment.property?.region || 'Unknown area'}</p>
+                  <p className="admin-card-detail">💰 Amount: ETB {Number(payment.amount || 0).toLocaleString()}</p>
+                  <p className="admin-card-detail">📅 {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString() : 'Date unavailable'}</p>
+                  <p className="admin-card-detail">✅ Status: {payment.status || 'Unknown'}</p>
+                  <p className="admin-card-detail">🧾 Reference: {payment.paymentReference || 'N/A'}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -273,7 +368,94 @@ const AdminSectionPage = ({ type }) => {
         </section>
       )}
 
-      {!isAdminManagementPage && (
+      {type === 'rentalRequests' && (
+        <section className="admin-detail-section admin-dedicated-content">
+          {loading ? (
+            <div className="admin-loading-small">⏳ Loading rental requests...</div>
+          ) : loadError ? (
+            <div className="admin-empty-text">{loadError}</div>
+          ) : items.length === 0 ? (
+            <div className="admin-empty-text">No rental requests found.</div>
+          ) : (
+            <div className="admin-grid">
+              {items.map((request) => (
+                <div key={request._id} className="admin-card">
+                  <h4 className="admin-card-title">🏠 {request.property?.title || 'Property'}</h4>
+                  <p className="admin-card-detail">👤 Tenant: {request.tenant?.name || request.tenantName || 'Unknown tenant'}</p>
+                  <p className="admin-card-detail">📍 Area: {request.property?.city || request.property?.region || 'Unknown area'}</p>
+                  <p className="admin-card-detail">📌 Status: {request.status || 'pending'}</p>
+                  {request.property?._id && (
+                    <button
+                      type="button"
+                      className="admin-card-link"
+                      onClick={() => openRentalRequestDetails(request)}
+                    >
+                      📄 View Details
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {type === 'rentalRequests' && selectedRentalRequest && (
+        <div className="admin-request-modal-overlay" role="presentation" onClick={() => setSelectedRentalRequest(null)}>
+          <section
+            className="admin-request-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rental-request-details-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="admin-request-modal-header">
+              <h2 id="rental-request-details-title" className="admin-card-title">📄 Rental Request Details</h2>
+              <button type="button" className="admin-card-link" onClick={() => setSelectedRentalRequest(null)}>Close</button>
+            </div>
+            {getPropertyImageUrl(selectedRentalRequest.property) ? (
+              <img
+                src={getPropertyImageUrl(selectedRentalRequest.property)}
+                alt={selectedRentalRequest.property?.title || 'Property'}
+                className="admin-request-modal-image"
+              />
+            ) : (
+              <div className="admin-request-modal-image admin-empty-text" role="img" aria-label="No property image available">📷 No property image</div>
+            )}
+            <h3 className="admin-card-title">🏠 {selectedRentalRequest.property?.title || 'Property'}</h3>
+            <p className="admin-card-detail">👤 Tenant: {selectedRentalRequest.tenant?.name || selectedRentalRequest.tenantName || 'Unknown tenant'}</p>
+            <p className="admin-card-detail">🏠 Landlord: {selectedRentalRequest.landlord?.name || 'Unknown landlord'}</p>
+            <p className="admin-card-detail">📍 Area: {selectedRentalRequest.property?.city || selectedRentalRequest.property?.region || 'Unknown area'}</p>
+            <p className="admin-card-detail">📍 Address: {selectedRentalRequest.property?.location || 'Location unavailable'}</p>
+            <p className="admin-card-detail">📝 Request: {selectedRentalRequest.message || 'No message provided'}</p>
+            <p className="admin-card-detail">📅 Requested: {selectedRentalRequest.createdAt ? new Date(selectedRentalRequest.createdAt).toLocaleString() : 'Date unavailable'}</p>
+            <p className="admin-card-detail">📌 Status: {selectedRentalRequest.status || 'pending'}</p>
+            {rentalRequestFeedback && <p className="admin-request-feedback">{rentalRequestFeedback}</p>}
+            {canManageRentalRequests && (
+              <div className="admin-card-actions">
+                <button
+                  type="button"
+                  onClick={() => handleRentalRequestAction(selectedRentalRequest._id, 'approved')}
+                  disabled={actionLoading === selectedRentalRequest._id}
+                  className="admin-btn admin-btn-approve"
+                >
+                  {actionLoading === selectedRentalRequest._id ? 'Working...' : '✅ Approve'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRentalRequestAction(selectedRentalRequest._id, 'rejected')}
+                  disabled={actionLoading === selectedRentalRequest._id}
+                  className="admin-btn admin-btn-reject"
+                >
+                  {actionLoading === selectedRentalRequest._id ? 'Working...' : '❌ Reject'}
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {type !== 'paymentPeriod' && !isAdminManagementPage && type !== 'rentalRequests' && (
         <section className="admin-detail-section admin-dedicated-content">
           {loading ? (
             <div className="admin-loading-small">⏳ Loading...</div>
@@ -322,7 +504,7 @@ const AdminSectionPage = ({ type }) => {
                       />
                     </div>
                   )}
-                  {(type === 'awaitingVerification' || type === 'allProperties') && (
+                  {canManageVerification && (
                     <div className="admin-card-actions">
                       <button
                         type="button"

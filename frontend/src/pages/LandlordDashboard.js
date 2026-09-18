@@ -39,6 +39,8 @@ export const landlordSidebarItems = [
   { key: 'addProperty', label: 'Add Property', icon: '➕', path: '/landlord/add-property' },
   { key: 'rentalRequests', label: 'Rental Requests', icon: '📝', path: '/landlord/rental-requests' },
   { key: 'rented', label: 'Rented Properties', icon: '🏠', path: '/landlord/rented-properties' },
+  { key: 'underReview', label: 'Under Review', icon: '⏳', path: '/landlord/under-review' },
+  { key: 'rejected', label: 'Rejected', icon: '❌', path: '/landlord/rejected' },
   { key: 'rentPayments', label: 'Rent Payments', icon: '💰', path: '/landlord/rent-payments' },
   { key: 'notifications', label: 'Notifications', icon: '🔔', path: '/landlord/notifications' },
   { key: 'profile', label: 'Profile', icon: '👤', path: '/landlord/profile' },

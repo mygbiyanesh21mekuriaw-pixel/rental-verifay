@@ -38,6 +38,22 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+const areaAdminOnly = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin only.' });
+    }
+    const user = await User.findById(req.user.id).select('role adminType adminAreas');
+    const isAreaAdmin = user && user.role === 'admin' && user.adminType === 'area';
+    if (!isAreaAdmin) {
+      return res.status(403).json({ message: 'Area Admin permission required.' });
+    }
+    next();
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to verify area admin permission' });
+  }
+};
+
 const platformAdminOnly = async (req, res, next) => {
   try {
     if (req.user.role !== 'admin') {
@@ -71,4 +87,4 @@ const landlordCreateOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { auth, optionalAuth, adminOnly, platformAdminOnly, landlordOnly, landlordCreateOnly };
+module.exports = { auth, optionalAuth, adminOnly, areaAdminOnly, platformAdminOnly, landlordOnly, landlordCreateOnly };
