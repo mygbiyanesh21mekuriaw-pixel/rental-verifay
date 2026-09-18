@@ -360,7 +360,7 @@ const PropertyDetail = () => {
           </div>
 
           {/* ===== Admin verification actions ===== */}
-          {user?.role === 'admin' && property && property.verificationStatus === 'pending' && !property.isVerified && (
+          {user?.role === 'admin' && user?.adminType === 'area' && property && property.verificationStatus === 'pending' && !property.isVerified && (
             <div className="property-contact-section">
               <button
                 type="button"

@@ -10,6 +10,11 @@ const maskAccountNumber = (value) => {
   return `${'*'.repeat(Math.max(0, accountNumber.length - 4))}${accountNumber.slice(-4)}`;
 };
 
+const normalizeLoginEmail = (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  return normalizedEmail.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
+};
+
 const serializeUser = (user) => ({
   id: user._id ? user._id.toString() : user.id,
   name: user.name,
@@ -98,7 +103,7 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedEmail = normalizeLoginEmail(email);
 
     // ተጠቃሚውን ያግኙ
     const user = await User.findOne({ email: normalizedEmail });

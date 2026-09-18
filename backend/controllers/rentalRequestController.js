@@ -5,6 +5,160 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { isApprovedProperty } = require('../utils/propertyVerification');
 const { createSystemLog } = require('./systemLogController');
+const { normalizeAdminAreaObject, propertyMatchesAdminAreas, buildAdminAreaQuery } = require('../utils/adminArea');
+
+const getAreaAdminAreas = async (adminId) => {
+  const admin = await User.findById(adminId).select('role adminType adminAreas').lean();
+  if (!admin || admin.role !== 'admin' || admin.adminType !== 'area') return null;
+  return (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+};
+
+const activateRentalRelationship = async (propertyId, tenantId) => {
+  return Property.findOneAndUpdate(
+    { _id: propertyId, availabilityStatus: { $ne: 'rented' }, rentedBy: null },
+    {
+      availabilityStatus: 'rented',
+      rentedBy: tenantId,
+      rentedAt: new Date(),
+    },
+    { new: true },
+  );
+};
+
+const getAdminRentalRequests = async (req, res) => {
+  try {
+    const admin = await User.findById(req.user.id).select('role adminType adminAreas').lean();
+    if (!admin || admin.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin permission required.' });
+    }
+
+    let propertyFilter = {};
+    if (admin.adminType === 'area') {
+      const adminAreas = (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+      if (adminAreas.length === 0) return res.json([]);
+      propertyFilter = buildAdminAreaQuery(adminAreas);
+    } else if (admin.adminType !== 'platform') {
+      return res.status(403).json({ message: 'Admin permission required.' });
+    }
+
+    const properties = Object.keys(propertyFilter).length === 0
+      ? await Property.find().select('_id').lean()
+      : await Property.find(propertyFilter).select('_id').lean();
+    const propertyIds = properties
+      .map(property => property._id)
+      .filter(propertyId => mongoose.isValidObjectId(propertyId));
+    if (propertyIds.length === 0) return res.json([]);
+
+    const requests = await RentRequest.find({ property: { $in: propertyIds } })
+      .populate('property', 'title location region zone wereda city subCity kebele houseNumber images image')
+      .populate('tenant', 'name email phone')
+      .populate('landlord', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    res.json(requests);
+  } catch (error) {
+    console.error('Error fetching admin rental requests:', error);
+    res.status(500).json({ message: 'Unable to load rental requests' });
+  }
+};
+
+const adminRespondToRentalRequest = async (req, res) => {
+  try {
+    const { status, message } = req.body;
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be approved or rejected' });
+    }
+
+    const adminAreas = await getAreaAdminAreas(req.user.id);
+    if (!adminAreas || adminAreas.length === 0) {
+      return res.status(403).json({ message: 'Area Admin permission required.' });
+    }
+
+    const request = await RentRequest.findById(req.params.id)
+      .populate('property', 'title location region zone wereda city subCity kebele houseNumber')
+      .populate('tenant', 'name email phone')
+      .populate('landlord', 'name email phone');
+    if (!request) return res.status(404).json({ message: 'Rental request not found' });
+    if (!request.property) return res.status(404).json({ message: 'Property for rental request not found' });
+
+    if (!propertyMatchesAdminAreas(request.property, adminAreas)) {
+      return res.status(403).json({ message: 'This rental request is outside your assigned admin area' });
+    }
+    if (request.status !== 'pending') {
+      return res.status(400).json({ message: 'This rental request has already been answered' });
+    }
+
+    if (status === 'approved') {
+      if (request.property.availabilityStatus === 'rented' || request.property.rentedBy) {
+        return res.status(409).json({ message: 'This property is already rented' });
+      }
+
+      const existingActiveRental = await RentRequest.exists({
+        _id: { $ne: request._id },
+        property: request.property._id,
+        status: { $in: ['approved', 'confirmed'] },
+      });
+      if (existingActiveRental) {
+        const existingRequest = await RentRequest.findOne({
+          _id: { $ne: request._id },
+          property: request.property._id,
+          status: { $in: ['approved', 'confirmed'] },
+        }).select('tenant').lean();
+        if (existingRequest?.tenant) {
+          await activateRentalRelationship(request.property._id, existingRequest.tenant);
+        }
+        return res.status(409).json({ message: 'This property already has an active rental request' });
+      }
+    }
+
+    request.status = status;
+    request.adminComment = message || '';
+    request.reviewedBy = req.user.id;
+    request.reviewedAt = new Date();
+    await request.save();
+
+    if (status === 'approved') {
+      await activateRentalRelationship(request.property._id, request.tenant._id);
+    }
+
+    const propertyTitle = request.property?.title || 'the property';
+    const notificationType = status === 'approved' ? 'approved' : 'rejected';
+    const notificationMessage = status === 'approved'
+      ? `Your rental request for "${propertyTitle}" was approved by the Area Admin.`
+      : `Your rental request for "${propertyTitle}" was rejected by the Area Admin.`;
+    const notification = {
+      property: request.property._id,
+      rentalRequest: request._id,
+      propertyTitle,
+      message: notificationMessage,
+      type: notificationType,
+      instructions: status === 'approved' ? 'Contact the landlord to confirm the rental.' : 'You can search for another property.',
+      read: false,
+    };
+    await Notification.create({ ...notification, tenant: request.tenant._id, recipientRole: 'tenant' });
+    await Notification.create({
+      ...notification,
+      landlord: request.landlord._id,
+      recipientRole: 'landlord',
+      message: `The rental request for "${propertyTitle}" was ${status} by the Area Admin.`,
+    });
+    await createSystemLog({
+      user: req.user.id,
+      role: req.user.role,
+      action: status === 'approved' ? 'RENTAL_REQUEST_APPROVED' : 'RENTAL_REQUEST_REJECTED',
+      description: `Area Admin ${status} rental request for property "${propertyTitle}".`,
+      property: request.property._id,
+      rentalRequest: request._id,
+      status: 'success',
+      ipAddress: req.ip || '',
+    });
+
+    res.json({ message: `Rental request ${status}`, request });
+  } catch (error) {
+    console.error('Error responding to admin rental request:', error);
+    res.status(500).json({ message: 'Unable to update rental request' });
+  }
+};
 
 // ===== አዲስ የኪራይ ጥያቄ መፍጠር (Tenant ብቻ) =====
 const createRentRequest = async (req, res) => {
@@ -338,4 +492,6 @@ module.exports = {
   landlordRespondToRequest,
   getRentRequestForLandlord,
   getLandlordRentStats,
+  getAdminRentalRequests,
+  adminRespondToRentalRequest,
 };

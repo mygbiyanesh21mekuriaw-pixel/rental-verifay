@@ -3,8 +3,14 @@ const bcrypt = require('bcryptjs');
 const Property = require('../models/Property');
 const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
+const Payment = require('../models/Payment');
 const User = require('../models/User');
 const { isApprovedProperty } = require('../utils/propertyVerification');
+const {
+  normalizeAdminAreaObject,
+  propertyMatchesAdminAreas,
+  buildAdminAreaQuery,
+} = require('../utils/adminArea');
 const { createLandlordNotification } = require('./notificationController');
 const { createSystemLog } = require('./systemLogController');
 
@@ -33,29 +39,27 @@ const buildTrendSeries = (records, key = 'month') => {
     .sort((left, right) => (left.label || '').localeCompare(right.label || ''));
 };
 
-const adminAreaFields = ['region', 'zone', 'wereda', 'city', 'subCity'];
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 const getAdminAreas = async (adminId) => {
   const admin = await User.findById(adminId).select('adminAreas').lean();
-  return (admin?.adminAreas || []).filter((area) =>
-    adminAreaFields.some((field) => String(area?.[field] || '').trim())
-  );
+  return (admin?.adminAreas || [])
+    .map((area) => normalizeAdminAreaObject(area))
+    .filter(Boolean);
 };
 
-const buildAdminAreaQuery = (areas) => ({
-  $or: areas.map((area) => ({
-    $and: adminAreaFields
-      .filter((field) => String(area?.[field] || '').trim())
-      .map((field) => ({
-        [field]: new RegExp(`^${escapeRegex(String(area[field]).trim())}$`, 'i'),
-      })),
-  })),
-});
+const getCanonicalAreaField = (area) => {
+  if (!area || typeof area !== 'object') return null;
+  return ['city', 'region', 'zone', 'wereda', 'subCity']
+    .find((field) => String(area[field] || '').trim()) || null;
+};
 
 const applyAdminAreaScope = async (adminId, filter = {}) => {
-  const areas = await getAdminAreas(adminId);
-  if (areas.length === 0) return filter;
+  const admin = await User.findById(adminId).select('adminType adminAreas').lean();
+  if (admin?.adminType !== 'area') return filter;
+
+  const areas = (admin.adminAreas || [])
+    .map((area) => normalizeAdminAreaObject(area))
+    .filter(Boolean);
+  if (areas.length === 0) return { ...filter, _id: null };
 
   return {
     ...filter,
@@ -66,37 +70,25 @@ const applyAdminAreaScope = async (adminId, filter = {}) => {
   };
 };
 
-const propertyMatchesAdminAreas = (property, areas) => {
-  if (areas.length === 0) return true;
-  return areas.some((area) => adminAreaFields
-    .filter((field) => String(area?.[field] || '').trim())
-    .every((field) => String(property[field] || '').trim().toLowerCase() === String(area[field]).trim().toLowerCase()));
-};
-
 const normalizeAdminAreas = (areas) => {
   if (!Array.isArray(areas)) return null;
 
-  return areas
-    .filter((area) => area && typeof area === 'object')
-    .map((area) => Object.fromEntries(
-      adminAreaFields.map((field) => [field, String(area[field] || '').trim()])
-    ))
-    .filter((area) => adminAreaFields.some((field) => area[field]));
-};
+  const normalizedAreas = areas
+    .map((area) => normalizeAdminAreaObject(area))
+    .filter(Boolean);
 
-const adminRegionValues = new Set(['Addis Ababa', 'amhara', 'oromiya']);
+  return normalizedAreas.length > 0 ? normalizedAreas : null;
+};
 
 const normalizeAreaAdminFields = (adminAreas) => {
   const normalizedAreas = normalizeAdminAreas(adminAreas);
   if (!normalizedAreas || normalizedAreas.length !== 1) return null;
 
   const [area] = normalizedAreas;
-  if (!area.region || !adminRegionValues.has(area.region)
-    || adminAreaFields.some((field) => field !== 'region' && area[field])) {
-    return null;
-  }
+  const field = getCanonicalAreaField(area);
+  if (!field) return null;
 
-  return [{ region: area.region }];
+  return [{ [field]: area[field] }];
 };
 
 const createAdminAccount = async (req, res) => {
@@ -402,6 +394,11 @@ const verifyProperty = async (req, res) => {
       return res.status(404).json({ message: 'Property not found' });
     }
 
+    const admin = await User.findById(req.user.id).select('adminType adminAreas').lean();
+    if (!admin || admin.adminType !== 'area') {
+      return res.status(403).json({ message: 'Platform Admins are read-only and cannot verify properties.' });
+    }
+
     const adminAreas = await getAdminAreas(req.user.id);
     if (!propertyMatchesAdminAreas(property, adminAreas)) {
       return res.status(403).json({ message: 'This property is outside your assigned admin area' });
@@ -457,6 +454,11 @@ const rejectProperty = async (req, res) => {
     
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
+    }
+
+    const admin = await User.findById(req.user.id).select('adminType adminAreas').lean();
+    if (!admin || admin.adminType !== 'area') {
+      return res.status(403).json({ message: 'Platform Admins are read-only and cannot reject properties.' });
     }
 
     const adminAreas = await getAdminAreas(req.user.id);
@@ -552,6 +554,34 @@ const getAnalytics = async (req, res) => {
   } catch (error) {
     console.error('Analytics fetch failed:', error);
     res.status(500).json({ message: 'Unable to load admin analytics', error: error.message });
+  }
+};
+
+const getAdminPaymentPeriods = async (req, res) => {
+  try {
+    const payments = await Payment.find({})
+      .populate('tenant', 'name email role')
+      .populate('landlord', 'name email role')
+      .populate('property', 'title location city region subCity zone wereda')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json(payments.map((payment) => ({
+      _id: payment._id,
+      tenant: payment.tenant || null,
+      landlord: payment.landlord || null,
+      property: payment.property || null,
+      paymentPeriod: payment.paymentPeriod,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: payment.status,
+      paymentReference: payment.paymentReference,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
+    })));
+  } catch (error) {
+    console.error('Payment period fetch failed:', error);
+    res.status(500).json({ message: 'Unable to load payment period data', error: error.message });
   }
 };
 
@@ -691,6 +721,7 @@ module.exports = {
   getAllUsers,
   getStats,
   getAnalytics,
+  getAdminPaymentPeriods,
   deleteUser,
   changeUserRole,
   createAdminAccount,
