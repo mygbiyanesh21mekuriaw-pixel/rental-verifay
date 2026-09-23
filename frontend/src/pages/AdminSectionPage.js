@@ -349,7 +349,7 @@ const AdminSectionPage = ({ type }) => {
                   <h4 className="admin-card-title">👤 {admin.name}</h4>
                   <p className="admin-card-detail">📧 {admin.email}</p>
                   {admin.phone && <p className="admin-card-detail">📱 {admin.phone}</p>}
-                  <p className="admin-card-detail">📍 Area: {admin.adminAreas?.[0]?.region || 'Unassigned'}</p>
+                  <p className="admin-card-detail">📍 Area: {(admin.adminAreas?.[0]?.city || admin.adminAreas?.[0]?.region || admin.adminAreas?.[0]?.zone || admin.adminAreas?.[0]?.wereda || admin.adminAreas?.[0]?.subCity || 'Unassigned')}</p>
                   <div className="admin-card-actions">
                     <button type="button" onClick={() => handleEditAdmin(admin)} className="admin-btn admin-btn-primary">Edit</button>
                     <button
@@ -538,3 +538,4 @@ const AdminSectionPage = ({ type }) => {
 };
 
 export default AdminSectionPage;
+

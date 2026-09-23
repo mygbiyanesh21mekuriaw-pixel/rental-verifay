@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
 // CSS
@@ -38,6 +38,15 @@ import AdminSystemLogs from './pages/AdminSystemLogs';
 // ክፍሎች (Components)
 import Navbar from './components/Navbar';
 
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+};
 const dashboardPaths = {
   tenant: '/tenant-dashboard',
   landlord: '/landlord-dashboard',
@@ -133,6 +142,7 @@ function App() {
     <div className="app">
       <Router>
         <Navbar />
+        <ScrollToTop />
         <main className="app-main">
           <Routes>
             {/* ===== ለሁሉም የሚገኙ ገፆች ===== */}
@@ -316,3 +326,11 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+
+

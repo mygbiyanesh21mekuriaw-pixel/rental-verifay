@@ -29,12 +29,7 @@ body {
   padding: 32px;
 }
 
-.app:has(.navbar-authenticated) .app-main {
-  max-width: none;
-  width: calc(100% - var(--rv-sidebar-width));
-  margin-left: var(--rv-sidebar-width);
-  padding: 32px;
-}
+.app:has(.navbar-authenticated) .app-main { max-width: none; width: calc(100% - var(--rv-sidebar-width)); margin-left: var(--rv-sidebar-width); padding: 32px; box-sizing: border-box; }
 
 .app:has(.navbar-authenticated) .app-footer {
   margin-left: var(--rv-sidebar-width);
@@ -290,3 +285,17 @@ body {
   border-color: var(--rv-brand);
   box-shadow: 0 8px 20px rgba(70, 95, 255, .22);
 }
+
+
+
+
+
+
+
+/* FIX: authenticated sidebar must not create vertical page height */
+.navbar-authenticated { height: 100vh !important; max-height: 100vh !important; overflow-y: auto !important; box-sizing: border-box !important; }
+
+
+/* FINAL SIDEBAR LAYOUT FIX */
+.app .navbar.navbar-authenticated { position: fixed !important; top: 0 !important; left: 0 !important; bottom: 0 !important; height: 100vh !important; width: var(--rv-sidebar-width) !important; overflow-y: auto !important; }
+
