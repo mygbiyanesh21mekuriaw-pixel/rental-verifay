@@ -7,7 +7,7 @@
   padding: 30px 20px;
   animation: adminFadeIn 0.6s ease;
   background: linear-gradient(135deg, #ffe4ef 0%, #fbcfe8 28%, #dbeafe 64%, #cffafe 100%);
-  min-height: 100vh;
+  min-height: calc(100vh - 64px);
   border-radius: 0;
   position: relative;
   overflow: hidden;
