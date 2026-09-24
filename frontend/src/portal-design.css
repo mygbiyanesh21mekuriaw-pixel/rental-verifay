@@ -25,11 +25,37 @@ body {
 }
 
 .app-main {
-  max-width: 1440px;
-  padding: 32px;
+  max-width: none;
+  margin-left: 260px;
+  width: calc(100% - 260px);
+  padding: 20px 30px;
+  padding-top: 80px;
+  box-sizing: border-box;
 }
 
-.app:has(.navbar-authenticated) .app-main { max-width: none; width: calc(100% - var(--rv-sidebar-width)); margin-left: var(--rv-sidebar-width); padding: 32px; box-sizing: border-box; }
+.app:has(.navbar-authenticated) .app-main {
+  max-width: none;
+  width: calc(100% - var(--rv-sidebar-width));
+  margin-left: var(--rv-sidebar-width);
+  padding: 20px 30px;
+  padding-top: 80px;
+  box-sizing: border-box;
+}
+
+.page-container,
+.dashboard-container,
+.content-wrapper {
+  width: 100%;
+  max-width: none;
+}
+
+.dashboard-container {
+  margin-top: 20px;
+}
+
+main {
+  margin-top: 0;
+}
 
 .app:has(.navbar-authenticated) .app-footer {
   margin-left: var(--rv-sidebar-width);
@@ -42,40 +68,64 @@ body {
   width: var(--rv-sidebar-width);
   background: var(--rv-surface);
   border-right: 1px solid var(--rv-border);
+  padding: 0;
 }
 
 .navbar-authenticated .navbar-container {
   height: 100%;
-  padding: 24px 16px;
+  padding: 0 16px 8px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 24px;
+  gap: 0;
 }
 
 .navbar-authenticated .navbar-logo {
   color: var(--rv-ink);
-  padding: 0 12px 20px;
+  padding: 8px 12px 6px;
   border-bottom: 1px solid var(--rv-border);
+  margin: 0;
+  min-height: 0;
+  gap: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-authenticated .navbar-logo-image {
+  width: 34px;
+  height: 34px;
 }
 
 .navbar-authenticated .navbar-logo-text {
   background: none;
   color: var(--rv-ink);
   -webkit-text-fill-color: initial;
+  font-size: 18px;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.navbar-authenticated .navbar-section-label {
+  margin: 10px 0 4px;
+  color: rgba(255,255,255,0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 .navbar-authenticated .navbar-links {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
+  gap: 4px;
   white-space: normal;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .navbar-authenticated .navbar-link {
   color: var(--rv-muted);
-  padding: 11px 14px;
+  padding: 9px 12px;
   border-radius: 8px;
   font-size: 14px;
 }
@@ -105,12 +155,14 @@ body {
 }
 
 .navbar-authenticated .navbar-user-info {
-  margin-top: auto;
+  margin-top: 0;
   color: var(--rv-ink);
   padding: 12px;
   background: var(--rv-page);
   border: 1px solid var(--rv-border);
   border-radius: 10px;
+  display: flex;
+  align-items: center;
 }
 
 .navbar-authenticated .navbar-user-role {
@@ -123,7 +175,8 @@ body {
 
 .navbar-authenticated .navbar-logout-btn {
   justify-content: center;
-  width: 100%;
+  width: auto;
+  margin-left: auto;
   background: var(--rv-brand);
   box-shadow: none;
 }
@@ -284,18 +337,230 @@ body {
   background: var(--rv-brand);
   border-color: var(--rv-brand);
   box-shadow: 0 8px 20px rgba(70, 95, 255, .22);
+}/* ===== Remove Extra Page Scroll ===== */
+
+html,
+body {
+    overflow-x: hidden;
+    margin:0;
+}
+
+
+.app {
+    min-height:100vh;
+}
+
+
+.app-main {
+
+    min-height:0 !important;
+
+    padding-top:25px !important;
+
+    overflow:visible !important;
+
+}
+
+
+
+/* authenticated pages */
+
+.app:has(.navbar-authenticated) .app-main {
+
+    height:auto !important;
+
+    min-height:calc(100vh - 25px);
+
+}
+
+
+
+/* remove extra dashboard height */
+
+.page-container,
+.dashboard-container,
+.content-wrapper {
+
+    min-height:0 !important;
+
+}
+
+
+
+/* sidebar independent scroll */
+
+.navbar-authenticated {
+
+    height:100vh !important;
+
+    overflow-y:auto;
+
+}/* =========================================
+   FINAL SIDEBAR + CONTENT SPACE FIX
+========================================= */
+
+
+/* Sidebar fixed without unnecessary scroll */
+.navbar-authenticated {
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+
+/* Sidebar container fit content */
+.navbar-authenticated .navbar-container {
+  height: 100vh !important;
+  padding: 12px 16px !important;
+}
+
+
+/* Remove big empty sidebar bottom space */
+.navbar-authenticated .navbar-user-info {
+  margin-top: 20px !important;
+}
+
+
+/* Reduce sidebar item spacing */
+.navbar-authenticated .navbar-links {
+  gap: 2px !important;
+  margin-top: 8px !important;
+}
+
+
+/* Section title closer */
+.navbar-authenticated .navbar-section-label {
+  margin-top: 8px !important;
+  margin-bottom: 5px !important;
+}
+
+
+/* Move dashboard content upward */
+.app:has(.navbar-authenticated) .app-main {
+
+  padding-top: 20px !important;
+
+}
+
+
+/* Remove page unwanted scroll */
+html,
+body,
+#root {
+  overflow-x: hidden !important;
+}
+
+/* ===================================
+   REAL FINAL SIDEBAR CLEAN FIX
+=================================== */
+
+
+/* Sidebar */
+.navbar-authenticated {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: var(--rv-sidebar-width) !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+
+/* Sidebar inner */
+.navbar-authenticated .navbar-container {
+  height: auto !important;
+  min-height: 100vh !important;
+  padding: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+
+/* Remove bottom empty space */
+.navbar-authenticated .navbar-user-info {
+  margin-top: 15px !important;
+}
+
+
+/* Links closer */
+.navbar-authenticated .navbar-links {
+  margin-top: 10px !important;
+  gap: 3px !important;
+}
+
+
+/* Main content */
+.app:has(.navbar-authenticated) .app-main {
+
+  margin-left: var(--rv-sidebar-width) !important;
+
+  width: calc(100% - var(--rv-sidebar-width)) !important;
+
+  padding-top: 20px !important;
+
+}
+
+
+/* Remove browser page vertical overflow */
+body {
+  overflow-x: hidden !important;
+}/* =========================================
+   SIDEBAR EMPTY SPACE FIX
+========================================= */
+
+/* Sidebar itself */
+.navbar-authenticated {
+  height: 100vh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Sidebar content */
+.navbar-authenticated .navbar-container {
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 12px 14px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+}
+
+/* Logo */
+.navbar-authenticated .navbar-logo {
+  padding: 0 8px 12px !important;
+  margin: 0 !important;
+}
+
+/* Workspace */
+.navbar-authenticated .navbar-section-label {
+  margin: 10px 0 6px !important;
+}
+
+/* Navigation */
+.navbar-authenticated .navbar-links {
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 2px !important;
+}
+
+/* Navigation buttons */
+.navbar-authenticated .navbar-link {
+  padding: 8px 12px !important;
+  margin: 0 !important;
+}
+
+/* User card */
+.navbar-authenticated .navbar-user-info {
+  margin-top: 12px !important;
+  padding: 10px !important;
+}
+
+/* Prevent flex from pushing user card to bottom */
+.navbar-authenticated .navbar-container > * {
+  flex-shrink: 0 !important;
 }
 
 
 
 
-
-
-
-/* FIX: authenticated sidebar must not create vertical page height */
-.navbar-authenticated { height: 100vh !important; max-height: 100vh !important; overflow-y: auto !important; box-sizing: border-box !important; }
-
-
-/* FINAL SIDEBAR LAYOUT FIX */
-.app .navbar.navbar-authenticated { position: fixed !important; top: 0 !important; left: 0 !important; bottom: 0 !important; height: 100vh !important; width: var(--rv-sidebar-width) !important; overflow-y: auto !important; }
 

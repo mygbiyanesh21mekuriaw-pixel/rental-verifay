@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import axios from 'axios';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
@@ -53,4 +53,20 @@ test('show landlord dashboard actions for the main sections', async () => {
   expect(screen.getByRole('button', { name: /rent payments/i })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /messages/i })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /profile/i })).toBeInTheDocument();
+});
+
+test('clears the session and redirects to login when logout is clicked', async () => {
+  localStorage.setItem('token', 'tenant-token');
+  localStorage.setItem('user', JSON.stringify({ id: 'tenant-1', role: 'tenant', name: 'Tenant Test' }));
+  axios.get.mockResolvedValue({ data: { user: { id: 'tenant-1', role: 'tenant', name: 'Tenant Test' } } });
+  window.history.pushState({}, '', '/tenant-dashboard');
+
+  renderApp();
+
+  const logoutButton = await screen.findByRole('button', { name: /logout/i });
+  fireEvent.click(logoutButton);
+
+  expect(localStorage.getItem('token')).toBeNull();
+  expect(localStorage.getItem('user')).toBeNull();
+  expect(window.location.pathname).toBe('/login');
 });
