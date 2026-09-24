@@ -65,6 +65,40 @@
   white-space: nowrap;
 }
 
+.navbar-topbar {
+  position: fixed;
+  top: 20px;
+  right: 25px;
+  left: auto;
+  height: auto;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  z-index: 999;
+}
+
+.navbar-top-logout-btn {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 8px 16px rgba(79, 70, 229, 0.2);
+}
+
+.navbar-top-logout-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 20px rgba(79, 70, 229, 0.25);
+}
+
 /* ===== የተለመደ ሊንክ ===== */
 .navbar-link {
   color: #cbd5e0;
@@ -156,6 +190,10 @@
 .navbar-user-role.tenant {
   background: rgba(72, 187, 120, 0.3);
   color: #48bb78;
+}
+
+.navbar-logout-btn {
+  margin-left: auto;
 }
 
 /* ===== የመውጫ ቁልፍ ===== */

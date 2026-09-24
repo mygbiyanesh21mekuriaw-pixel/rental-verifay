@@ -32,8 +32,10 @@ const Navbar = () => {
   }, [user]);
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     logout();
-    navigate('/');
+    window.location.href = '/login';
   };
 
   const getInitial = (name) => {
@@ -52,10 +54,6 @@ const Navbar = () => {
   const getRoleClass = (role) => {
     return `navbar-user-role ${role}`;
   };
-
-  if (user?.role === 'landlord') {
-    return null;
-  }
 
   const isPlatformAdmin = user?.role === 'admin' && user?.adminType === 'platform';
   const isAreaAdmin = user?.role === 'admin' && user?.adminType === 'area';
@@ -81,7 +79,6 @@ const Navbar = () => {
             ['💳', 'Payment Period', '/admin-dashboard/payment-period'],
             ['🔔', 'Notifications', '/admin-dashboard/notifications'],
             ['👤', 'Profile', '/admin-dashboard'],
-            ['🚪', 'Logout', 'logout'],
           ]
         : isAreaAdmin
           ? [
@@ -92,127 +89,116 @@ const Navbar = () => {
               ['📋', 'Rental Requests', '/admin-dashboard/rental-requests'],
               ['🔎', 'Under Review', '/admin-dashboard/pending'],
               ['🔔', 'Notifications', '/admin-dashboard/notifications'],
-              ['🚪', 'Logout', 'logout'],
             ]
           : [
               ['⚙️', 'Dashboard', '/admin-dashboard'],
               ['🏠', 'Properties', '/admin-dashboard/all-properties'],
               ['🔔', 'Notifications', '/admin-dashboard/notifications'],
               ['👤', 'Profile', '/admin-dashboard'],
-              ['🚪', 'Logout', 'logout'],
             ];
 
   return (
-    <nav className={`navbar ${user ? 'navbar-authenticated' : ''}`}>
-      <div className="navbar-container">
-        {/* ===== ሎጎ ===== */}
-        <Link to="/" className="navbar-logo">
-          <img
-            src="/mekdela-amba-logo.jpeg"
-            alt="Mekdela Amba University logo"
-            className="navbar-logo-image"
-          />
-          <span className="navbar-logo-text">House Rental Management System</span>
-        </Link>
+    <>
+      {user && (
+        <div className="navbar-topbar">
+          <button type="button" onClick={handleLogout} className="navbar-top-logout-btn">
+            🚪 Logout
+          </button>
+        </div>
+      )}
 
-        {/* ===== ሊንኮች ===== */}
-        <div className="navbar-links">
-          {!user && (
-            <>
-              <Link 
-                to="/" 
-                className={`navbar-link ${location.pathname === '/' ? 'active' : ''}`}
-              >
-                🏠 Home
-              </Link>
+      <nav className={`navbar ${user ? 'navbar-authenticated' : ''}`}>
+        <div className="navbar-container">
+          <Link to="/" className="navbar-logo">
+            <img
+              src="/mekdela-amba-logo.jpeg"
+              alt="Mekdela Amba University logo"
+              className="navbar-logo-image"
+            />
+            <span className="navbar-logo-text">House Rental Management System</span>
+          </Link>
 
-              <Link 
-                to="/about" 
-                className={`navbar-link ${location.pathname === '/about' ? 'active' : ''}`}
-              >
-                ℹ️ About Us
-              </Link>
-              
-              <Link 
-                to="/contact" 
-                className={`navbar-link ${location.pathname === '/contact' ? 'active' : ''}`}
-              >
-                📞 Contact Us
-              </Link>
+          <div className="navbar-links">
+            {!user && (
+              <>
+                <Link
+                  to="/"
+                  className={`navbar-link ${location.pathname === '/' ? 'active' : ''}`}
+                >
+                  🏠 Home
+                </Link>
 
-              <Link 
-                to="/login" 
-                className={`navbar-link ${location.pathname === '/login' ? 'active' : ''}`}
-              >
-                🔐 Login
-              </Link>
-              <Link 
-                to="/register" 
-                className="navbar-link navbar-register-btn"
-              >
-                ✍️ Register
-              </Link>
-            </>
-          )}
+                <Link
+                  to="/about"
+                  className={`navbar-link ${location.pathname === '/about' ? 'active' : ''}`}
+                >
+                  ℹ️ About Us
+                </Link>
 
-          {user && (
-            <>
-              {user?.role !== 'landlord' && (
-                <>
-                  <div className="navbar-section-label">Workspace</div>
-                  {sidebarLinks.map(([icon, label, path]) => {
-                    const isNotificationsItem = label === 'Notifications';
-                    const isLogoutItem = path === 'logout';
+                <Link
+                  to="/contact"
+                  className={`navbar-link ${location.pathname === '/contact' ? 'active' : ''}`}
+                >
+                  📞 Contact Us
+                </Link>
 
-                    if (isLogoutItem) {
+                <Link
+                  to="/login"
+                  className={`navbar-link ${location.pathname === '/login' ? 'active' : ''}`}
+                >
+                  🔐 Login
+                </Link>
+
+                <Link
+                  to="/register"
+                  className="navbar-link navbar-register-btn"
+                >
+                  ✍️ Register
+                </Link>
+              </>
+            )}
+
+            {user && (
+              <>
+                {user?.role !== 'landlord' && (
+                  <>
+                    <div className="navbar-section-label">Workspace</div>
+                    {sidebarLinks.map(([icon, label, path]) => {
+                      const isNotificationsItem = label === 'Notifications';
+
                       return (
-                        <button
-                          key={label}
-                          type="button"
-                          onClick={handleLogout}
-                          className="navbar-link navbar-logout-link"
+                        <Link
+                          key={path}
+                          to={path}
+                          className={`navbar-link ${location.pathname === path ? 'active' : ''}`}
                         >
                           <span aria-hidden="true">{icon}</span> {label}
-                        </button>
+                          {isNotificationsItem && unreadCount > 0 && (
+                            <span className="navbar-notification-badge">{unreadCount}</span>
+                          )}
+                        </Link>
                       );
-                    }
+                    })}
+                  </>
+                )}
 
-                    return (
-                      <Link
-                        key={path}
-                        to={path}
-                        className={`navbar-link ${location.pathname === path ? 'active' : ''}`}
-                      >
-                        <span aria-hidden="true">{icon}</span> {label}
-                        {isNotificationsItem && unreadCount > 0 && (
-                          <span className="navbar-notification-badge">{unreadCount}</span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </>
-              )}
-              
-              <div className="navbar-user-info">
-                <span className="navbar-user-avatar">
-                  {getInitial(user.name)}
-                </span>
-                <span>
-                  {user.name}
-                  <span className={getRoleClass(user.role)}>
-                    {getRoleName(user.role)}
+                <div className="navbar-user-info">
+                  <span className="navbar-user-avatar">
+                    {getInitial(user.name)}
                   </span>
-                </span>
-              </div>
-              
-              <button onClick={handleLogout} className="navbar-logout-btn">
-                🚪 Logout
-              </button>
-            </>
-          )}
+                  <span>
+                    {user.name}
+                    <span className={getRoleClass(user.role)}>
+                      {getRoleName(user.role)}
+                    </span>
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </>
   );
 };
 

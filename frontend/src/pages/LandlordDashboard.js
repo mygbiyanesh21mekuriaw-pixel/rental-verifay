@@ -115,18 +115,6 @@ export const LandlordSidebar = ({ user, notificationCount = 0 }) => {
               <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">👤 Landlord</p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              logout();
-              navigate('/', { replace: true });
-            }}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
-          >
-            <span>🚪</span>
-            <span>Logout</span>
-          </button>
         </div>
     </aside>
   );
