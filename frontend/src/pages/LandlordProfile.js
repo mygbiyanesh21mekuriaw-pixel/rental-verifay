@@ -4,25 +4,109 @@ import axios from 'axios';
 const LandlordProfile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
   const [banks, setBanks] = useState([]);
-  const [bankDetails, setBankDetails] = useState({ bankAccountName: '', bankAccountNumber: '', bankCode: '' });
+
+  const [bankDetails, setBankDetails] = useState({
+    bankAccountName: '',
+    bankAccountNumber: '',
+    bankCode: '',
+  });
+
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
+        setLoading(true);
+        setErrorMessage('');
+
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:5000/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const loadedProfile = response.data.user || response.data;
+
+        if (!token) {
+          setErrorMessage('Login token not found. Please login again.');
+          return;
+        }
+
+        // ==============================
+        // GET CURRENT USER
+        // ==============================
+        const response = await axios.get(
+          'http://localhost:5000/api/auth/me',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const loadedProfile =
+          response.data?.user || response.data;
+
+        if (!loadedProfile) {
+          setErrorMessage('User profile was not returned by the server.');
+          return;
+        }
+
         setProfile(loadedProfile);
-        setBankDetails({ bankAccountName: loadedProfile.bankAccountName || '', bankAccountNumber: '', bankCode: loadedProfile.bankCode || '' });
-        const banksResponse = await axios.get('http://localhost:5000/api/payments/banks', { headers: { Authorization: `Bearer ${token}` } });
-        setBanks(Array.isArray(banksResponse.data) ? banksResponse.data : []);
+
+        setBankDetails({
+          bankAccountName:
+            loadedProfile.bankAccountName || '',
+          bankAccountNumber: '',
+          bankCode:
+            loadedProfile.bankCode || '',
+        });
+
+        // ==============================
+        // GET BANKS
+        // ==============================
+        try {
+          const banksResponse = await axios.get(
+            'http://localhost:5000/api/payments/banks',
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          setBanks(
+            Array.isArray(banksResponse.data)
+              ? banksResponse.data
+              : banksResponse.data?.banks || []
+          );
+        } catch (bankError) {
+          console.error(
+            'Bank loading error:',
+            bankError
+          );
+
+          setBanks([]);
+        }
       } catch (error) {
-        setProfile(null);
+        console.error(
+          'Profile loading error:',
+          error
+        );
+
+        if (error.response) {
+          setErrorMessage(
+            error.response.data?.message ||
+              `Server error: ${error.response.status}`
+          );
+        } else if (error.request) {
+          setErrorMessage(
+            'Backend server is not responding. Make sure the backend is running on port 5000.'
+          );
+        } else {
+          setErrorMessage(
+            error.message ||
+              'Unable to load profile.'
+          );
+        }
       } finally {
         setLoading(false);
       }
@@ -31,71 +115,276 @@ const LandlordProfile = () => {
     loadProfile();
   }, []);
 
+  // ==============================
+  // SAVE BANK DETAILS
+  // ==============================
   const saveBankDetails = async (event) => {
     event.preventDefault();
+
     setSaving(true);
     setSaveMessage('');
+
     try {
       const token = localStorage.getItem('token');
-      await axios.put('http://localhost:5000/api/auth/profile', bankDetails, { headers: { Authorization: `Bearer ${token}` } });
-      setSaveMessage('Bank details saved securely.');
-      setProfile((current) => ({ ...current, bankName: banks.find((bank) => bank.code === bankDetails.bankCode)?.name || current.bankName, bankCode: bankDetails.bankCode, bankAccountMasked: `********${bankDetails.bankAccountNumber.slice(-4)}` }));
-      setBankDetails((current) => ({ ...current, bankAccountNumber: '' }));
+
+      if (!token) {
+        setSaveMessage(
+          'Login token not found. Please login again.'
+        );
+        return;
+      }
+
+      const response = await axios.put(
+        'http://localhost:5000/api/auth/profile',
+        bankDetails,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const updatedUser =
+        response.data?.user;
+
+      if (updatedUser) {
+        setProfile(updatedUser);
+      }
+
+      setSaveMessage(
+        response.data?.message ||
+          'Bank details saved successfully.'
+      );
+
+      setBankDetails((current) => ({
+        ...current,
+        bankAccountNumber: '',
+      }));
     } catch (error) {
-      setSaveMessage(error.response?.data?.message || 'Unable to save bank details.');
+      console.error(
+        'Bank details save error:',
+        error
+      );
+
+      setSaveMessage(
+        error.response?.data?.message ||
+          'Unable to save bank details.'
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  // ==============================
+  // LOADING
+  // ==============================
+  if (loading) {
+    return (
+      <div className="tenant-container tenant-section-page">
+        <div className="tenant-header">
+          <h1 className="tenant-title">
+            👤 Profile
+          </h1>
+        </div>
+
+        <div className="tenant-loading">
+          Loading profile...
+        </div>
+      </div>
+    );
+  }
+
+  // ==============================
+  // ERROR
+  // ==============================
+  if (!profile) {
+    return (
+      <div className="tenant-container tenant-section-page">
+        <div className="tenant-header">
+          <h1 className="tenant-title">
+            👤 Profile
+          </h1>
+        </div>
+
+        <div className="tenant-empty">
+          <h2>Profile could not be loaded</h2>
+
+          <p>
+            {errorMessage ||
+              'Profile not available.'}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
-        <h1 className="tenant-title">👤 Profile</h1>
+        <h1 className="tenant-title">
+          👤 Profile
+        </h1>
       </div>
 
-      {loading ? (
-        <div className="tenant-loading">Loading profile...</div>
-      ) : !profile ? (
-        <div className="tenant-empty">
-          <p>Profile not available.</p>
+      {/* ==============================
+          PROFILE INFORMATION
+      ============================== */}
+      <div className="tenant-request-detail-card">
+
+        <div className="tenant-request-detail-row">
+          <strong>Name:</strong>
+          <span>
+            {profile.name || 'N/A'}
+          </span>
         </div>
-      ) : (
-        <div className="tenant-request-detail-card">
-          <div className="tenant-request-detail-row">
-            <strong>Name:</strong>
-            <span>{profile.name || 'N/A'}</span>
-          </div>
-          <div className="tenant-request-detail-row">
-            <strong>Email:</strong>
-            <span>{profile.email || 'N/A'}</span>
-          </div>
-          <div className="tenant-request-detail-row">
-            <strong>Phone:</strong>
-            <span>{profile.phone || 'N/A'}</span>
-          </div>
-          <div className="tenant-request-detail-row">
-            <strong>Role:</strong>
-            <span>{profile.role || 'landlord'}</span>
-          </div>
-          <form onSubmit={saveBankDetails} className="payment-form">
-            <h2>Chapa payout bank details</h2>
-            <p className="payment-muted">Bank details are sent only to the backend for landlord payouts.</p>
-            {profile.bankAccountMasked && <p className="payment-muted">Bank: {profile.bankName || 'Configured'} · Account: {profile.bankAccountMasked} · Status: Configured</p>}
-            <label htmlFor="bank-code">Bank</label>
-            <select id="bank-code" value={bankDetails.bankCode} onChange={(event) => setBankDetails({ ...bankDetails, bankCode: event.target.value })} required>
-              <option value="" disabled>Select a bank</option>
-              {banks.map((bank) => <option key={bank.code} value={bank.code}>{bank.name}</option>)}
-            </select>
-            <label htmlFor="bank-account-name">Account name</label>
-            <input id="bank-account-name" value={bankDetails.bankAccountName} onChange={(event) => setBankDetails({ ...bankDetails, bankAccountName: event.target.value })} required />
-            <label htmlFor="bank-account-number">Account number</label>
-            <input id="bank-account-number" type="password" value={bankDetails.bankAccountNumber} onChange={(event) => setBankDetails({ ...bankDetails, bankAccountNumber: event.target.value })} required />
-            <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save bank details'}</button>
-            {saveMessage && <p className="payment-muted">{saveMessage}</p>}
-          </form>
+
+        <div className="tenant-request-detail-row">
+          <strong>Email:</strong>
+          <span>
+            {profile.email || 'N/A'}
+          </span>
         </div>
-      )}
+
+        <div className="tenant-request-detail-row">
+          <strong>Phone:</strong>
+          <span>
+            {profile.phone || 'N/A'}
+          </span>
+        </div>
+
+        <div className="tenant-request-detail-row">
+          <strong>Role:</strong>
+          <span>
+            {profile.role || 'landlord'}
+          </span>
+        </div>
+
+        {/* ==============================
+            BANK DETAILS
+        ============================== */}
+
+        <form
+          onSubmit={saveBankDetails}
+          className="payment-form"
+        >
+          <h2>
+            Chapa payout bank details
+          </h2>
+
+          <p className="payment-muted">
+            Bank details are sent securely to
+            the backend for landlord payouts.
+          </p>
+
+          {profile.bankAccountMasked && (
+            <p className="payment-muted">
+              Bank:{' '}
+              {profile.bankName ||
+                'Configured'}
+              {' · '}
+              Account:{' '}
+              {profile.bankAccountMasked}
+              {' · '}
+              Status: Configured
+            </p>
+          )}
+
+          {/* BANK */}
+          <label htmlFor="bank-code">
+            Bank
+          </label>
+
+          <select
+            id="bank-code"
+            value={bankDetails.bankCode}
+            onChange={(event) =>
+              setBankDetails({
+                ...bankDetails,
+                bankCode:
+                  event.target.value,
+              })
+            }
+            required
+          >
+            <option value="" disabled>
+              Select a bank
+            </option>
+
+            {banks.map((bank) => (
+              <option
+                key={bank.code}
+                value={bank.code}
+              >
+                {bank.name}
+              </option>
+            ))}
+          </select>
+
+          {/* ACCOUNT NAME */}
+          <label htmlFor="bank-account-name">
+            Account name
+          </label>
+
+          <input
+            id="bank-account-name"
+            type="text"
+            value={
+              bankDetails.bankAccountName
+            }
+            onChange={(event) =>
+              setBankDetails({
+                ...bankDetails,
+                bankAccountName:
+                  event.target.value,
+              })
+            }
+            required
+          />
+
+          {/* ACCOUNT NUMBER */}
+          <label htmlFor="bank-account-number">
+            Account number
+          </label>
+
+          <input
+            id="bank-account-number"
+            type="password"
+            value={
+              bankDetails.bankAccountNumber
+            }
+            onChange={(event) =>
+              setBankDetails({
+                ...bankDetails,
+                bankAccountNumber:
+                  event.target.value,
+              })
+            }
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={saving}
+          >
+            {saving
+              ? 'Saving...'
+              : 'Save bank details'}
+          </button>
+
+          {saveMessage && (
+            <p className="payment-muted">
+              {saveMessage}
+            </p>
+          )}
+        </form>
+      </div>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-﻿const crypto = require('crypto');
+const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const Payout = require('../models/Payout');
 const Property = require('../models/Property');
@@ -157,20 +157,7 @@ const createPayment = async (req, res) => {
     const tenant = await User.findById(req.user.id).select('email phone');
     if (!tenant) return res.status(403).json({ message: 'Authenticated tenant not found' });
     const existing = await Payment.findOne({ tenant: req.user.id, property: propertyId, paymentPeriod: period });
-
-    if (existing && existing.status === 'paid') {
-      return res.status(409).json({
-        message: 'This payment period has already been paid.',
-        payment: existing,
-      });
-    }
-
-    if (existing && existing.status === 'pending') {
-      return res.status(409).json({
-        message: 'A payment is already pending for this period. Complete the existing checkout first.',
-        payment: existing,
-      });
-    }
+    if (existing) return res.status(409).json({ message: 'A payment already exists for this period', payment: existing });
 
     if (!hasChapaConfig()) {
       const config = getProviderConfig();
