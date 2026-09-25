@@ -813,3 +813,112 @@
  color:#b91c1c;
  margin:10px 0;
 }
+
+.tenant-message-panel {
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  box-shadow:0 4px 12px rgba(0,0,0,.06);
+  padding:24px;
+}
+
+.tenant-message-conversation {
+  background:#f8fafc;
+  border:1px solid #dbeafe;
+  border-radius:10px;
+  color:#1e3a8a;
+  cursor:pointer;
+  display:block;
+  font:inherit;
+  margin:0 0 10px;
+  padding:14px 16px;
+  text-align:left;
+  width:100%;
+}
+
+.tenant-message-conversation:hover {
+  background:#eff6ff;
+}
+
+.tenant-message-list {
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin:18px 0;
+  max-height:360px;
+  overflow-y:auto;
+}
+
+.tenant-message {
+  align-self:flex-start;
+  background:#f1f5f9;
+  border-radius:12px;
+  color:#1e293b;
+  max-width:80%;
+  padding:10px 14px;
+}
+
+.tenant-message-own {
+  align-self:flex-end;
+  background:#dbeafe;
+}
+
+.tenant-message p {
+  margin:0 0 4px;
+  white-space:pre-wrap;
+}
+
+.tenant-message-sender {
+  color:#334155;
+  display:block;
+  font-size:12px;
+  margin-bottom:4px;
+}
+
+.tenant-message small {
+  color:#64748b;
+  font-size:12px;
+}
+
+.tenant-message-form {
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin-top:18px;
+}
+
+.tenant-message-form textarea {
+  background:#fff;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  box-sizing:border-box;
+  color:#1e293b;
+  font:inherit;
+  min-height:90px;
+  padding:12px;
+  resize:vertical;
+  width:100%;
+}
+
+.tenant-message-form textarea:focus {
+  border-color:#2563eb;
+  box-shadow:0 0 0 3px rgba(37,99,235,.15);
+  outline:none;
+}
+
+.tenant-request-message-btn {
+  align-self:flex-start;
+  background:#2563eb;
+  border:0;
+  border-radius:8px;
+  color:#fff;
+  cursor:pointer;
+  font:inherit;
+  font-weight:700;
+  padding:10px 16px;
+}
+
+.tenant-request-message-btn:disabled {
+  cursor:not-allowed;
+  opacity:.6;
+}

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import './TenantDashboard.css';
 
 const LandlordMessages = () => {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [body, setBody] = useState('');
@@ -66,7 +68,16 @@ const LandlordMessages = () => {
             <h2 className="tenant-section-title">💬 Reply Message</h2>
             <p className="tenant-subtitle">{selected.property?.title} · {selected.property?.location}</p>
             <div className="tenant-message-list">
-              {selected.messages?.map(message => <div key={message._id} className="tenant-message"><p>{message.body}</p><small>{new Date(message.sentAt).toLocaleString()}</small></div>)}
+              {selected.messages?.map(message => {
+                const isOwnMessage = String(message.sender?._id || message.sender) === String(user?.id);
+                return (
+                  <div key={message._id} className={`tenant-message ${isOwnMessage ? 'tenant-message-own' : ''}`}>
+                    <strong className="tenant-message-sender">{isOwnMessage ? 'You' : 'Tenant'}</strong>
+                    <p>{message.body}</p>
+                    <small>{new Date(message.sentAt).toLocaleString()}</small>
+                  </div>
+                );
+              })}
             </div>
             <form className="tenant-message-form" onSubmit={sendMessage}>
               <textarea value={body} onChange={event => setBody(event.target.value)} rows="3" placeholder="Reply to tenant" />

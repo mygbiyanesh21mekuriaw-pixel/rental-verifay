@@ -98,6 +98,9 @@ const TenantMessages = () => {
           <div className="tenant-message-list">
             {conversation.messages?.length === 0 ? <p className="tenant-empty">Start the conversation with your landlord.</p> : conversation.messages.map(message => (
               <div key={message._id} className={`tenant-message ${String(message.sender?._id || message.sender) === String(user?.id) ? 'tenant-message-own' : ''}`}>
+                <strong className="tenant-message-sender">
+                  {String(message.sender?._id || message.sender) === String(user?.id) ? 'You' : 'Landlord'}
+                </strong>
                 <p>{message.body}</p>
                 <small>{new Date(message.sentAt).toLocaleString()}</small>
               </div>
