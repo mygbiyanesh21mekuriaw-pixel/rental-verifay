@@ -7,6 +7,7 @@ const {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   getUnreadCount,
+  deleteNotification,
 } = require('../controllers/notificationController');
 const { auth, adminOnly, landlordOnly } = require('../middleware/auth');
 
@@ -29,5 +30,6 @@ router.get('/landlord', auth, landlordOnly, getLandlordNotifications);
 router.get('/unread-count', auth, getUnreadCount);
 router.put('/:id/read', auth, markNotificationAsRead);
 router.put('/read-all', auth, markAllNotificationsAsRead);
+router.delete('/:id', auth, deleteNotification);
 
 module.exports = router;

@@ -10,6 +10,7 @@ const TenantMessages = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const conversationId = searchParams.get('conversationId');
+  const [conversations, setConversations] = useState([]);
   const [conversation, setConversation] = useState(null);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
@@ -25,7 +26,11 @@ const TenantMessages = () => {
       const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setConversation(response.data);
+      if (conversationId) {
+        setConversation(response.data);
+      } else {
+        setConversations(Array.isArray(response.data) ? response.data : []);
+      }
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to load conversation.');
     } finally {
@@ -35,16 +40,12 @@ const TenantMessages = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (!conversationId) {
-      navigate('/tenant/rented-property', { replace: true });
-      return;
-    }
     loadConversation();
-  }, [conversationId, loadConversation, navigate]);
+  }, [conversationId, loadConversation]);
 
   const sendMessage = async (event) => {
     event.preventDefault();
-    if (!body.trim() || sending) return;
+    if (!body.trim() || sending || !conversation) return;
     setSending(true);
     try {
       const token = localStorage.getItem('token');
@@ -54,6 +55,9 @@ const TenantMessages = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setConversation(response.data);
+      setConversations((current) => current.map((item) => (
+        item._id === response.data._id ? response.data : item
+      )));
       setBody('');
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to send message.');
@@ -77,23 +81,33 @@ const TenantMessages = () => {
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
         <h1 className="tenant-title">✉️ Messages</h1>
-        <p className="tenant-subtitle">{conversation.property?.title} · {conversation.property?.location}</p>
-        <p className="tenant-subtitle">Landlord: {conversation.landlord?.name}</p>
+        {conversation && <>
+          <p className="tenant-subtitle">{conversation.property?.title} · {conversation.property?.location}</p>
+          <p className="tenant-subtitle">Landlord: {conversation.landlord?.name}</p>
+        </>}
         <BackToDashboard />
       </div>
       <section className="tenant-section tenant-message-panel">
-        <div className="tenant-message-list">
-          {conversation.messages?.length === 0 ? <p className="tenant-empty">Start the conversation with your landlord.</p> : conversation.messages.map(message => (
-            <div key={message._id} className={`tenant-message ${message.sender === user.id ? 'tenant-message-own' : ''}`}>
-              <p>{message.body}</p>
-              <small>{new Date(message.sentAt).toLocaleString()}</small>
-            </div>
-          ))}
-        </div>
-        <form className="tenant-message-form" onSubmit={sendMessage}>
-          <textarea value={body} onChange={event => setBody(event.target.value)} placeholder="Write a message to your landlord" rows="3" />
-          <button type="submit" className="tenant-request-message-btn" disabled={sending || !body.trim()}>{sending ? 'Sending...' : 'Send message'}</button>
-        </form>
+        {!conversationId && !conversation && conversations.length === 0 && <p className="tenant-empty">No conversations yet.</p>}
+        {!conversationId && !conversation && conversations.map(item => (
+          <button type="button" className="tenant-message-conversation" key={item._id} onClick={() => navigate(`/tenant/messages?conversationId=${item._id}`)}>
+            {item.property?.title || 'Property'} · Landlord: {item.landlord?.name || 'Landlord'}
+          </button>
+        ))}
+        {conversation && <>
+          <div className="tenant-message-list">
+            {conversation.messages?.length === 0 ? <p className="tenant-empty">Start the conversation with your landlord.</p> : conversation.messages.map(message => (
+              <div key={message._id} className={`tenant-message ${String(message.sender?._id || message.sender) === String(user?.id) ? 'tenant-message-own' : ''}`}>
+                <p>{message.body}</p>
+                <small>{new Date(message.sentAt).toLocaleString()}</small>
+              </div>
+            ))}
+          </div>
+          <form className="tenant-message-form" onSubmit={sendMessage}>
+            <textarea value={body} onChange={event => setBody(event.target.value)} placeholder="Write a message to your landlord" rows="3" />
+            <button type="submit" className="tenant-request-message-btn" disabled={sending || !body.trim()}>{sending ? 'Sending...' : 'Send message'}</button>
+          </form>
+        </>}
       </section>
     </div>
   );

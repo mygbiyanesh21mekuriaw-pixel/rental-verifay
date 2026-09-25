@@ -781,3 +781,35 @@
 .app-main {
     padding-top: 80px !important;
 }
+
+.tenant-notification-actions-row {
+ display:flex;
+ align-items:center;
+ gap:10px;
+}
+
+.notification-delete-btn {
+ background:transparent;
+ border:1px solid #fecaca;
+ border-radius:6px;
+ cursor:pointer;
+ font-size:16px;
+ line-height:1;
+ min-height:34px;
+ min-width:34px;
+ padding:6px;
+}
+
+.notification-delete-btn:hover:not(:disabled) {
+ background:#fef2f2;
+}
+
+.notification-delete-btn:disabled {
+ cursor:wait;
+ opacity:.6;
+}
+
+.tenant-notification-error {
+ color:#b91c1c;
+ margin:10px 0;
+}

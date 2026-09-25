@@ -255,6 +255,17 @@ const createRentRequest = async (req, res) => {
       throw saveError;
     }
 
+    await Notification.create({
+      recipientRole: 'admin',
+      property: property._id,
+      rentalRequest: rentRequest._id,
+      propertyTitle: property.title,
+      message: `New rental request submitted by ${tenant.name}.`,
+      type: 'pending',
+      instructions: 'Review this rental request in the Admin Dashboard.',
+      read: false,
+    });
+
     res.status(201).json({
       message: '✅ Rental request submitted successfully! The landlord will review it',
       rentRequest,
@@ -398,6 +409,16 @@ const landlordRespondToRequest = async (req, res) => {
         read: false,
       });
       await notification.save();
+      await Notification.create({
+        recipientRole: 'admin',
+        property: request.property,
+        rentalRequest: request._id,
+        propertyTitle: request.propertyTitle || 'Property',
+        message: `Landlord ${status} the rental request for "${request.propertyTitle || 'the property'}".`,
+        type: notificationType,
+        instructions: `Tenant: ${request.tenant?.name || 'Unknown tenant'}.`,
+        read: false,
+      });
     }
 
     res.json({
