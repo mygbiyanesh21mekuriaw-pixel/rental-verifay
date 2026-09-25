@@ -222,7 +222,10 @@ const TenantSectionPage = ({ type }) => {
           axios.get('http://localhost:5000/api/rent-requests/my-requests', { headers }),
           axios.get('http://localhost:5000/api/notifications', { headers }),
         ]);
-        setNotifications(notificationResponse.data);
+        const notificationRecords = Array.isArray(notificationResponse.data)
+          ? notificationResponse.data
+          : notificationResponse.data?.notifications;
+        setNotifications(Array.isArray(notificationRecords) ? notificationRecords : []);
         setItems(type === 'rented'
           ? response.data.filter(request => isActiveRental(request, user.id)
             && (!rentedPropertyId || String(request.property?._id) === rentedPropertyId))
