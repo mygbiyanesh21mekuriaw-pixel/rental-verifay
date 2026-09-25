@@ -4,6 +4,8 @@ import axios from 'axios';
 const LandlordNotifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState(null);
+  const [actionError, setActionError] = useState('');
 
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 
@@ -13,7 +15,8 @@ const LandlordNotifications = () => {
       const response = await axios.get('http://localhost:5000/api/notifications', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setNotifications(Array.isArray(response.data) ? response.data : []);
+      const records = Array.isArray(response.data) ? response.data : response.data?.notifications;
+      setNotifications(Array.isArray(records) ? records : []);
     } catch (error) {
       setNotifications([]);
     } finally {
@@ -22,6 +25,7 @@ const LandlordNotifications = () => {
   };
 
   const handleMarkRead = async (notificationId) => {
+    setActionError('');
     try {
       const token = localStorage.getItem('token');
       await axios.put(`http://localhost:5000/api/notifications/${notificationId}/read`, {}, {
@@ -32,10 +36,12 @@ const LandlordNotifications = () => {
       )));
     } catch (error) {
       console.error('Unable to mark landlord notification as read:', error);
+      setActionError('Unable to mark the notification as read. Please try again.');
     }
   };
 
   const handleMarkAllRead = async () => {
+    setActionError('');
     try {
       const token = localStorage.getItem('token');
       await axios.put('http://localhost:5000/api/notifications/read-all', {}, {
@@ -44,6 +50,38 @@ const LandlordNotifications = () => {
       setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
     } catch (error) {
       console.error('Unable to mark all landlord notifications as read:', error);
+      setActionError('Unable to mark all notifications as read. Please try again.');
+    }
+  };
+
+  const handleDelete = async (notificationId) => {
+    console.log('DELETE notification ID:', notificationId);
+    if (!notificationId) {
+      setActionError('Unable to delete the notification because its ID is missing.');
+      return;
+    }
+
+    setDeletingId(notificationId);
+    setActionError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(`http://localhost:5000/api/notifications/${notificationId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log('DELETE response status:', response.status);
+      console.log('DELETE response:', response.data);
+      setNotifications((current) => current.filter((notification) => notification._id !== notificationId));
+    } catch (error) {
+      console.error('Unable to delete landlord notification:', error);
+      console.error('DELETE error status:', error.response?.status);
+      console.error('DELETE error response:', error.response?.data);
+      setActionError(
+        error.response?.data?.message ||
+        (error.request ? 'The server did not respond to the delete request.' : error.message) ||
+        'Unable to delete the notification.'
+      );
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -78,6 +116,7 @@ const LandlordNotifications = () => {
               )}
             </div>
           </div>
+          {actionError && <p className="tenant-notification-error" role="alert">{actionError}</p>}
           {notifications.map((notification) => (
             <article key={notification._id} className={`tenant-notification-item ${notification.type || 'info'} ${notification.read ? 'read' : 'unread'}`}>
               <div className="tenant-notification-header">
@@ -85,11 +124,16 @@ const LandlordNotifications = () => {
                   <strong>{notification.propertyTitle || 'Property'}</strong>
                   <small>{new Date(notification.createdAt).toLocaleString()}</small>
                 </div>
-                {!notification.read && (
-                  <button type="button" className="tenant-notification-read-btn" onClick={() => handleMarkRead(notification._id)}>
-                    Mark as read
+                <div className="tenant-notification-actions-row">
+                  {!notification.read && (
+                    <button type="button" className="tenant-notification-read-btn" onClick={() => handleMarkRead(notification._id)}>
+                      Mark as read
+                    </button>
+                  )}
+                  <button type="button" className="notification-delete-btn" onClick={() => handleDelete(notification._id)} disabled={deletingId === notification._id} aria-label="Delete notification" title="Delete notification">
+                    {deletingId === notification._id ? '...' : '🗑️'}
                   </button>
-                )}
+                </div>
               </div>
               <p className="tenant-notification-message">{notification.message}</p>
               {notification.instructions && <p className="tenant-notification-message tenant-notification-instructions">{notification.instructions}</p>}

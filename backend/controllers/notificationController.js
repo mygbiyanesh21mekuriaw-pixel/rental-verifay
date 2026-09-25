@@ -1,188 +1,359 @@
-const mongoose = require('mongoose');
 const Notification = require('../models/Notification');
-const Property = require('../models/Property');
 
-const isValidObjectId = (value) => value && mongoose.Types.ObjectId.isValid(value);
+const getUserId = (user) => user.id || user._id;
 
-// ===== አዲስ ማሳወቂያ መፍጠር =====
-const createNotification = async (tenantId, propertyId, propertyTitle, message, type, instructions) => {
-  try {
-    const notification = new Notification({
-      tenant: tenantId,
-      recipientRole: 'tenant',
-      property: propertyId,
-      propertyTitle: propertyTitle,
-      message: message,
-      type: type,
-      instructions: instructions || '',
-    });
-    await notification.save();
-    return notification;
-  } catch (error) {
-    console.error('Error creating notification:', error);
-    return null;
-  }
-};
-
-const createLandlordNotification = async (landlordId, propertyId, propertyTitle, message, type, instructions) => {
-  try {
-    const notification = new Notification({
-      landlord: landlordId,
-      recipientRole: 'landlord',
-      property: propertyId,
-      propertyTitle,
-      message,
-      type,
-      instructions: instructions || '',
-    });
-    await notification.save();
-    return notification;
-  } catch (error) {
-    console.error('Error creating landlord notification:', error);
-    return null;
-  }
-};
-
-const getAccessibleNotificationFilter = async (req) => {
-  const { role, id: userId } = req.user;
-
-  if (role === 'tenant') {
-    return { tenant: userId, recipientRole: 'tenant' };
-  }
-
-  if (role === 'landlord') {
-    return { landlord: userId, recipientRole: 'landlord' };
-  }
-
-  if (role === 'admin') {
-    return {};
-  }
-
-  return { _id: null };
-};
-
-const getAdminNotifications = async (req, res) => {
-  try {
-    const notifications = await Notification.find({})
-      .populate('tenant', 'name email role')
-      .populate('property', 'title location landlord')
-      .populate('rentalRequest', 'status createdAt')
-      .sort({ createdAt: -1 })
-      .limit(100);
-
-    res.json(notifications);
-  } catch (error) {
-    console.error('Error fetching admin notifications:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// ===== የተከራዩን ማሳወቂያዎች ማግኘት =====
+/**
+ * Get notifications for tenant
+ */
 const getMyNotifications = async (req, res) => {
   try {
-    const tenantId = req.user.id;
-    const notifications = await Notification.find({ tenant: tenantId })
-      .populate('rentalRequest', 'status createdAt')
-      .populate('property', 'title location')
-      .sort({ createdAt: -1 })
-      .limit(50);
+    const notifications = await Notification.find({
+      tenant: getUserId(req.user),
+      recipientRole: 'tenant',
+    })
+      .populate('property', 'title')
+      .populate('rentalRequest')
+      .sort({ createdAt: -1 });
 
-    res.json(notifications);
+    const unreadCount = await Notification.countDocuments({
+      tenant: getUserId(req.user),
+      recipientRole: 'tenant',
+      read: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      unreadCount,
+      notifications,
+    });
   } catch (error) {
-    console.error('Error fetching notifications:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Get tenant notifications error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get notifications',
+      error: error.message,
+    });
   }
 };
 
+/**
+ * Get notifications for landlord
+ */
 const getLandlordNotifications = async (req, res) => {
   try {
-    const landlordId = req.user.id;
     const notifications = await Notification.find({
-      landlord: landlordId,
+      landlord: getUserId(req.user),
       recipientRole: 'landlord',
     })
-      .populate('landlord', 'name email')
-      .populate('property', 'title location')
-      .populate('rentalRequest', 'status createdAt')
-      .sort({ createdAt: -1 })
-      .limit(50);
+      .populate('property', 'title')
+      .populate('rentalRequest')
+      .sort({ createdAt: -1 });
 
-    res.json(notifications);
+    const unreadCount = await Notification.countDocuments({
+      landlord: getUserId(req.user),
+      recipientRole: 'landlord',
+      read: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      unreadCount,
+      notifications,
+    });
   } catch (error) {
-    console.error('Error fetching landlord notifications:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Get landlord notifications error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get landlord notifications',
+      error: error.message,
+    });
   }
 };
 
-// ===== ማሳወቂያ እንደተነበበ ምልክት ማድረግ =====
+/**
+ * Get notifications for admin
+ */
+const getAdminNotifications = async (req, res) => {
+  try {
+    const notifications = await Notification.find({
+      recipientRole: 'admin',
+    })
+      .populate('property', 'title')
+      .populate('rentalRequest')
+      .sort({ createdAt: -1 });
+
+    const unreadCount = await Notification.countDocuments({
+      recipientRole: 'admin',
+      read: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      unreadCount,
+      notifications,
+    });
+  } catch (error) {
+    console.error('Get admin notifications error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get admin notifications',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get unread notification count
+ */
+const getUnreadCount = async (req, res) => {
+  try {
+    let filter = {
+      read: false,
+    };
+
+    if (req.user.role === 'tenant') {
+      filter.tenant = getUserId(req.user);
+      filter.recipientRole = 'tenant';
+    } else if (req.user.role === 'landlord') {
+      filter.landlord = getUserId(req.user);
+      filter.recipientRole = 'landlord';
+    } else if (req.user.role === 'admin') {
+      filter.recipientRole = 'admin';
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid user role',
+      });
+    }
+
+    const unreadCount = await Notification.countDocuments(filter);
+
+    res.status(200).json({
+      success: true,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error('Get unread count error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get unread count',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Mark one notification as read
+ */
 const markNotificationAsRead = async (req, res) => {
   try {
-    const { id } = req.params;
-    if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: 'Invalid notification id' });
-    }
+    const notification = await Notification.findById(req.params.id);
 
-    const notification = await Notification.findById(id).populate('property', 'landlord title');
     if (!notification) {
-      return res.status(404).json({ message: 'Notification not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
     }
 
-    const role = req.user.role;
-    const canAccess =
-      (role === 'tenant' && notification.recipientRole === 'tenant' && String(notification.tenant) === String(req.user.id)) ||
-      (role === 'landlord' && notification.recipientRole === 'landlord' && String(notification.landlord) === String(req.user.id)) ||
-      (role === 'admin');
+    // Check ownership
+    if (req.user.role === 'tenant') {
+      if (
+        notification.recipientRole !== 'tenant' ||
+        !notification.tenant ||
+        notification.tenant.toString() !== getUserId(req.user).toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to access this notification',
+        });
+      }
+    }
 
-    if (!canAccess) {
-      return res.status(403).json({ message: 'Access denied' });
+    if (req.user.role === 'landlord') {
+      if (
+        notification.recipientRole !== 'landlord' ||
+        !notification.landlord ||
+        notification.landlord.toString() !== getUserId(req.user).toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to access this notification',
+        });
+      }
+    }
+
+    if (req.user.role === 'admin') {
+      if (notification.recipientRole !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to access this notification',
+        });
+      }
+    }
+
+    if (!['tenant', 'landlord', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to access this notification',
+      });
     }
 
     notification.read = true;
+
     await notification.save();
 
-    res.json({ message: 'Notification marked as read', notification });
+    res.status(200).json({
+      success: true,
+      message: 'Notification marked as read',
+      notification,
+    });
   } catch (error) {
-    console.error('Error marking notification as read:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Mark notification as read error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notification as read',
+      error: error.message,
+    });
   }
 };
 
-// ===== ሁሉንም ማሳወቂያዎች እንደተነበበ ምልክት ማድረግ =====
+/**
+ * Mark all notifications as read
+ */
 const markAllNotificationsAsRead = async (req, res) => {
   try {
-    const filter = await getAccessibleNotificationFilter(req);
-    if (!filter || Object.keys(filter).length === 0 && req.user.role === 'admin') {
-      await Notification.updateMany({ read: false }, { read: true });
-      return res.json({ message: 'All notifications marked as read' });
+    let filter = {
+      read: false,
+    };
+
+    if (req.user.role === 'tenant') {
+      filter.tenant = getUserId(req.user);
+      filter.recipientRole = 'tenant';
+    } else if (req.user.role === 'landlord') {
+      filter.landlord = getUserId(req.user);
+      filter.recipientRole = 'landlord';
+    } else if (req.user.role === 'admin') {
+      filter.recipientRole = 'admin';
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid user role',
+      });
     }
 
-    await Notification.updateMany({ ...filter, read: false }, { read: true });
-    res.json({ message: 'All notifications marked as read' });
+    const result = await Notification.updateMany(
+      filter,
+      {
+        $set: {
+          read: true,
+        },
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'All notifications marked as read',
+      modifiedCount: result.modifiedCount,
+    });
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Mark all notifications as read error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark all notifications as read',
+      error: error.message,
+    });
   }
 };
 
-// ===== ያልተነበቡ ማሳወቂያዎች ብዛት =====
-const getUnreadCount = async (req, res) => {
+/**
+ * Delete one notification
+ */
+const deleteNotification = async (req, res) => {
   try {
-    const filter = await getAccessibleNotificationFilter(req);
-    const count = await Notification.countDocuments({ ...filter, read: false });
-    res.json({ count });
+    const notification = await Notification.findById(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
+
+    // Tenant can delete only their own notifications
+    if (req.user.role === 'tenant') {
+      if (
+        notification.recipientRole !== 'tenant' ||
+        !notification.tenant ||
+        notification.tenant.toString() !== getUserId(req.user).toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to delete this notification',
+        });
+      }
+    }
+
+    // Landlord can delete only their own notifications
+    if (req.user.role === 'landlord') {
+      if (
+        notification.recipientRole !== 'landlord' ||
+        !notification.landlord ||
+        notification.landlord.toString() !== getUserId(req.user).toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to delete this notification',
+        });
+      }
+    }
+
+    // Admin can delete only admin notifications
+    if (req.user.role === 'admin') {
+      if (notification.recipientRole !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to delete this notification',
+        });
+      }
+    }
+
+    if (!['tenant', 'landlord', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this notification',
+      });
+    }
+
+    await Notification.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification deleted successfully',
+    });
   } catch (error) {
-    console.error('Error getting unread count:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Delete notification error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete notification',
+      error: error.message,
+    });
   }
 };
 
 module.exports = {
-  createNotification,
-  createLandlordNotification,
   getMyNotifications,
   getLandlordNotifications,
   getAdminNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
   getUnreadCount,
+  deleteNotification,
 };

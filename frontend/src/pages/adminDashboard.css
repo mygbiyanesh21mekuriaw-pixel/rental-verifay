@@ -1004,6 +1004,33 @@
   gap: 16px;
 }
 
+.admin-notification-toolbar,
+.admin-notification-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-notification-toolbar {
+  margin-bottom: 16px;
+  color: #4b5563;
+}
+
+.admin-notification-read-btn {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  color: #3730a3;
+  cursor: pointer;
+  padding: 7px 10px;
+}
+
+.admin-notification-read-btn:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
 .admin-notification-item {
   background: white;
   border-radius: 12px;
@@ -1036,6 +1063,22 @@
 .admin-notification-date {
   font-size: 12px;
   color: #9ca3af;
+}
+
+.admin-notification-header {
+  position: relative;
+  padding-right: 48px;
+}
+
+.admin-notification-header .notification-delete-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.admin-notification-error {
+  color: #b91c1c;
+  margin-bottom: 12px;
 }
 
 .admin-notification-message {

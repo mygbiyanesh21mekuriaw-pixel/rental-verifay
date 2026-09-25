@@ -124,6 +124,7 @@ const Navbar = () => {
     ['📝', 'Rental Requests', '/tenant/rental-requests'],
     ['🏠', 'Rented Property', '/tenant/rented-property'],
     ['🔎', 'Search Properties', '/tenant/search'],
+    ['🔔', 'Notifications', '/tenant/notifications'],
   ];
 
   // =========================================================
