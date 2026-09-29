@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import './contactUs.css';
 
 const Contact = () => {
@@ -9,6 +10,22 @@ const Contact = () => {
     message: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [formError, setFormError] = useState('');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    axios.get('http://localhost:5000/api/contact/details')
+      .then((response) => {
+        if (active) setAdminEmail(response.data?.email || '');
+      })
+      .catch(() => {
+        if (active) setAdminEmail('');
+      });
+
+    return () => { active = false; };
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -17,11 +34,19 @@ const Contact = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // ለአሁን ለማሳያ ብቻ
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    setFormError('');
+    setSending(true);
+    try {
+      await axios.post('http://localhost:5000/api/contact', formData);
+      setSubmitted(true);
+      setFormData({ name: '', email: '', subject: '', message: '' });
+    } catch (error) {
+      setFormError(error.response?.data?.message || 'Unable to send your message right now. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -40,16 +65,11 @@ const Contact = () => {
             <h3>Address</h3>
             <p>Addis Ababa, Ethiopia</p>
           </div>
-          <div className="contact-info-card">
-            <span className="contact-info-icon">📞</span>
-            <h3>Phone</h3>
-            <p>+251 9XX-XXXXXX</p>
-          </div>
-          <div className="contact-info-card">
+          {adminEmail && <div className="contact-info-card">
             <span className="contact-info-icon">📧</span>
             <h3>Email</h3>
-            <p>info@rentalverify.com</p>
-          </div>
+            <p><a href={`mailto:${adminEmail}`}>{adminEmail}</a></p>
+          </div>}
           <div className="contact-info-card">
             <span className="contact-info-icon">🕐</span>
             <h3>Business hours</h3>
@@ -61,10 +81,11 @@ const Contact = () => {
           <h2>📝 Send us a message</h2>
           {submitted ? (
             <div className="contact-success">
-              ✅ Your message was sent successfully!
+              ✅ Your message was sent to the Platform Admin.
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="contact-form">
+              {formError && <p className="contact-error" role="alert">{formError}</p>}
               <div className="contact-form-group">
                 <label className="contact-form-label">Full name</label>
                 <input
@@ -112,8 +133,8 @@ const Contact = () => {
                   required
                 />
               </div>
-              <button type="submit" className="contact-form-btn">
-                📤 Send message
+              <button type="submit" className="contact-form-btn" disabled={sending}>
+                {sending ? 'Sending...' : '📤 Send message'}
               </button>
             </form>
           )}

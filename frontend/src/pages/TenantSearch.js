@@ -199,6 +199,7 @@ const defaultFilters = {
   title: '',
   description: '',
   address: '',
+  bedrooms: '',
   region: '',
   zone: '',
   wereda: '',
@@ -232,6 +233,7 @@ const TenantSearch = () => {
         ['title', nextFilters.title],
         ['description', nextFilters.description],
         ['address', nextFilters.address],
+        ['bedrooms', nextFilters.bedrooms],
         ['region', nextFilters.region],
         ['zone', nextFilters.zone],
         ['wereda', nextFilters.wereda],
@@ -338,6 +340,23 @@ const TenantSearch = () => {
           </div>
 
           <div className="tenant-search-controls tenant-search-layout">
+            <label className="tenant-field-label">Bedrooms</label>
+            <div className="tenant-search-input-wrap">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                name="bedrooms"
+                value={filters.bedrooms}
+                onChange={handleFieldChange}
+                placeholder="Bedrooms"
+                className="tenant-search-input"
+              />
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by bedrooms">🔎</button>
+            </div>
+          </div>
+
+          <div className="tenant-search-controls tenant-search-layout">
             <label className="tenant-field-label">Price</label>
             <div className="tenant-search-input-wrap">
               <input
@@ -354,7 +373,18 @@ const TenantSearch = () => {
           </div>
 
           <div className="tenant-search-controls tenant-search-layout">
-            <div className="tenant-field-label" style={{ marginBottom: 0 }}>Address</div>
+            <label className="tenant-field-label">Address</label>
+            <div className="tenant-search-input-wrap">
+              <input
+                type="search"
+                name="address"
+                value={filters.address}
+                onChange={handleFieldChange}
+                placeholder="Address"
+                className="tenant-search-input"
+              />
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by address">🔎</button>
+            </div>
           </div>
 
           <div className="tenant-search-controls tenant-search-layout">

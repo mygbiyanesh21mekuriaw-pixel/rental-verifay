@@ -1,4 +1,6 @@
 const Notification = require('../models/Notification');
+const Property = require('../models/Property');
+const RentalRequest = require('../models/RentalRequest');
 
 const getUserId = (user) => user.id || user._id;
 
@@ -77,6 +79,70 @@ const getLandlordNotifications = async (req, res) => {
  */
 const getAdminNotifications = async (req, res) => {
   try {
+    const pendingProperties = await Property.find({
+      isVerified: false,
+      verificationStatus: 'pending',
+    }).select('_id title').lean();
+
+    if (pendingProperties.length > 0) {
+      const propertyIds = pendingProperties.map((property) => property._id);
+      const existingNotifications = await Notification.find({
+        recipientRole: 'admin',
+        property: { $in: propertyIds },
+        instructions: 'Review this property in the Admin Dashboard.',
+      }).select('property').lean();
+      const notifiedPropertyIds = new Set(
+        existingNotifications.map((notification) => String(notification.property))
+      );
+      const missingNotifications = pendingProperties
+        .filter((property) => !notifiedPropertyIds.has(String(property._id)))
+        .map((property) => ({
+          recipientRole: 'admin',
+          property: property._id,
+          propertyTitle: property.title,
+          message: `Property awaiting verification: "${property.title}".`,
+          type: 'pending',
+          instructions: 'Review this property in the Admin Dashboard.',
+          read: false,
+        }));
+
+      if (missingNotifications.length > 0) {
+        await Notification.insertMany(missingNotifications);
+      }
+    }
+
+    const pendingRequests = await RentalRequest.find({ status: 'pending' })
+      .populate('property', 'title')
+      .select('_id property tenantName')
+      .lean();
+
+    if (pendingRequests.length > 0) {
+      const requestIds = pendingRequests.map((request) => request._id);
+      const existingRequestNotifications = await Notification.find({
+        recipientRole: 'admin',
+        rentalRequest: { $in: requestIds },
+      }).select('rentalRequest').lean();
+      const notifiedRequestIds = new Set(
+        existingRequestNotifications.map((notification) => String(notification.rentalRequest))
+      );
+      const missingRequestNotifications = pendingRequests
+        .filter((request) => request.property && !notifiedRequestIds.has(String(request._id)))
+        .map((request) => ({
+          recipientRole: 'admin',
+          property: request.property._id,
+          rentalRequest: request._id,
+          propertyTitle: request.property.title || 'Property',
+          message: `New rental request submitted by ${request.tenantName || 'a tenant'}.`,
+          type: 'pending',
+          instructions: 'Review this rental request in the Admin Dashboard.',
+          read: false,
+        }));
+
+      if (missingRequestNotifications.length > 0) {
+        await Notification.insertMany(missingRequestNotifications);
+      }
+    }
+
     const notifications = await Notification.find({
       recipientRole: 'admin',
     })

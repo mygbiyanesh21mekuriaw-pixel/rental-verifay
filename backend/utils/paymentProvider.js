@@ -46,6 +46,10 @@ const initializeChapaPayment = async ({ amount, currency = 'ETB', email, phone, 
     '{propertyId}',
     encodeURIComponent(String(metadata.propertyId || ''))
   );
+  const frontendBaseUrl = String(process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/+$/, '');
+  const developmentReturnUrl = `${frontendBaseUrl}/tenant/rent-payment/${encodeURIComponent(String(metadata.propertyId || ''))}`;
+  const resolvedReturnUrl = returnUrl
+    || (process.env.NODE_ENV === 'production' ? configuredReturnUrl : developmentReturnUrl);
 
   const { response, payload } = await fetchProviderJson(`${config.baseUrl}/v1/transaction/initialize`, {
     method: 'POST',
@@ -60,7 +64,7 @@ const initializeChapaPayment = async ({ amount, currency = 'ETB', email, phone, 
       phone: phone || '',
       tx_ref: paymentReference,
       callback_url: callbackUrl || config.callbackUrl,
-      return_url: returnUrl || configuredReturnUrl,
+      return_url: resolvedReturnUrl,
       customization: {
         title: 'RentalVerify',
         description: customizationDescription,

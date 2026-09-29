@@ -52,6 +52,115 @@ const displayRequestStatus = (status, isRented = false) => {
   return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
 };
 
+const RentalReview = ({ propertyId }) => {
+  const [review, setReview] = useState(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    const token = localStorage.getItem('token');
+    axios.get(`http://localhost:5000/api/reviews/my/${propertyId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then((response) => {
+      if (active) setReview(response.data.review || null);
+    }).catch((requestError) => {
+      if (active) setError(requestError.response?.data?.message || 'Unable to check review status.');
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+
+    return () => { active = false; };
+  }, [propertyId]);
+
+  const submitReview = async (event) => {
+    event.preventDefault();
+    if (!rating) {
+      setError('Please select a star rating.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('http://localhost:5000/api/reviews', {
+        propertyId,
+        rating,
+        comment,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setReview(response.data.review);
+      setIsOpen(false);
+    } catch (submitError) {
+      setError(submitError.response?.data?.message || 'Unable to submit your review.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) return <p className="tenant-review-status">Checking review status...</p>;
+  if (review) {
+    return (
+      <div className="tenant-review-saved">
+        <strong>Your review</strong>
+        <span className="tenant-review-stars">{'⭐'.repeat(review.rating)}</span>
+        <p>{review.comment}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tenant-rental-review">
+      {!isOpen && (
+        <button type="button" className="tenant-review-open-btn" onClick={() => setIsOpen(true)}>
+          ⭐ Write a review
+        </button>
+      )}
+      {isOpen && (
+        <form className="tenant-review-form" onSubmit={submitReview}>
+          <label className="tenant-review-label">Your rating</label>
+          <div className="tenant-review-rating-picker" role="group" aria-label="Select a star rating">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                className={`tenant-review-star-btn ${rating >= star ? 'selected' : ''}`}
+                onClick={() => setRating(star)}
+                aria-label={`${star} star${star === 1 ? '' : 's'}`}
+                aria-pressed={rating === star}
+              >
+                {rating >= star ? '★' : '☆'}
+              </button>
+            ))}
+          </div>
+          <label className="tenant-review-label" htmlFor={`review-${propertyId}`}>Your review</label>
+          <textarea
+            id={`review-${propertyId}`}
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            maxLength={2000}
+            rows={3}
+            required
+            placeholder="Share your experience with this property"
+          />
+          {error && <p className="tenant-review-error" role="alert">{error}</p>}
+          <div className="tenant-review-form-actions">
+            <button type="button" className="tenant-review-cancel-btn" onClick={() => setIsOpen(false)}>Cancel</button>
+            <button type="submit" className="tenant-review-submit-btn" disabled={submitting || !comment.trim()}>
+              {submitting ? 'Submitting...' : 'Submit Review'}
+            </button>
+          </div>
+        </form>
+      )}
+      {!isOpen && error && <p className="tenant-review-error" role="alert">{error}</p>}
+    </div>
+  );
+};
+
 const sectionConfig = {
   verified: { title: '✅ Verified properties', empty: 'No verified properties are available yet.' },
   favorites: { title: '❤️ Favorite properties', empty: 'You have no favorite properties yet' },
@@ -160,6 +269,9 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
             </div>
           )}
           {isActiveRental(request, userId) && <div className="tenant-rented-notice">🏠 This property has been rented in your name.</div>}
+          {showActiveRentalActions && isConfirmedRental(request, userId) && (
+            <RentalReview propertyId={request.property?._id} />
+          )}
           {!showActiveRentalActions && notifications.find(notification => String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id))?.message && (
             <div className={`tenant-rental-notification tenant-rental-notification-${request.status}`}>
               {notifications.find(notification => String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id)).message}
@@ -167,13 +279,15 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
           )}
         </div>
         <div className="tenant-request-confirmed-actions">
-          <span
-            role="status"
-            className={`tenant-request-status tenant-request-status-${isApprovedRequest(request) ? 'approved' : request.status}`}
-          >
-            {isActiveRental(request, userId) && showActiveRentalActions ? '🏠 Rented' : isApprovedRequest(request) ? '✅ Approved' : request.status === 'rejected' ? '❌ Rejected' : `⏳ ${displayRequestStatus(request.status)}`}
-          </span>
-          {request._id && (() => {
+          {!showActiveRentalActions && (
+            <span
+              role="status"
+              className={`tenant-request-status tenant-request-status-${isApprovedRequest(request) ? 'approved' : request.status}`}
+            >
+              {isApprovedRequest(request) ? '✅ Approved' : request.status === 'rejected' ? '❌ Rejected' : `⏳ ${displayRequestStatus(request.status)}`}
+            </span>
+          )}
+          {!showActiveRentalActions && request._id && (() => {
             const propertyId = request.property?._id;
             if (!propertyId) return null;
             return (

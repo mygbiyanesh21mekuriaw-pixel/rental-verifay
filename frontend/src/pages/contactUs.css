@@ -62,6 +62,15 @@
   font-size: 14px;
 }
 
+.contact-info-card a {
+  color: #166534;
+  text-decoration: none;
+}
+
+.contact-info-card a:hover {
+  text-decoration: underline;
+}
+
 .contact-form-container {
   background: white;
   padding: 30px;
@@ -156,4 +165,18 @@
   .contact-info {
     grid-template-columns: 1fr;
   }
+}
+
+.contact-form-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+  transform: none;
+}
+
+.contact-error {
+  padding: 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 14px;
 }

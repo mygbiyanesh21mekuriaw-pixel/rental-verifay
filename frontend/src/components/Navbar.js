@@ -31,14 +31,16 @@ const Navbar = () => {
           }
         );
 
-        setUnreadCount(Number(response.data?.count || 0));
+        setUnreadCount(Number(response.data?.unreadCount || 0));
       } catch (error) {
         setUnreadCount(0);
       }
     };
 
     fetchUnreadCount();
-  }, [user]);
+    const refreshInterval = window.setInterval(fetchUnreadCount, 30000);
+    return () => window.clearInterval(refreshInterval);
+  }, [user, location.pathname]);
 
   // ==============================
   // LOGOUT
@@ -106,6 +108,10 @@ const Navbar = () => {
 
     ['🏘️', 'Rented Properties', '/landlord/rented-properties'],
 
+    ['⏳', 'Under Review', '/landlord/under-review'],
+
+    ['❌', 'Rejected', '/landlord/rejected'],
+
     ['💰', 'Rent Payments', '/landlord/rent-payments'],
 
     ['🔔', 'Notifications', '/landlord/notifications'],
@@ -138,7 +144,8 @@ const Navbar = () => {
     ['👤', 'Users', '/admin-dashboard/all-users'],
     ['💳', 'Payment Period', '/admin-dashboard/payment-period'],
     ['🔔', 'Notifications', '/admin-dashboard/notifications'],
-    ['👤', 'Profile', '/admin-dashboard'],
+    ['✉️', 'Contact Messages', '/admin-dashboard/contact-messages'],
+    ['👤', 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
@@ -152,6 +159,7 @@ const Navbar = () => {
     ['📋', 'Rental Requests', '/admin-dashboard/rental-requests'],
     ['🔎', 'Under Review', '/admin-dashboard/pending'],
     ['🔔', 'Notifications', '/admin-dashboard/notifications'],
+    ['👤', 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
@@ -161,7 +169,7 @@ const Navbar = () => {
     ['⚙️', 'Dashboard', '/admin-dashboard'],
     ['🏠', 'Properties', '/admin-dashboard/all-properties'],
     ['🔔', 'Notifications', '/admin-dashboard/notifications'],
-    ['👤', 'Profile', '/admin-dashboard'],
+    ['👤', 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
@@ -279,7 +287,7 @@ const Navbar = () => {
 
                 <Link
                   to="/register"
-                  className="navbar-link navbar-register-btn"
+                  className={`navbar-link ${location.pathname === '/register' ? 'active' : ''}`}
                 >
                   ✍️ Register
                 </Link>

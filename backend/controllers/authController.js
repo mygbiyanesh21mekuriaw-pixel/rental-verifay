@@ -1,8 +1,14 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { createSystemLog } = require('./systemLogController');
 const { listChapaBanks } = require('../utils/payoutProvider');
+const sendEmail = require('../utils/email');
+
+const registrationNamePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
+const registrationEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const registrationPhonePattern = /^(?:0[79]\d{8}|\+251[79]\d{8})$/;
 
 const maskAccountNumber = (value) => {
   const accountNumber = String(value || '');
@@ -36,19 +42,30 @@ const serializeUser = (user) => ({
 const register = async (req, res) => {
   try {
     const { name, email, password, phone, profilePhoto, role } = req.body;
-    const normalizedName = name?.trim();
-    const normalizedEmail = email?.trim().toLowerCase();
+    const normalizedName = String(name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPhone = String(phone || '').trim();
 
-    if (!normalizedName || !normalizedEmail || !password || !role) {
-      return res.status(400).json({ message: 'Name, email, password and role are required' });
+    if (!normalizedName || !normalizedEmail || !password || !normalizedPhone || !role) {
+      return res.status(400).json({ message: 'Name, email, phone, password and role are required.' });
+    }
+
+    if (!registrationNamePattern.test(normalizedName)) {
+      return res.status(400).json({ message: 'Name must contain letters and spaces only.' });
+    }
+    if (!registrationEmailPattern.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Enter a valid email address.' });
+    }
+    if (!registrationPhonePattern.test(normalizedPhone)) {
+      return res.status(400).json({ message: 'Use 09XXXXXXXX, 07XXXXXXXX, +2519XXXXXXXX, or +2517XXXXXXXX.' });
     }
 
     if (!['tenant', 'landlord'].includes(role)) {
       return res.status(400).json({ message: 'Public registration is limited to tenant or landlord accounts' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    if (String(password).length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters.' });
     }
 
     // ተጠቃሚው አስቀድሞ መኖሩን ያረጋግጡ
@@ -66,7 +83,7 @@ const register = async (req, res) => {
       name: normalizedName,
       email: normalizedEmail,
       password: hashedPassword,
-      phone: phone || '',
+      phone: normalizedPhone,
       profilePhoto: profilePhoto?.trim() || '',
       role,
     });
@@ -159,7 +176,7 @@ const getMe = async (req, res) => {
 // የተጠቃሚ መረጃ ማዘመን
 const updateProfile = async (req, res) => {
   try {
-    const { name, phone, profilePhoto, bankAccountName, bankAccountNumber, bankCode } = req.body;
+    const { name, email, phone, profilePhoto, bankAccountName, bankAccountNumber, bankCode } = req.body;
     const userId = req.user.id;
 
     const user = await User.findById(userId);
@@ -167,8 +184,21 @@ const updateProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.name = name || user.name;
-    user.phone = phone || user.phone;
+    if (name !== undefined) {
+      const normalizedName = String(name).trim();
+      if (!normalizedName) return res.status(400).json({ message: 'Name is required.' });
+      user.name = normalizedName;
+    }
+    if (email !== undefined) {
+      const normalizedEmail = String(email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        return res.status(400).json({ message: 'Enter a valid email address.' });
+      }
+      const existingUser = await User.findOne({ email: normalizedEmail, _id: { $ne: userId } }).select('_id');
+      if (existingUser) return res.status(409).json({ message: 'That email address is already in use.' });
+      user.email = normalizedEmail;
+    }
+    if (phone !== undefined) user.phone = String(phone).trim();
     user.profilePhoto = profilePhoto || user.profilePhoto;
     if (user.role === 'landlord') {
       if (bankAccountName !== undefined || bankAccountNumber !== undefined || bankCode !== undefined) {
@@ -206,6 +236,150 @@ const updateProfile = async (req, res) => {
   }
 };
 
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current password and new password are required.' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters.' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    const passwordMatches = await bcrypt.compare(currentPassword, user.password);
+    if (!passwordMatches) return res.status(400).json({ message: 'Current password is incorrect.' });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    await createSystemLog({
+      user: user._id,
+      role: user.role,
+      action: 'PASSWORD_CHANGED',
+      description: `User ${user.name} changed their password.`,
+      status: 'success',
+      ipAddress: req.ip || '',
+    });
+
+    res.json({ message: 'Password changed successfully.' });
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({ message: 'Unable to change password.' });
+  }
+};
+
+const requestPasswordReset = async (req, res) => {
+  const responseMessage = 'If an account exists for that email, password reset instructions will be sent.';
+
+  try {
+    const normalizedEmail = normalizeLoginEmail(req.body.email);
+    if (!registrationEmailPattern.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Enter a valid email address.' });
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const emailConfigured = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    if (isProduction && !emailConfigured) {
+      return res.status(503).json({ message: 'Password reset email is not configured on this server.' });
+    }
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+      role: { $in: ['tenant', 'landlord'] },
+    });
+    if (!user) return res.json({ message: responseMessage });
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.passwordResetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await user.save();
+
+    const frontendUrl = String(process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/+$/, '');
+    const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+    let emailSent = false;
+    if (emailConfigured) {
+      const emailResult = await sendEmail({
+        to: user.email,
+        subject: 'Reset your Rental Verification password',
+        text: `Use this link to reset your password. It expires in one hour: ${resetUrl}`,
+        html: `<p>We received a request to reset your password.</p><p><a href="${resetUrl}">Create a new password</a></p><p>This link expires in one hour. If you did not request this, ignore this email.</p>`,
+      });
+      emailSent = emailResult.success;
+    }
+
+    if (!emailSent && isProduction) {
+      user.passwordResetTokenHash = undefined;
+      user.passwordResetExpiresAt = undefined;
+      await user.save();
+      console.error('Password reset email could not be sent.');
+    }
+
+    if (!emailConfigured && !isProduction) {
+      return res.json({
+        message: 'Email is not configured in development. Use this temporary link to reset your password.',
+        devResetUrl: resetUrl,
+      });
+    }
+
+    if (!emailSent && !isProduction) {
+      return res.json({
+        message: 'The email could not be sent in development. Use this temporary link to reset your password.',
+        devResetUrl: resetUrl,
+      });
+    }
+
+    return res.json({ message: responseMessage });
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    return res.status(500).json({ message: 'Unable to process the password reset request right now.' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: 'Reset token and new password are required.' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters.' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
+    const user = await User.findOne({
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: { $gt: new Date() },
+      role: { $in: ['tenant', 'landlord'] },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'This reset link is invalid or has expired. Request a new one.' });
+    }
+
+    user.password = await bcrypt.hash(String(newPassword), 10);
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpiresAt = undefined;
+    await user.save();
+
+    await createSystemLog({
+      user: user._id,
+      role: user.role,
+      action: 'PASSWORD_RESET',
+      description: `User ${user.name} reset their password using an email link.`,
+      status: 'success',
+      ipAddress: req.ip || '',
+    });
+
+    return res.json({ message: 'Password updated successfully.' });
+  } catch (error) {
+    console.error('Password reset error:', error);
+    return res.status(500).json({ message: 'Unable to reset password right now.' });
+  }
+};
+
 const logout = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('name role');
@@ -224,4 +398,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, logout };
+module.exports = { register, login, getMe, updateProfile, changePassword, requestPasswordReset, resetPassword, logout };

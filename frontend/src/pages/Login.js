@@ -128,7 +128,7 @@ const Login = () => {
                 }}
                 required
                 aria-invalid={Boolean(fieldErrors.password)}
-                className={`pr-11 ${fieldErrors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}`}
+                className={`auth-password-input pr-11 ${fieldErrors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}`}
                 placeholder="••••••••"
               />
               <button
@@ -142,6 +142,10 @@ const Login = () => {
             </div>
             {fieldErrors.password && <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.password}</p>}
           </div>
+
+          {email.trim().toLowerCase() !== platformAdminEmail && (
+            <p className="auth-forgot-password"><Link to="/forgot-password">Forgot Password?</Link></p>
+          )}
           
           <button 
             type="submit" 

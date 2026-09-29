@@ -1,5 +1,6 @@
 const Property = require('../models/Property');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
 const cloudinary = require('../config/cloudinary');
@@ -176,6 +177,16 @@ const createProperty = async (req, res) => {
     });
 
     await verificationRequest.save();
+
+    await Notification.create({
+      recipientRole: 'admin',
+      property: property._id,
+      propertyTitle: property.title,
+      message: `New property submitted for verification: "${property.title}".`,
+      type: 'pending',
+      instructions: 'Review this property in the Admin Dashboard.',
+      read: false,
+    });
 
     res.status(201).json({
       message: 'Property created successfully. Awaiting verification.',
@@ -531,6 +542,16 @@ const updateProperty = async (req, res) => {
       property: property._id,
       status: 'success',
       ipAddress: req.ip || '',
+    });
+
+    await Notification.create({
+      recipientRole: 'admin',
+      property: property._id,
+      propertyTitle: property.title,
+      message: `Property resubmitted for verification: "${property.title}".`,
+      type: 'pending',
+      instructions: 'Review the updated property in the Admin Dashboard.',
+      read: false,
     });
 
     res.json({ message: 'Property updated successfully. Needs re-verification.', property });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import './PropertyDetail.css';
@@ -28,10 +28,7 @@ const PropertyDetail = () => {
   // ===== የተወዳጅ ሁኔታ =====
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // ===== ግምገማ ሁኔታዎች =====
-  const [rating, setRating] = useState(0);
-  const [review, setReview] = useState('');
-  const [showReviewForm, setShowReviewForm] = useState(false);
+  // ===== ግምገማዎች =====
   const [reviews, setReviews] = useState([]);
 
   // ===== የመገናኛ ሁኔታ =====
@@ -108,21 +105,21 @@ const PropertyDetail = () => {
     }
   }, [id, user?.id, user?.role]);
 
-  // useEffect በትክክለኛው ቦታ
+  const fetchReviews = useCallback(async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/reviews/property/${id}`);
+      setReviews(Array.isArray(response.data) ? response.data : []);
+    } catch (reviewError) {
+      console.error('Unable to load property reviews:', reviewError);
+      setReviews([]);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchProperty();
     checkIfFavorite();
     fetchReviews();
-  }, [checkIfFavorite, fetchProperty]);
-
-  // ===== ግምገማዎችን ማምጣት =====
-  const fetchReviews = async () => {
-    // ለአሁን ለማሳያ ብቻ
-    setReviews([
-      { id: 1, user: 'Abeitu Kebede', rating: 5, comment: 'This is a great property!', date: '2026-01-15' },
-      { id: 2, user: 'Selam Alemu', rating: 4, comment: 'A comfortable location.', date: '2026-01-10' },
-    ]);
-  };
+  }, [checkIfFavorite, fetchProperty, fetchReviews]);
 
   // ===== ወደ ተወዳጅ መጨመር/ማስወገድ =====
   const toggleFavorite = async () => {
@@ -212,19 +209,6 @@ const PropertyDetail = () => {
     } finally {
       setAdminActionLoading(false);
     }
-  };
-
-  // ===== ግምገማ መስጠት =====
-  const handleSubmitReview = (e) => {
-    e.preventDefault();
-    if (rating === 0) {
-      alert('Please select a star rating');
-      return;
-    }
-    alert(`✅ Your review was submitted! (${rating} ⭐)`);
-    setShowReviewForm(false);
-    setRating(0);
-    setReview('');
   };
 
   if (loading) {
@@ -500,79 +484,30 @@ const PropertyDetail = () => {
             </div>
           )}
 
-          {/* ===== የግምገማ ክፍል ===== */}
-          <div className="property-divider"></div>
-          <div className="property-reviews-section">
-            <div className="property-reviews-header">
-              <h3 className="property-section-title">⭐ Reviews</h3>
-              {user?.role === 'tenant' && (
-                <button 
-                  onClick={() => setShowReviewForm(!showReviewForm)}
-                  className="property-review-btn"
-                >
-                  {showReviewForm ? '✖ Close' : '✍️ Write a review'}
-                </button>
-              )}
-            </div>
-
-            {/* የግምገማ ቅጽ (Tenant ብቻ) */}
-            {showReviewForm && (
-              <form onSubmit={handleSubmitReview} className="property-review-form">
-                <div className="property-rating">
-                  <label>⭐ Select a rating:</label>
-                  <div className="property-stars">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        className={`property-star ${rating >= star ? 'active' : ''}`}
-                        onClick={() => setRating(star)}
-                      >
-                        {rating >= star ? '⭐' : '☆'}
-                      </button>
-                    ))}
-                  </div>
+          {reviews.length > 0 && (
+            <>
+              <div className="property-divider"></div>
+              <div className="property-reviews-section">
+                <div className="property-reviews-header">
+                  <h3 className="property-section-title">⭐ Reviews</h3>
                 </div>
-                <textarea
-                  className="property-review-input"
-                  placeholder="Write your review..."
-                  value={review}
-                  onChange={(e) => setReview(e.target.value)}
-                />
-                <button type="submit" className="property-submit-review">
-                  📤 Submit review
-                </button>
-              </form>
-            )}
-
-            {/* የቀደሙ ግምገማዎች */}
-            <div className="property-reviews-list">
-              {reviews.length === 0 ? (
-                <p className="property-no-reviews">No reviews yet</p>
-              ) : (
-                reviews.map((review) => (
-                  <div key={review.id} className="property-review-item">
-                    <div className="property-review-header">
-                      <strong>{review.user}</strong>
-                      <span className="property-review-rating">
-                        {'⭐'.repeat(review.rating)}
-                      </span>
-                      <small className="property-review-date">{review.date}</small>
+                <div className="property-reviews-list">
+                  {reviews.map((review) => (
+                    <div key={review._id} className="property-review-item">
+                      <div className="property-review-header">
+                        <strong>{review.tenant?.name || 'Tenant'}</strong>
+                        <span className="property-review-rating">
+                          {'⭐'.repeat(review.rating)}
+                        </span>
+                        <small className="property-review-date">{new Date(review.createdAt).toLocaleDateString()}</small>
+                      </div>
+                      <p className="property-review-comment">{review.comment}</p>
                     </div>
-                    <p className="property-review-comment">{review.comment}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* ===== የተመሳሳይ ቤቶች አገናኝ ===== */}
-          <div className="property-divider"></div>
-          <div className="property-related">
-            <Link to="/search" className="property-related-btn">
-              🔍 Find similar properties
-            </Link>
-          </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -18,11 +18,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/contact', require('./routes/contactRoutes'));
 app.use('/api/properties', require('./routes/propertyRoutes'));
 app.use('/api/rent-requests', require('./routes/rentRequestRoutes'));
 app.use('/api/rental-requests', require('./routes/rentRequestRoutes'));
 app.use('/api/view-history', require('./routes/viewHistoryRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
+app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/favorites', require('./routes/favoriteRoutes'));

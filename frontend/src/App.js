@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
 // CSS
@@ -9,6 +9,8 @@ import './portal-design.css';
 // ገፆች (Pages)
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Home from './pages/Home';
 import LandlordDashboard, { LandlordLayout } from './pages/LandlordDashboard';
 import LandlordSectionPage from './pages/LandlordSectionPage';
@@ -16,6 +18,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminAnalytics from './pages/AdminAnalytics';
 import AdminSectionPage from './pages/AdminSectionPage';
 import AdminNotifications from './pages/AdminNotifications';
+import AdminContactMessages from './pages/AdminContactMessages';
+import AdminProfile from './pages/AdminProfile';
 import AdminMessages from './pages/AdminMessages';
 import PropertyDetail from './pages/PropertyDetail';
 import TenantDashboard from './pages/TenantDashboard';
@@ -32,6 +36,7 @@ import LandlordRequests from './pages/LandlordRequests';
 import LandlordRequestDetail from './pages/LandlordRequestDetail';
 import LandlordNotifications from './pages/LandlordNotifications';
 import LandlordProfile from './pages/LandlordProfile';
+import LandlordReviews from './pages/LandlordReviews';
 import TenantRentalRequestDetail from './pages/TenantRentalRequestDetail';
 import AdminSystemLogs from './pages/AdminSystemLogs';
 
@@ -138,6 +143,8 @@ const PublicAliasRoute = ({ target }) => {
 };
 
 function App() {
+  const { user } = useAuth();
+
   return (
     <div className="app">
       <Router>
@@ -155,6 +162,8 @@ function App() {
             <Route path="/contact-us" element={<PublicAliasRoute target="/contact" />} />
             <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
             <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route 
               path="/landlord/add-property" 
@@ -202,6 +211,7 @@ function App() {
             <Route path="/landlord/rent-payments" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordPayments /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/rental-requests" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordRequests /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/rental-requests/:requestId" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordRequestDetail /></LandlordLayout></PrivateRoute>} />
+            <Route path="/landlord/reviews" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordReviews /></LandlordLayout></PrivateRoute>} />
             
             {/* ===== Landlord ብቻ ===== */}
             <Route 
@@ -300,6 +310,8 @@ function App() {
             <Route path="/admin-dashboard/verified" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="verified" /></PrivateRoute>} />
             <Route path="/admin-dashboard/rejected" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="rejected" /></PrivateRoute>} />
             <Route path="/admin-dashboard/notifications" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminNotifications /></PrivateRoute>} />
+            <Route path="/admin-dashboard/contact-messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminContactMessages /></PrivateRoute>} />
+            <Route path="/admin-dashboard/profile" element={<PrivateRoute allowedRoles={['admin']}><AdminProfile /></PrivateRoute>} />
             <Route path="/admin-dashboard/messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminMessages /></PrivateRoute>} />
             <Route path="/admin-dashboard/system-logs" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSystemLogs /></PrivateRoute>} />
             <Route path="/admin-dashboard/open" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><Navigate to="/admin-dashboard" replace /></PrivateRoute>} />
@@ -311,14 +323,32 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
-        
-        {/* ===== የግርጌ (Footer) ===== */}
+
         <footer className="app-footer">
-          <p>
-            🏠 House Rental Management System &copy; 2026
-            <br />
-            Built by <a href="/about">Internship Project</a>
-          </p>
+          <div className="app-footer-content">
+            <div className="app-footer-brand">
+              <strong>House Rental Management System</strong>
+              <span>Student Academic Project</span>
+              <span>Mekdela Amba University</span>
+              <span>College of Computing and Informatics</span>
+            </div>
+            <nav className="app-footer-links" aria-label="Footer navigation">
+              <span className="app-footer-heading">Quick links</span>
+              <Link to="/">Home</Link>
+              <Link to="/about">About Us</Link>
+              <Link to="/contact">Contact Us</Link>
+              {!user && <Link to="/login">Login</Link>}
+              {!user && <Link to="/register">Register</Link>}
+            </nav>
+            <div className="app-footer-contact">
+              <span className="app-footer-heading">Contact</span>
+              <a href="mailto:info@rentalverify.com">info@rentalverify.com</a>
+            </div>
+          </div>
+          <div className="app-footer-bottom">
+            <span>© {new Date().getFullYear()} House Rental Management System</span>
+            <span>All Rights Reserved.</span>
+          </div>
         </footer>
       </Router>
     </div>

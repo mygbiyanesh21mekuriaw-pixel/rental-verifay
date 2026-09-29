@@ -9,14 +9,14 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-container">
-      <div className="admin-header">
+      <div className="admin-header admin-dashboard-header">
         <div className="admin-title-wrapper">
           <div>
             <h1 className="admin-title">
               <span className="admin-title-icon">⚙️</span>
               <span className="admin-title-gradient">Admin Dashboard</span>
             </h1>
-            <p className="admin-subtitle">Welcome to the Admin Dashboard, <strong>{user?.name}</strong> ({adminLabel})!</p>
+            <p className="admin-subtitle admin-dashboard-welcome">Welcome to the Admin Dashboard, <strong>{user?.name}</strong> ({adminLabel})!</p>
           </div>
         </div>
       </div>

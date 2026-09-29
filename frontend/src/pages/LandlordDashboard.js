@@ -7,6 +7,7 @@ import LandlordRequests from './LandlordRequests';
 import LandlordPayments from './LandlordPayments';
 import LandlordProfile from './LandlordProfile';
 import LandlordNotifications from './LandlordNotifications';
+import './landlordDashboard.css';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -39,6 +40,7 @@ export const landlordSidebarItems = [
   { key: 'addProperty', label: 'Add Property', icon: '➕', path: '/landlord/add-property' },
   { key: 'rentalRequests', label: 'Rental Requests', icon: '📝', path: '/landlord/rental-requests' },
   { key: 'rented', label: 'Rented Properties', icon: '🏠', path: '/landlord/rented-properties' },
+  { key: 'reviews', label: 'Tenant Reviews', icon: '⭐', path: '/landlord/reviews' },
   { key: 'underReview', label: 'Under Review', icon: '⏳', path: '/landlord/under-review' },
   { key: 'rejected', label: 'Rejected', icon: '❌', path: '/landlord/rejected' },
   { key: 'rentPayments', label: 'Rent Payments', icon: '💰', path: '/landlord/rent-payments' },
@@ -297,6 +299,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
       verified: '/landlord/verified-properties',
       rentalRequests: '/landlord/rental-requests',
       rented: '/landlord/rented-properties',
+      reviews: '/landlord/reviews',
       underReview: '/landlord/under-review',
       rejected: '/landlord/rejected',
       rentPayments: '/landlord/rent-payments',
@@ -498,9 +501,9 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
 
     return (
       <div className="space-y-6">
-        <div className="flex flex-col gap-2 pb-1">
-          <h2 className="text-[32px] font-bold tracking-tight text-slate-900">Landlord Dashboard</h2>
-          <p className="text-base font-medium text-slate-600">Welcome back, {user?.name || 'Landlord'}.</p>
+        <div className="landlord-dashboard-header">
+          <h2 className="landlord-dashboard-title">Landlord Dashboard</h2>
+          <p className="landlord-dashboard-welcome">Welcome to {user?.name || 'Landlord'}.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

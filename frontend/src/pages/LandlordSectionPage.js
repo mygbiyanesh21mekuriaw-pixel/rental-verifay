@@ -51,6 +51,7 @@ const LandlordSectionPage = ({ type }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [properties, setProperties] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const config = sectionConfig[type];
 
@@ -61,6 +62,20 @@ const LandlordSectionPage = ({ type }) => {
       const response = await axios.get('http://localhost:5000/api/properties', {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (type === 'rented') {
+        try {
+          const reviewsResponse = await axios.get('http://localhost:5000/api/reviews/landlord', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setReviews(Array.isArray(reviewsResponse.data) ? reviewsResponse.data : []);
+        } catch (reviewError) {
+          console.error('Error fetching landlord reviews:', reviewError);
+          setReviews([]);
+        }
+      } else {
+        setReviews([]);
+      }
 
       const myProperties = response.data.filter((property) => {
         const landlordId = property.landlord && typeof property.landlord === 'object'
@@ -159,6 +174,35 @@ const LandlordSectionPage = ({ type }) => {
                   />
                 </div>
               )}
+              {type === 'rented' && (() => {
+                const propertyReviews = reviews.filter((review) => (
+                  String(review.property?._id || review.property) === String(property._id)
+                ));
+                if (propertyReviews.length === 0) return null;
+
+                return (
+                  <section style={styles.reviewSection} aria-label={`Tenant reviews for ${property.title}`}>
+                    <h4 style={styles.reviewTitle}>⭐ Tenant Reviews</h4>
+                    {propertyReviews.map((review) => (
+                      <article key={review._id} style={styles.reviewCard}>
+                        <div style={styles.reviewHeader}>
+                          <strong>{review.tenant?.name || 'Tenant'}</strong>
+                          <span style={styles.reviewRating} aria-label={`${review.rating} out of 5 stars`}>
+                            {'⭐'.repeat(review.rating)}
+                          </span>
+                        </div>
+                        <p style={styles.reviewProperty}>{property.title}</p>
+                        <p style={styles.reviewComment}>{review.comment}</p>
+                        <time style={styles.reviewDate} dateTime={review.createdAt}>
+                          {new Date(review.createdAt).toLocaleDateString(undefined, {
+                            year: 'numeric', month: 'short', day: 'numeric',
+                          })}
+                        </time>
+                      </article>
+                    ))}
+                  </section>
+                );
+              })()}
               <div style={styles.cardActions}>
                 {type === 'rented' && (
                   <button 
@@ -345,6 +389,52 @@ const styles = {
     border: '1px solid #cbd5e0',
     borderRadius: '8px',
     backgroundColor: '#f7fafc',
+  },
+  reviewSection: {
+    margin: '0 16px 14px',
+    paddingTop: '12px',
+    borderTop: '1px solid #e2e8f0',
+  },
+  reviewTitle: {
+    margin: '0 0 10px',
+    color: '#172033',
+    fontSize: '14px',
+  },
+  reviewCard: {
+    padding: '12px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    backgroundColor: '#f8fafc',
+  },
+  reviewHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    color: '#1e293b',
+    fontSize: '13px',
+  },
+  reviewRating: {
+    color: '#ca8a04',
+    fontSize: '12px',
+    whiteSpace: 'nowrap',
+  },
+  reviewProperty: {
+    margin: '8px 0 0',
+    color: '#475569',
+    fontSize: '12px',
+    fontWeight: '600',
+  },
+  reviewComment: {
+    margin: '8px 0',
+    color: '#334155',
+    fontSize: '13px',
+    lineHeight: 1.5,
+    overflowWrap: 'anywhere',
+  },
+  reviewDate: {
+    color: '#64748b',
+    fontSize: '11px',
   },
   cardActions: {
     padding: '0 16px 16px',

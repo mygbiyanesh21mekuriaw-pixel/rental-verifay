@@ -10,6 +10,7 @@ const dashboardPaths = {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const namePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
+const phonePattern = /^(?:0[79]\d{8}|\+251[79]\d{8})$/;
 
 const EyeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
@@ -26,13 +27,13 @@ const EyeOffIcon = () => (
   </svg>
 );
 
-const validateRegisterForm = ({ name, email, password, confirmPassword, role }) => {
+const validateRegisterForm = ({ name, email, phone, password, confirmPassword, role }) => {
   const nextErrors = {};
   const trimmedName = String(name || '').trim();
   const trimmedEmail = String(email || '').trim();
 
   if (!trimmedName || !namePattern.test(trimmedName)) {
-    nextErrors.name = 'Name must contain letters only';
+    nextErrors.name = 'Use letters and spaces only';
   }
 
   if (!trimmedEmail) {
@@ -41,10 +42,17 @@ const validateRegisterForm = ({ name, email, password, confirmPassword, role }) 
     nextErrors.email = 'Please enter a valid email address';
   }
 
+  const trimmedPhone = String(phone || '').trim();
+  if (!trimmedPhone) {
+    nextErrors.phone = 'Phone number is required';
+  } else if (!phonePattern.test(trimmedPhone)) {
+    nextErrors.phone = 'Use 09XXXXXXXX, 07XXXXXXXX, +2519XXXXXXXX, or +2517XXXXXXXX';
+  }
+
   if (!password) {
     nextErrors.password = 'Password is required';
-  } else if (String(password).length < 6) {
-    nextErrors.password = 'Password must be at least 6 characters';
+  } else if (String(password).length < 8) {
+    nextErrors.password = 'Password must be at least 8 characters';
   }
 
   if (!confirmPassword) {
@@ -168,8 +176,12 @@ const Register = () => {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              placeholder="09XX-XXXXXX"
+              required
+              aria-invalid={Boolean(fieldErrors.phone)}
+              className={fieldErrors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}
+              placeholder="0912345678 or +251912345678"
             />
+            {fieldErrors.phone && <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.phone}</p>}
           </div>
 
           {formData.role === 'landlord' && (
@@ -194,8 +206,9 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
+                minLength={8}
                 aria-invalid={Boolean(fieldErrors.password)}
-                className={`pr-11 ${fieldErrors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}`}
+                className={`auth-password-input pr-11 ${fieldErrors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}`}
                 placeholder="••••••••"
               />
               <button
@@ -219,8 +232,9 @@ const Register = () => {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
+                minLength={8}
                 aria-invalid={Boolean(fieldErrors.confirmPassword)}
-                className={`pr-11 ${fieldErrors.confirmPassword ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}`}
+                className={`auth-password-input pr-11 ${fieldErrors.confirmPassword ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}`}
                 placeholder="••••••••"
               />
               <button
