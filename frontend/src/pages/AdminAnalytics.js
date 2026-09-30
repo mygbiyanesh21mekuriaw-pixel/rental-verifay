@@ -98,7 +98,7 @@ const AdminAnalytics = () => {
 
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:5000/api/admin/analytics', {
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/admin/analytics`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setAnalytics(response.data);
@@ -171,11 +171,11 @@ const AdminAnalytics = () => {
   }, [analytics]);
 
   if (loading) {
-    return <div className="admin-container"><div className="admin-empty-text">⏳ Loading analytics...</div></div>;
+    return <div className="admin-container"><div className="admin-empty-text">â³ Loading analytics...</div></div>;
   }
 
   if (error) {
-    return <div className="admin-container"><div className="admin-empty-text">⚠️ {error}</div></div>;
+    return <div className="admin-container"><div className="admin-empty-text">âš ï¸ {error}</div></div>;
   }
 
   if (!analytics) {
@@ -187,11 +187,11 @@ const AdminAnalytics = () => {
       <div className="admin-header">
         <div className="admin-title-wrapper">
           <div>
-            <h1 className="admin-title"><span className="admin-title-icon">📊</span><span className="admin-title-gradient">Admin Analytics</span></h1>
+            <h1 className="admin-title"><span className="admin-title-icon">ðŸ“Š</span><span className="admin-title-gradient">Admin Analytics</span></h1>
             <p className="admin-subtitle">Platform insights from the live database</p>
           </div>
           <button type="button" className="admin-logout-btn" onClick={() => window.location.href = '/admin-dashboard'}>
-            <span className="admin-logout-icon">←</span>
+            <span className="admin-logout-icon">â†</span>
             Back to dashboard
           </button>
         </div>
@@ -243,3 +243,5 @@ const AdminAnalytics = () => {
 };
 
 export default AdminAnalytics;
+
+

@@ -16,7 +16,7 @@ const LandlordRequestDetail = () => {
     const loadRequest = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`http://localhost:5000/api/rent-requests/landlord-requests/${requestId}`, {
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/rent-requests/landlord-requests/${requestId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setRequest(response.data);
@@ -36,7 +36,7 @@ const LandlordRequestDetail = () => {
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
         <h1 className="tenant-title">Rental Request Details</h1>
-        <Link to="/landlord/rental-requests" className="tenant-back-btn">← Back to Requests</Link>
+        <Link to="/landlord/rental-requests" className="tenant-back-btn">â† Back to Requests</Link>
       </div>
 
       {loading ? (
@@ -94,3 +94,4 @@ const LandlordRequestDetail = () => {
 };
 
 export default LandlordRequestDetail;
+

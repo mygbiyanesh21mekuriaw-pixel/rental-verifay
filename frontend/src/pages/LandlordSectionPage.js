@@ -5,27 +5,27 @@ import { useAuth } from '../context/AuthContext';
 
 const sectionConfig = {
   myProperties: {
-    title: '🏠 My Properties',
+    title: 'ðŸ  My Properties',
     empty: 'You have not created any properties yet.',
     filter: () => true,
   },
   verified: { 
-    title: '✅ Verified Properties', 
+    title: 'âœ… Verified Properties', 
     empty: 'You have no verified properties yet.',
     filter: (property) => property.isVerified && property.verificationStatus === 'approved' && property.availabilityStatus !== 'rented'
   },
   underReview: { 
-    title: '⏳ Properties Under Review', 
+    title: 'â³ Properties Under Review', 
     empty: 'You have no properties under review.',
     filter: (property) => !property.isVerified && property.verificationStatus === 'pending' && property.availabilityStatus !== 'rented'
   },
   rejected: {
-    title: '❌ Rejected Properties',
+    title: 'âŒ Rejected Properties',
     empty: 'You have no rejected properties.',
     filter: (property) => !property.isVerified && property.verificationStatus === 'rejected'
   },
   rented: {
-    title: '🏠 Rented Properties',
+    title: 'ðŸ  Rented Properties',
     empty: 'You have no rented properties.',
     filter: (property) => property.availabilityStatus === 'rented'
   },
@@ -33,18 +33,18 @@ const sectionConfig = {
 
 const getPropertyStatusBadge = (property) => {
   if (property.availabilityStatus === 'rented') {
-    return { label: '🏠 Rented', style: styles.rentedBadge };
+    return { label: 'ðŸ  Rented', style: styles.rentedBadge };
   }
 
   if (property.isVerified && property.verificationStatus === 'approved') {
-    return { label: '✅ Verified', style: styles.verifiedBadge };
+    return { label: 'âœ… Verified', style: styles.verifiedBadge };
   }
 
   if (property.verificationStatus === 'pending') {
-    return { label: '⏳ Under review', style: styles.pendingBadge };
+    return { label: 'â³ Under review', style: styles.pendingBadge };
   }
 
-  return { label: '❌ Rejected', style: styles.rejectedBadge };
+  return { label: 'âŒ Rejected', style: styles.rejectedBadge };
 };
 
 const LandlordSectionPage = ({ type }) => {
@@ -59,13 +59,13 @@ const LandlordSectionPage = ({ type }) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/properties', {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/properties`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (type === 'rented') {
         try {
-          const reviewsResponse = await axios.get('http://localhost:5000/api/reviews/landlord', {
+          const reviewsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/reviews/landlord`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           setReviews(Array.isArray(reviewsResponse.data) ? reviewsResponse.data : []);
@@ -106,11 +106,11 @@ const LandlordSectionPage = ({ type }) => {
     if (!window.confirm('Are you sure you want to delete this property?')) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/properties/${id}`, {
+      await axios.delete(`${process.env.REACT_APP_API_URL}/api/properties/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       await fetchProperties();
-      alert('✅ Property deleted successfully.');
+      alert('âœ… Property deleted successfully.');
     } catch (error) {
       alert('Error deleting property: ' + (error.response?.data?.message || error.message));
     }
@@ -136,7 +136,7 @@ const LandlordSectionPage = ({ type }) => {
       </div>
 
       {loading ? (
-        <div style={styles.loading}>⏳ Loading...</div>
+        <div style={styles.loading}>â³ Loading...</div>
       ) : properties.length === 0 ? (
         <div style={styles.noProperties}>{config.empty}</div>
       ) : (
@@ -150,7 +150,7 @@ const LandlordSectionPage = ({ type }) => {
                   style={styles.cardImage}
                 />
               ) : (
-                <div style={styles.cardImagePlaceholder}>📸 No photo</div>
+                <div style={styles.cardImagePlaceholder}>ðŸ“¸ No photo</div>
               )}
               <div style={styles.cardHeader}>
                 <h3 style={styles.cardTitle}>{property.title}</h3>
@@ -159,14 +159,14 @@ const LandlordSectionPage = ({ type }) => {
                   return <span style={statusBadge.style}>{statusBadge.label}</span>;
                 })()}
               </div>
-              <p style={styles.cardLocation}>📍 {property.location}</p>
-              <p style={styles.cardPrice}>💰 ETB {property.price.toLocaleString()}</p>
+              <p style={styles.cardLocation}>ðŸ“ {property.location}</p>
+              <p style={styles.cardPrice}>ðŸ’° ETB {property.price.toLocaleString()}</p>
               {type === 'rented' && property.rentedBy?.name && (
-                <p style={styles.cardLocation}>👤 Tenant: {property.rentedBy.name}</p>
+                <p style={styles.cardLocation}>ðŸ‘¤ Tenant: {property.rentedBy.name}</p>
               )}
               {property.verificationDocument && (
                 <div style={styles.documentSection}>
-                  <strong>📄 Proof of Ownership</strong>
+                  <strong>ðŸ“„ Proof of Ownership</strong>
                   <img
                     src={property.verificationDocument}
                     alt={`Proof of ownership for ${property.title}`}
@@ -182,13 +182,13 @@ const LandlordSectionPage = ({ type }) => {
 
                 return (
                   <section style={styles.reviewSection} aria-label={`Tenant reviews for ${property.title}`}>
-                    <h4 style={styles.reviewTitle}>⭐ Tenant Reviews</h4>
+                    <h4 style={styles.reviewTitle}>â­ Tenant Reviews</h4>
                     {propertyReviews.map((review) => (
                       <article key={review._id} style={styles.reviewCard}>
                         <div style={styles.reviewHeader}>
                           <strong>{review.tenant?.name || 'Tenant'}</strong>
                           <span style={styles.reviewRating} aria-label={`${review.rating} out of 5 stars`}>
-                            {'⭐'.repeat(review.rating)}
+                            {'â­'.repeat(review.rating)}
                           </span>
                         </div>
                         <p style={styles.reviewProperty}>{property.title}</p>
@@ -210,7 +210,7 @@ const LandlordSectionPage = ({ type }) => {
                     style={styles.messageBtn}
                     title="Send message"
                   >
-                    ✉️ Message
+                    âœ‰ï¸ Message
                   </button>
                 )}
                 <button 
@@ -218,14 +218,14 @@ const LandlordSectionPage = ({ type }) => {
                   style={styles.updateBtn}
                   title="Edit property"
                 >
-                  ✏️ Update
+                  âœï¸ Update
                 </button>
                 <button 
                   onClick={() => handleDelete(property._id)}
                   style={styles.deleteBtn}
                   title="Delete property"
                 >
-                  🗑️ Delete
+                  ðŸ—‘ï¸ Delete
                 </button>
                 {type === 'rented' && (
                   <button
@@ -233,7 +233,7 @@ const LandlordSectionPage = ({ type }) => {
                     style={styles.paymentBtn}
                     title="View rent payments"
                   >
-                    💰 Rent Payments
+                    ðŸ’° Rent Payments
                   </button>
                 )}
               </div>
@@ -504,3 +504,5 @@ const styles = {
 };
 
 export default LandlordSectionPage;
+
+

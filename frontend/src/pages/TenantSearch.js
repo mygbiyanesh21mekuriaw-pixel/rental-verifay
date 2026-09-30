@@ -82,7 +82,7 @@ const PropertyMap = ({ properties, selectedPropertyId, onSelectProperty }) => {
   if (validProperties.length === 0) {
     return (
       <div className="tenant-map-empty">
-        <span>📍</span>
+        <span>ðŸ“</span>
         <p>No properties found in this area.</p>
       </div>
     );
@@ -162,34 +162,34 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token, selected, onS
       }}
     >
       <div className="tenant-card-image">
-        {property.images?.[0] ? <img src={property.images[0]} alt={property.title} /> : <div className="tenant-card-no-image">📸</div>}
-        <span className="tenant-card-badge">✅ Verified</span>
+        {property.images?.[0] ? <img src={property.images[0]} alt={property.title} /> : <div className="tenant-card-no-image">ðŸ“¸</div>}
+        <span className="tenant-card-badge">âœ… Verified</span>
       </div>
       <div className="tenant-card-content">
         <h3 className="tenant-card-title">{property.title}</h3>
-        <p className="tenant-card-location">📍 {property.location}</p>
+        <p className="tenant-card-location">ðŸ“ {property.location}</p>
         <p className="tenant-card-detail">
-          📍 {property.city}, {property.subCity}, Kebele {property.kebele}
+          ðŸ“ {property.city}, {property.subCity}, Kebele {property.kebele}
         </p>
-        <p className="tenant-card-price">💰 ETB {property.price?.toLocaleString()}</p>
-        <p className="tenant-card-detail">🚪 {property.bedrooms} bedrooms</p>
-        <p className="tenant-card-detail">👤 Landlord: {property.landlord?.name || 'Not available'}</p>
+        <p className="tenant-card-price">ðŸ’° ETB {property.price?.toLocaleString()}</p>
+        <p className="tenant-card-detail">ðŸšª {property.bedrooms} bedrooms</p>
+        <p className="tenant-card-detail">ðŸ‘¤ Landlord: {property.landlord?.name || 'Not available'}</p>
         {getPropertyCoordinates(property) ? (
-          <p className="tenant-card-detail">🗺️ Map ready</p>
+          <p className="tenant-card-detail">ðŸ—ºï¸ Map ready</p>
         ) : (
-          <p className="tenant-card-detail">🗺️ Location details pending</p>
+          <p className="tenant-card-detail">ðŸ—ºï¸ Location details pending</p>
         )}
         <p className="tenant-card-description">{property.description}</p>
-        <p className="tenant-card-detail">✅ Verification status: Approved</p>
+        <p className="tenant-card-detail">âœ… Verification status: Approved</p>
         <button 
           type="button" 
           className={`tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`} 
           onClick={handleFavorite}
           disabled={isUpdating}
         >
-          {isUpdating ? '⏳' : isFavorite ? '❤️ Favorited' : '❤️ Favorite'}
+          {isUpdating ? 'â³' : isFavorite ? 'â¤ï¸ Favorited' : 'â¤ï¸ Favorite'}
         </button>
-        <Link to={`/property/${property._id}`} className="tenant-card-btn">🏠 Request to Rent</Link>
+        <Link to={`/property/${property._id}`} className="tenant-card-btn">ðŸ  Request to Rent</Link>
       </div>
     </div>
   );
@@ -254,7 +254,7 @@ const TenantSearch = () => {
       if (nextFilters.availability === 'available') params.append('availability', 'available');
       if (nextFilters.sortPrice && nextFilters.sortPrice !== 'recommended') params.append('sortPrice', nextFilters.sortPrice);
 
-      const response = await axios.get(`http://localhost:5000/api/properties?${params.toString()}`, { headers });
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/properties?${params.toString()}`, { headers });
       const availableProperties = uniqueProperties(response.data);
       setProperties(availableProperties);
       setSelectedPropertyId((current) => {
@@ -303,7 +303,7 @@ const TenantSearch = () => {
       <BackToDashboard />
 
       <div className="tenant-header">
-        <h1 className="tenant-title">🔎 Advanced Property Search</h1>
+        <h1 className="tenant-title">ðŸ”Ž Advanced Property Search</h1>
         <p className="tenant-subtitle">Find verified rental properties</p>
       </div>
 
@@ -320,7 +320,7 @@ const TenantSearch = () => {
                 placeholder="Title"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by title">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by title">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -335,7 +335,7 @@ const TenantSearch = () => {
                 placeholder="Description"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by description">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by description">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -352,7 +352,7 @@ const TenantSearch = () => {
                 placeholder="Bedrooms"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by bedrooms">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by bedrooms">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -368,7 +368,7 @@ const TenantSearch = () => {
                 placeholder="Price"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by price">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by price">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -383,7 +383,7 @@ const TenantSearch = () => {
                 placeholder="Address"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by address">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by address">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -398,7 +398,7 @@ const TenantSearch = () => {
                 placeholder="Region"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by region">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by region">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -413,7 +413,7 @@ const TenantSearch = () => {
                 placeholder="Zone"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by zone">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by zone">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -428,7 +428,7 @@ const TenantSearch = () => {
                 placeholder="Wereda"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by wereda">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by wereda">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -443,7 +443,7 @@ const TenantSearch = () => {
                 placeholder="City"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by city">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by city">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -458,7 +458,7 @@ const TenantSearch = () => {
                 placeholder="Sub-city"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by sub-city">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by sub-city">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -473,7 +473,7 @@ const TenantSearch = () => {
                 placeholder="Kebele"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by kebele">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by kebele">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -488,7 +488,7 @@ const TenantSearch = () => {
                 placeholder="House Number"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by house number">🔎</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by house number">ðŸ”Ž</button>
             </div>
           </div>
 
@@ -514,7 +514,7 @@ const TenantSearch = () => {
 
       {errorMessage && (
         <div className="tenant-empty">
-          <span className="tenant-empty-icon">⚠️</span>
+          <span className="tenant-empty-icon">âš ï¸</span>
           <p>{errorMessage}</p>
         </div>
       )}
@@ -526,13 +526,13 @@ const TenantSearch = () => {
       {loading && (
         <div className="tenant-loading">
           <div className="tenant-loading-spinner"></div>
-          <span>⏳ Searching properties...</span>
+          <span>â³ Searching properties...</span>
         </div>
       )}
 
       {!loading && hasSearched && properties.length === 0 && !errorMessage && (
         <div className="tenant-empty">
-          <span className="tenant-empty-icon">😕</span>
+          <span className="tenant-empty-icon">ðŸ˜•</span>
           <p>No properties found matching your filters.</p>
         </div>
       )}
@@ -551,7 +551,7 @@ const TenantSearch = () => {
             <p className="tenant-results-count">Found {properties.length} propert{properties.length === 1 ? 'y' : 'ies'}</p>
             {selectedProperty && (
               <div className="tenant-selected-property-banner">
-                Focused on: <strong>{selectedProperty.title}</strong> · {selectedProperty.location}
+                Focused on: <strong>{selectedProperty.title}</strong> Â· {selectedProperty.location}
               </div>
             )}
           </div>
@@ -576,3 +576,4 @@ const TenantSearch = () => {
 };
 
 export default TenantSearch;
+

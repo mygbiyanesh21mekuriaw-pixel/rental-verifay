@@ -21,7 +21,7 @@ const AdminProfile = () => {
   useEffect(() => {
     let active = true;
     const token = localStorage.getItem('token');
-    axios.get('http://localhost:5000/api/auth/me', {
+    axios.get(`${process.env.REACT_APP_API_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then((response) => {
       if (!active) return;
@@ -47,7 +47,7 @@ const AdminProfile = () => {
     setProfileMessage('');
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.put('http://localhost:5000/api/auth/profile', profileForm, {
+      const response = await axios.put(`${process.env.REACT_APP_API_URL}/api/auth/profile`, profileForm, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const updatedProfile = response.data?.user;
@@ -84,7 +84,7 @@ const AdminProfile = () => {
     setSavingPassword(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.put('http://localhost:5000/api/auth/change-password', {
+      const response = await axios.put(`${process.env.REACT_APP_API_URL}/api/auth/change-password`, {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       }, { headers: { Authorization: `Bearer ${token}` } });
@@ -102,7 +102,7 @@ const AdminProfile = () => {
     return (
       <div className="admin-profile-page">
         <BackToDashboard dashboardRoute="/admin-dashboard" />
-        <h1 className="admin-profile-heading">👤 Profile</h1>
+        <h1 className="admin-profile-heading">ðŸ‘¤ Profile</h1>
         <p className={loadError ? 'admin-profile-message error' : 'admin-profile-message'}>
           {loading ? 'Loading profile...' : loadError || 'Profile is unavailable.'}
         </p>
@@ -118,7 +118,7 @@ const AdminProfile = () => {
       <header className="admin-profile-heading-row">
         <div>
           <p className="admin-profile-eyebrow">ACCOUNT SETTINGS</p>
-          <h1 className="admin-profile-heading">👤 Profile</h1>
+          <h1 className="admin-profile-heading">ðŸ‘¤ Profile</h1>
         </div>
         <span className="admin-profile-role">{roleName}</span>
       </header>
@@ -128,7 +128,7 @@ const AdminProfile = () => {
           <h2 id="admin-profile-details-title">Account information</h2>
           {!editingProfile && (
             <button type="button" className="admin-profile-edit-button" onClick={() => setEditingProfile(true)}>
-              ✏️ Edit Profile
+              âœï¸ Edit Profile
             </button>
           )}
         </div>
@@ -169,7 +169,7 @@ const AdminProfile = () => {
               setPasswordMessage('');
               setEditingPassword(true);
             }}>
-              🔐 Change Password
+              ðŸ” Change Password
             </button>
           )}
         </div>
@@ -198,3 +198,5 @@ const AdminProfile = () => {
 };
 
 export default AdminProfile;
+
+

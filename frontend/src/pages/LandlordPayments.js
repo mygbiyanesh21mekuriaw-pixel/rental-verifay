@@ -34,7 +34,7 @@ const LandlordPayments = () => {
     const loadPayments = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:5000/api/payments/landlord', {
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/payments/landlord`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const landlordPayments = Array.isArray(response.data) ? response.data : [];
@@ -87,3 +87,5 @@ const LandlordPayments = () => {
 };
 
 export default LandlordPayments;
+
+

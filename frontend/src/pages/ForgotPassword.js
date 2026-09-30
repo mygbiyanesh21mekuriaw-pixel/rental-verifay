@@ -16,7 +16,7 @@ const ForgotPassword = () => {
     setError('');
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/forgot-password', { email });
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/forgot-password`, { email });
       setMessage(response.data?.message || 'If an account exists for that email, password reset instructions will be sent.');
       setDevResetUrl(response.data?.devResetUrl || '');
     } catch (requestError) {
@@ -66,3 +66,5 @@ const ForgotPassword = () => {
 };
 
 export default ForgotPassword;
+
+

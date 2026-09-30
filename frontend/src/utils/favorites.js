@@ -14,7 +14,7 @@ export const fetchFavoriteIds = async (token = localStorage.getItem('token')) =>
   }
 
   try {
-    const response = await axios.get('http://localhost:5000/api/favorites', {
+    const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/favorites`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -39,7 +39,7 @@ export const toggleFavorite = async (userId, propertyId, token = null) => {
 
     if (token) {
       const response = await axios.post(
-        'http://localhost:5000/api/favorites/toggle',
+        `${process.env.REACT_APP_API_URL}/api/favorites/toggle`,
         { propertyId: normalizedId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -78,3 +78,5 @@ export const toggleFavorite = async (userId, propertyId, token = null) => {
 
   return !isFavorite;
 };
+
+

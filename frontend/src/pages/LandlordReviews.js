@@ -11,7 +11,7 @@ const LandlordReviews = () => {
     let active = true;
     const token = localStorage.getItem('token');
 
-    axios.get('http://localhost:5000/api/reviews/landlord', {
+    axios.get(`${process.env.REACT_APP_API_URL}/api/reviews/landlord`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then((response) => {
       if (active) setReviews(Array.isArray(response.data) ? response.data : []);
@@ -48,7 +48,7 @@ const LandlordReviews = () => {
                 </div>
                 <div className="landlord-review-meta">
                   <span className="landlord-review-stars" aria-label={`${review.rating} out of 5 stars`}>
-                    {'⭐'.repeat(review.rating)}
+                    {'â­'.repeat(review.rating)}
                   </span>
                   <time dateTime={review.createdAt}>
                     {new Date(review.createdAt).toLocaleDateString(undefined, {
@@ -57,7 +57,7 @@ const LandlordReviews = () => {
                   </time>
                 </div>
               </div>
-              <p className="landlord-review-comment">“{review.comment}”</p>
+              <p className="landlord-review-comment">â€œ{review.comment}â€</p>
             </article>
           ))}
         </div>
@@ -67,3 +67,5 @@ const LandlordReviews = () => {
 };
 
 export default LandlordReviews;
+
+

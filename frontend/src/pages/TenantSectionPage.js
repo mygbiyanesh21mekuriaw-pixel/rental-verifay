@@ -39,7 +39,7 @@ const isActiveRental = (request, userId) => isConfirmedRental(request, userId);
 
 const resolveAssetUrl = (assetPath) => {
   if (!assetPath || /^https?:\/\//i.test(assetPath)) return assetPath;
-  return `http://localhost:5000${assetPath.startsWith('/') ? '' : '/'}${assetPath}`;
+  return `${process.env.REACT_APP_API_URL}${assetPath.startsWith('/') ? '' : '/'}${assetPath}`;
 };
 
 const displayRequestStatus = (status, isRented = false) => {
@@ -64,7 +64,7 @@ const RentalReview = ({ propertyId }) => {
   useEffect(() => {
     let active = true;
     const token = localStorage.getItem('token');
-    axios.get(`http://localhost:5000/api/reviews/my/${propertyId}`, {
+    axios.get(`${process.env.REACT_APP_API_URL}/api/reviews/my/${propertyId}`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then((response) => {
       if (active) setReview(response.data.review || null);
@@ -88,7 +88,7 @@ const RentalReview = ({ propertyId }) => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/reviews', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/reviews`, {
         propertyId,
         rating,
         comment,
@@ -107,7 +107,7 @@ const RentalReview = ({ propertyId }) => {
     return (
       <div className="tenant-review-saved">
         <strong>Your review</strong>
-        <span className="tenant-review-stars">{'⭐'.repeat(review.rating)}</span>
+        <span className="tenant-review-stars">{'â­'.repeat(review.rating)}</span>
         <p>{review.comment}</p>
       </div>
     );
@@ -117,7 +117,7 @@ const RentalReview = ({ propertyId }) => {
     <div className="tenant-rental-review">
       {!isOpen && (
         <button type="button" className="tenant-review-open-btn" onClick={() => setIsOpen(true)}>
-          ⭐ Write a review
+          â­ Write a review
         </button>
       )}
       {isOpen && (
@@ -133,7 +133,7 @@ const RentalReview = ({ propertyId }) => {
                 aria-label={`${star} star${star === 1 ? '' : 's'}`}
                 aria-pressed={rating === star}
               >
-                {rating >= star ? '★' : '☆'}
+                {rating >= star ? 'â˜…' : 'â˜†'}
               </button>
             ))}
           </div>
@@ -162,11 +162,11 @@ const RentalReview = ({ propertyId }) => {
 };
 
 const sectionConfig = {
-  verified: { title: '✅ Verified properties', empty: 'No verified properties are available yet.' },
-  favorites: { title: '❤️ Favorite properties', empty: 'You have no favorite properties yet' },
-  recentlyViewed: { title: '👁️ Recently viewed', empty: 'You have not viewed any properties yet' },
-  rentalRequests: { title: '📝 Rental Requests', empty: 'You have not submitted any rental requests yet.' },
-  rented: { title: '🏠 Rented Property', empty: 'You do not have an approved rented property yet.' },
+  verified: { title: 'âœ… Verified properties', empty: 'No verified properties are available yet.' },
+  favorites: { title: 'â¤ï¸ Favorite properties', empty: 'You have no favorite properties yet' },
+  recentlyViewed: { title: 'ðŸ‘ï¸ Recently viewed', empty: 'You have not viewed any properties yet' },
+  rentalRequests: { title: 'ðŸ“ Rental Requests', empty: 'You have not submitted any rental requests yet.' },
+  rented: { title: 'ðŸ  Rented Property', empty: 'You do not have an approved rented property yet.' },
 };
 
 const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
@@ -191,20 +191,20 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
   return (
   <div className="tenant-card">
     <div className="tenant-card-image">
-      {property.images?.[0] ? <img src={property.images[0]} alt={property.title} /> : <div className="tenant-card-no-image">📸</div>}
-      <span className="tenant-card-badge">✅ Verified</span>
+      {property.images?.[0] ? <img src={property.images[0]} alt={property.title} /> : <div className="tenant-card-no-image">ðŸ“¸</div>}
+      <span className="tenant-card-badge">âœ… Verified</span>
     </div>
     <div className="tenant-card-content">
       <h3 className="tenant-card-title">{property.title}</h3>
-      <p className="tenant-card-location">📍 {property.location}</p>
-      <p className="tenant-card-price">💰 ETB {property.price?.toLocaleString()}</p>
-      <p className="tenant-card-detail">🛏️ {property.bedrooms} rooms</p>
-      <p className="tenant-card-detail">👤 Landlord: {property.landlord?.name || 'Not available'}</p>
+      <p className="tenant-card-location">ðŸ“ {property.location}</p>
+      <p className="tenant-card-price">ðŸ’° ETB {property.price?.toLocaleString()}</p>
+      <p className="tenant-card-detail">ðŸ›ï¸ {property.bedrooms} rooms</p>
+      <p className="tenant-card-detail">ðŸ‘¤ Landlord: {property.landlord?.name || 'Not available'}</p>
       <p className="tenant-card-description">{property.description}</p>
-      <p className="tenant-card-detail">✅ Verification status: Approved</p>
+      <p className="tenant-card-detail">âœ… Verification status: Approved</p>
       {property.verificationDocument && (
         <div className="tenant-proof-section">
-          <strong>📄 Proof of Ownership</strong>
+          <strong>ðŸ“„ Proof of Ownership</strong>
           <img
             src={resolveAssetUrl(property.verificationDocument)}
             alt={`Proof of ownership for ${property.title}`}
@@ -218,9 +218,9 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
         onClick={handleFavorite}
         disabled={isUpdating}
       >
-        {isUpdating ? '⏳' : isFavorite ? '❤️ Favorited' : '❤️ Favorite'}
+        {isUpdating ? 'â³' : isFavorite ? 'â¤ï¸ Favorited' : 'â¤ï¸ Favorite'}
       </button>
-      <Link to={`/property/${property._id}`} className="tenant-card-btn">🏠 Request to Rent</Link>
+      <Link to={`/property/${property._id}`} className="tenant-card-btn">ðŸ  Request to Rent</Link>
     </div>
   </div>
   );
@@ -234,7 +234,7 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
     setOpeningRequestId(request._id);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/messages/conversations/open', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/messages/conversations/open`, {
         propertyId: request.property?._id,
       }, { headers: { Authorization: `Bearer ${token}` } });
       navigate(`/tenant/messages?conversationId=${response.data._id}`, {
@@ -254,15 +254,15 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
           {showActiveRentalActions && request.property?.images?.[0] && (
             <img className="tenant-request-image" src={request.property.images[0]} alt={request.property.title || 'Rented property'} />
           )}
-          <h3 className="tenant-request-title">🏠 {request.property?.title}</h3>
-          <p className="tenant-request-detail">📍 {request.property?.location}</p>
-          <p className="tenant-request-detail">💰 Rent: ETB {Number(request.property?.price || 0).toLocaleString()}</p>
-          <p className="tenant-request-detail">👤 Landlord: {request.landlord?.name || 'Not available'}</p>
-          <p className="tenant-request-detail">📅 Move-in date: {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString() : 'Not provided'}</p>
-          {showActiveRentalActions && request.property?.rentedAt && <p className="tenant-request-detail">📅 Rental started: {new Date(request.property.rentedAt).toLocaleDateString()}</p>}
+          <h3 className="tenant-request-title">ðŸ  {request.property?.title}</h3>
+          <p className="tenant-request-detail">ðŸ“ {request.property?.location}</p>
+          <p className="tenant-request-detail">ðŸ’° Rent: ETB {Number(request.property?.price || 0).toLocaleString()}</p>
+          <p className="tenant-request-detail">ðŸ‘¤ Landlord: {request.landlord?.name || 'Not available'}</p>
+          <p className="tenant-request-detail">ðŸ“… Move-in date: {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString() : 'Not provided'}</p>
+          {showActiveRentalActions && request.property?.rentedAt && <p className="tenant-request-detail">ðŸ“… Rental started: {new Date(request.property.rentedAt).toLocaleDateString()}</p>}
           {request.property?.verificationDocument && (
             <div className="tenant-proof-section">
-              <strong>📄 Proof of Ownership</strong>
+              <strong>ðŸ“„ Proof of Ownership</strong>
               <img
                 src={resolveAssetUrl(request.property.verificationDocument)}
                 alt={`Proof of ownership for ${request.property.title || 'rented property'}`}
@@ -270,7 +270,7 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
               />
             </div>
           )}
-          {isActiveRental(request, userId) && <div className="tenant-rented-notice">🏠 This property has been rented in your name.</div>}
+          {isActiveRental(request, userId) && <div className="tenant-rented-notice">ðŸ  This property has been rented in your name.</div>}
           {showActiveRentalActions && isConfirmedRental(request, userId) && (
             <RentalReview propertyId={request.property?._id} />
           )}
@@ -286,7 +286,7 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
               role="status"
               className={`tenant-request-status tenant-request-status-${isApprovedRequest(request) ? 'approved' : request.status}`}
             >
-              {isApprovedRequest(request) ? '✅ Approved' : request.status === 'rejected' ? '❌ Rejected' : `⏳ ${displayRequestStatus(request.status)}`}
+              {isApprovedRequest(request) ? 'âœ… Approved' : request.status === 'rejected' ? 'âŒ Rejected' : `â³ ${displayRequestStatus(request.status)}`}
             </span>
           )}
           {!showActiveRentalActions && request._id && (() => {
@@ -298,14 +298,14 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
                 state={request.status === 'rejected' ? { fromRejectedRequest: true, property: request.property } : undefined}
                 className="tenant-request-details-btn"
               >
-                👁️ View Details
+                ðŸ‘ï¸ View Details
               </Link>
             );
           })()}
           {showActiveRentalActions && isConfirmedRental(request, userId) && (
             <>
               <button type="button" className="tenant-request-message-btn" onClick={() => openMessage(request)} disabled={openingRequestId === request._id}>
-                {openingRequestId === request._id ? 'Opening...' : '✉️ Message Landlord'}
+                {openingRequestId === request._id ? 'Opening...' : 'âœ‰ï¸ Message Landlord'}
               </button>
               <button
                 type="button"
@@ -314,7 +314,7 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
                   state: { from: '/tenant/rented-property' },
                 })}
               >
-                💳 Pay Rent
+                ðŸ’³ Pay Rent
               </button>
             </>
           )}
@@ -342,8 +342,8 @@ const TenantSectionPage = ({ type }) => {
       const headers = { Authorization: `Bearer ${token}` };
       if (type === 'rentalRequests' || type === 'rented') {
         const [response, notificationResponse] = await Promise.all([
-          axios.get('http://localhost:5000/api/rent-requests/my-requests', { headers }),
-          axios.get('http://localhost:5000/api/notifications', { headers }),
+          axios.get(`${process.env.REACT_APP_API_URL}/api/rent-requests/my-requests`, { headers }),
+          axios.get(`${process.env.REACT_APP_API_URL}/api/notifications`, { headers }),
         ]);
         const notificationRecords = Array.isArray(notificationResponse.data)
           ? notificationResponse.data
@@ -354,7 +354,7 @@ const TenantSectionPage = ({ type }) => {
             && (!rentedPropertyId || String(request.property?._id) === rentedPropertyId))
           : response.data);
       } else if (type === 'recentlyViewed') {
-        const response = await axios.get('http://localhost:5000/api/view-history/my-history', { headers });
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/view-history/my-history`, { headers });
         const seenIds = new Set();
         setItems(response.data.map(entry => entry.property).filter(property => {
           const propertyId = property?._id?.toString();
@@ -363,13 +363,13 @@ const TenantSectionPage = ({ type }) => {
           return true;
         }));
       } else if (type === 'favorites') {
-        const response = await axios.get('http://localhost:5000/api/favorites', { headers });
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/favorites`, { headers });
         const favoriteProperties = uniqueProperties(response.data || []);
         setItems(favoriteProperties);
       } else {
         const params = new URLSearchParams({ verified: 'true' });
         if (type === 'verified' && searchTerm.trim()) params.set('search', searchTerm.trim());
-        const response = await axios.get(`http://localhost:5000/api/properties?${params.toString()}`, { headers });
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/properties?${params.toString()}`, { headers });
         const verifiedProperties = uniqueProperties(response.data);
         setItems(verifiedProperties);
       }
@@ -393,7 +393,7 @@ const TenantSectionPage = ({ type }) => {
   }, [fetchSection]);
 
   if (loading) {
-    return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>⏳ Loading...</span></div>;
+    return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>â³ Loading...</span></div>;
   }
 
   return (
@@ -405,7 +405,7 @@ const TenantSectionPage = ({ type }) => {
       </div>
       <section className="tenant-section">
         {items.length === 0 ? (
-          <div className="tenant-empty"><span className="tenant-empty-icon">😕</span><p>{config.empty}</p></div>
+          <div className="tenant-empty"><span className="tenant-empty-icon">ðŸ˜•</span><p>{config.empty}</p></div>
         ) : type === 'rentalRequests' || type === 'rented' ? (
           <RequestList
             requests={items}
@@ -431,3 +431,5 @@ const TenantSectionPage = ({ type }) => {
 };
 
 export default TenantSectionPage;
+
+

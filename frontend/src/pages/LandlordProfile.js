@@ -34,7 +34,7 @@ const LandlordProfile = () => {
         // GET CURRENT USER
         // ==============================
         const response = await axios.get(
-          'http://localhost:5000/api/auth/me',
+          `${process.env.REACT_APP_API_URL}/api/auth/me`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -65,7 +65,7 @@ const LandlordProfile = () => {
         // ==============================
         try {
           const banksResponse = await axios.get(
-            'http://localhost:5000/api/payments/banks',
+            `${process.env.REACT_APP_API_URL}/api/payments/banks`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -135,7 +135,7 @@ const LandlordProfile = () => {
       }
 
       const response = await axios.put(
-        'http://localhost:5000/api/auth/profile',
+        `${process.env.REACT_APP_API_URL}/api/auth/profile`,
         bankDetails,
         {
           headers: {
@@ -183,7 +183,7 @@ const LandlordProfile = () => {
       <div className="tenant-container tenant-section-page">
         <div className="tenant-header">
           <h1 className="tenant-title">
-            👤 Profile
+            ðŸ‘¤ Profile
           </h1>
         </div>
 
@@ -202,7 +202,7 @@ const LandlordProfile = () => {
       <div className="tenant-container tenant-section-page">
         <div className="tenant-header">
           <h1 className="tenant-title">
-            👤 Profile
+            ðŸ‘¤ Profile
           </h1>
         </div>
 
@@ -229,7 +229,7 @@ const LandlordProfile = () => {
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
         <h1 className="tenant-title">
-          👤 Profile
+          ðŸ‘¤ Profile
         </h1>
       </div>
 
@@ -288,10 +288,10 @@ const LandlordProfile = () => {
               Bank:{' '}
               {profile.bankName ||
                 'Configured'}
-              {' · '}
+              {' Â· '}
               Account:{' '}
               {profile.bankAccountMasked}
-              {' · '}
+              {' Â· '}
               Status: Configured
             </p>
           )}
@@ -390,3 +390,4 @@ const LandlordProfile = () => {
 };
 
 export default LandlordProfile;
+

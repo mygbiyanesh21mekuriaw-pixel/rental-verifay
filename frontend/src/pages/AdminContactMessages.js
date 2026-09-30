@@ -13,7 +13,7 @@ const AdminContactMessages = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/contact/platform-admin/inbox', {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/contact/platform-admin/inbox`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessages(Array.isArray(response.data) ? response.data : []);
@@ -31,7 +31,7 @@ const AdminContactMessages = () => {
   const markRead = async (messageId) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:5000/api/contact/platform-admin/inbox/${messageId}/read`, {}, {
+      await axios.put(`${process.env.REACT_APP_API_URL}/api/contact/platform-admin/inbox/${messageId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessages((current) => current.map((message) => (
@@ -65,7 +65,7 @@ const AdminContactMessages = () => {
               <div className="admin-contact-card-header">
                 <div>
                   <h2>{message.subject}</h2>
-                  <p>{message.name} · <a href={`mailto:${message.email}`}>{message.email}</a></p>
+                  <p>{message.name} Â· <a href={`mailto:${message.email}`}>{message.email}</a></p>
                 </div>
                 <div className="admin-contact-card-meta">
                   <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time>
@@ -83,3 +83,5 @@ const AdminContactMessages = () => {
 };
 
 export default AdminContactMessages;
+
+

@@ -73,7 +73,7 @@ const TenantRentPayment = () => {
     const loadContext = async (showLoading = false) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`http://localhost:5000/api/payments/tenant/property/${propertyId}`, {
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/payments/tenant/property/${propertyId}`, {
           headers: { Authorization: `Bearer ${token}` },
           timeout: PAYMENT_REQUEST_TIMEOUT_MS,
         });
@@ -190,7 +190,7 @@ const TenantRentPayment = () => {
     setSuccess('');
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/payments', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/payments`, {
         propertyId,
         paymentPeriod: normalizedPaymentPeriod,
       }, {
@@ -220,7 +220,7 @@ const TenantRentPayment = () => {
 
   if (loading) return <div className="payment-page-state">Loading rent payment details...</div>;
   const previousPage = location.state?.from || '/tenant/rented-property';
-  const backButton = <BackToDashboard dashboardRoute={previousPage} label="← Back to Previous Page" />;
+  const backButton = <BackToDashboard dashboardRoute={previousPage} label="â† Back to Previous Page" />;
 
   if (error && !context) return <div className="payment-page payment-page-state"><p className="payment-error">{error}</p>{backButton}</div>;
   if (!context) return <div className="payment-page-state">Loading rent payment details...</div>;
@@ -247,7 +247,7 @@ const TenantRentPayment = () => {
         <section className="payment-card payment-property-card">
           <span className="payment-property-badge">Rented property</span>
           <h2>{context.property.title}</h2>
-          <p className="payment-property-location">📍 {context.property.location}</p>
+          <p className="payment-property-location">ðŸ“ {context.property.location}</p>
           <div className="payment-detail-row"><span>Landlord</span><strong>{context.landlord.name}</strong></div>
           <div className="payment-detail-row"><span>Monthly rent</span><strong>ETB {Number(context.property.price).toLocaleString()}</strong></div>
           <div className="payment-detail-row"><span>Payment status</span><strong className={`payment-status payment-status-${latestPayment?.status || 'pending'}`}>{formatStatus(latestPayment?.status || 'pending')}</strong></div>
@@ -282,3 +282,5 @@ const TenantRentPayment = () => {
 };
 
 export default TenantRentPayment;
+
+

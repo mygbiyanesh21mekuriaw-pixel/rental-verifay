@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const res = await axios.get('http://localhost:5000/api/auth/me');
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/auth/me`);
       const authUser = res.data.user || res.data;
       setUser(authUser);
       persistUser(authUser);
@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login', {
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
         email,
         password,
       });
@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/register', userData);
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/register`, userData);
       const jwtToken = res.data.token;
       const authUser = res.data.user;
 
@@ -143,3 +143,4 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+

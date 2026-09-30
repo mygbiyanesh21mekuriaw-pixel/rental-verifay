@@ -15,7 +15,7 @@ const LandlordRequests = () => {
     const loadRequests = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:5000/api/rent-requests/landlord-requests', {
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/rent-requests/landlord-requests`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setRequests(response.data || []);
@@ -32,7 +32,7 @@ const LandlordRequests = () => {
   return (
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
-        <h1 className="tenant-title">📝 Rental Requests</h1>
+        <h1 className="tenant-title">ðŸ“ Rental Requests</h1>
       </div>
 
       {loading ? (
@@ -48,17 +48,17 @@ const LandlordRequests = () => {
               <div className="tenant-request-header">
                 <div>
                   <h3>{request.property?.title || 'Property'}</h3>
-                  <p className="tenant-request-detail">📍 {request.property?.location || 'Location unavailable'}</p>
+                  <p className="tenant-request-detail">ðŸ“ {request.property?.location || 'Location unavailable'}</p>
                 </div>
                 <span className={`tenant-request-status tenant-request-status-${request.status}`}>
                   {formatStatus(request.status)}
                 </span>
               </div>
 
-              <p className="tenant-request-detail">👤 Tenant: {request.tenant?.name || 'Unknown tenant'}</p>
-              <p className="tenant-request-detail">📧 {request.tenant?.email || 'No email available'}</p>
-              <p className="tenant-request-detail">📅 Requested: {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : 'N/A'}</p>
-              <p className="tenant-request-detail">📝 Message: {request.message || 'No message provided'}</p>
+              <p className="tenant-request-detail">ðŸ‘¤ Tenant: {request.tenant?.name || 'Unknown tenant'}</p>
+              <p className="tenant-request-detail">ðŸ“§ {request.tenant?.email || 'No email available'}</p>
+              <p className="tenant-request-detail">ðŸ“… Requested: {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : 'N/A'}</p>
+              <p className="tenant-request-detail">ðŸ“ Message: {request.message || 'No message provided'}</p>
 
               {request.status === 'pending' && (
                 <div className="tenant-request-actions">
@@ -76,3 +76,5 @@ const LandlordRequests = () => {
 };
 
 export default LandlordRequests;
+
+

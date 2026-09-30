@@ -16,7 +16,7 @@ const PropertyDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // ===== የኪራይ ጥያቄ ሁኔታዎች =====
+  // ===== á‹¨áŠªáˆ«á‹­ áŒ¥á‹«á‰„ áˆáŠ”á‰³á‹Žá‰½ =====
   const [showRentModal, setShowRentModal] = useState(false);
   const [rentMessage, setRentMessage] = useState('');
   const [rentPhone, setRentPhone] = useState(user?.phone || '');
@@ -25,17 +25,17 @@ const PropertyDetail = () => {
   const [rentalMessage, setRentalMessage] = useState('');
   const [rentalRequest, setRentalRequest] = useState(null);
 
-  // ===== የተወዳጅ ሁኔታ =====
+  // ===== á‹¨á‰°á‹ˆá‹³áŒ… áˆáŠ”á‰³ =====
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // ===== ግምገማዎች =====
+  // ===== áŒáˆáŒˆáˆ›á‹Žá‰½ =====
   const [reviews, setReviews] = useState([]);
 
-  // ===== የመገናኛ ሁኔታ =====
+  // ===== á‹¨áˆ˜áŒˆáŠ“áŠ› áˆáŠ”á‰³ =====
   const [showContact, setShowContact] = useState(false);
   const [adminActionLoading, setAdminActionLoading] = useState(false);
 
-  // fetchProperty ን በ useCallback ይከተቱ
+  // fetchProperty áŠ• á‰  useCallback á‹­áŠ¨á‰°á‰±
   const fetchProperty = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -44,14 +44,14 @@ const PropertyDetail = () => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
       const res = await axios.get(
-        `http://localhost:5000/api/properties/${id}`,
+        `${process.env.REACT_APP_API_URL}/api/properties/${id}`,
         { headers }
       );
       setProperty(res.data);
       setRentalRequest(null);
 
       if (requestId && user?.role === 'tenant') {
-        const requestResponse = await axios.get(`http://localhost:5000/api/rent-requests/my-requests/${requestId}`, { headers });
+        const requestResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/rent-requests/my-requests/${requestId}`, { headers });
         if (String(requestResponse.data.property?._id) === String(id)) {
           setRentalRequest(requestResponse.data);
         }
@@ -60,7 +60,7 @@ const PropertyDetail = () => {
       if (user?.role === 'tenant' && res.data.isVerified) {
         try {
           await axios.post(
-            'http://localhost:5000/api/view-history',
+            `${process.env.REACT_APP_API_URL}/api/view-history`,
             { propertyId: id },
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -86,7 +86,7 @@ const PropertyDetail = () => {
     }
   }, [id, location.state, requestId, user?.id, user?.role]);
 
-  // ===== የተወዳጅ ሁኔታ ማረጋገጥ =====
+  // ===== á‹¨á‰°á‹ˆá‹³áŒ… áˆáŠ”á‰³ áˆ›áˆ¨áŒ‹áŒˆáŒ¥ =====
   const checkIfFavorite = useCallback(async () => {
     if (user?.role !== 'tenant' || !user?.id || !id) {
       setIsFavorite(false);
@@ -95,7 +95,7 @@ const PropertyDetail = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/favorites/${id}`, {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/favorites/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setIsFavorite(Boolean(response.data?.isFavorited));
@@ -107,7 +107,7 @@ const PropertyDetail = () => {
 
   const fetchReviews = useCallback(async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/reviews/property/${id}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/reviews/property/${id}`);
       setReviews(Array.isArray(response.data) ? response.data : []);
     } catch (reviewError) {
       console.error('Unable to load property reviews:', reviewError);
@@ -121,7 +121,7 @@ const PropertyDetail = () => {
     fetchReviews();
   }, [checkIfFavorite, fetchProperty, fetchReviews]);
 
-  // ===== ወደ ተወዳጅ መጨመር/ማስወገድ =====
+  // ===== á‹ˆá‹° á‰°á‹ˆá‹³áŒ… áˆ˜áŒ¨áˆ˜áˆ­/áˆ›áˆµá‹ˆáŒˆá‹µ =====
   const toggleFavorite = async () => {
     if (user?.role !== 'tenant' || !user.id) return;
 
@@ -135,11 +135,11 @@ const PropertyDetail = () => {
     }
   };
 
-  // ===== የኪራይ ጥያቄ መላክ =====
+  // ===== á‹¨áŠªáˆ«á‹­ áŒ¥á‹«á‰„ áˆ˜áˆ‹áŠ­ =====
   const handleRentRequest = async (e) => {
     e.preventDefault();
     if (!rentMessage.trim() || !rentMoveInDate || !rentPhone.trim()) {
-      setRentalMessage('❌ Please complete the entire form.');
+      setRentalMessage('âŒ Please complete the entire form.');
       return;
     }
     setSubmittingRent(true);
@@ -148,7 +148,7 @@ const PropertyDetail = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'http://localhost:5000/api/rent-requests',
+        `${process.env.REACT_APP_API_URL}/api/rent-requests`,
         {
           propertyId: id,
           message: rentMessage,
@@ -158,19 +158,19 @@ const PropertyDetail = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setRentalMessage('✅ ' + response.data.message);
+      setRentalMessage('âœ… ' + response.data.message);
       setShowRentModal(false);
       setRentMessage('');
       setRentPhone('');
       setRentMoveInDate('');
     } catch (error) {
-      setRentalMessage('❌ ' + (error.response?.data?.message || 'An error occurred'));
+      setRentalMessage('âŒ ' + (error.response?.data?.message || 'An error occurred'));
     } finally {
       setSubmittingRent(false);
     }
   };
 
-  // ===== ከባለቤት ጋር መገናኘት =====
+  // ===== áŠ¨á‰£áˆˆá‰¤á‰µ áŒ‹áˆ­ áˆ˜áŒˆáŠ“áŠ˜á‰µ =====
   const contactLandlord = () => {
     setShowContact(!showContact);
   };
@@ -189,7 +189,7 @@ const PropertyDetail = () => {
     setAdminActionLoading(action);
     try {
       const token = localStorage.getItem('token');
-      const endpoint = `http://localhost:5000/api/admin/${action === 'verify' ? 'verify-property' : 'reject-property'}/${property._id}`;
+      const endpoint = `${process.env.REACT_APP_API_URL}/api/admin/${action === 'verify' ? 'verify-property' : 'reject-property'}/${property._id}`;
       const payload = action === 'reject' ? { comment: 'Documentation insufficient' } : {};
 
       await axios.put(endpoint, payload, {
@@ -215,7 +215,7 @@ const PropertyDetail = () => {
     return (
       <div className="property-loading">
         <div className="property-loading-spinner"></div>
-        <span>⏳ Loading...</span>
+        <span>â³ Loading...</span>
       </div>
     );
   }
@@ -223,11 +223,11 @@ const PropertyDetail = () => {
   if (error) {
     return (
       <div className="property-error">
-        <div className="property-error-icon">😕</div>
+        <div className="property-error-icon">ðŸ˜•</div>
         <h2 className="property-error-title">{error}</h2>
         <p className="property-error-desc">Return to the search page</p>
         <button onClick={() => navigate('/search')} className="property-back-btn">
-          🔙 Back to search
+          ðŸ”™ Back to search
         </button>
       </div>
     );
@@ -235,14 +235,14 @@ const PropertyDetail = () => {
 
   return (
     <div className="property-container">
-      {/* ===== የመመለሻ ቁልፍ ===== */}
+      {/* ===== á‹¨áˆ˜áˆ˜áˆˆáˆ» á‰áˆá ===== */}
       <button onClick={() => navigate('/search')} className="property-back-btn">
-        ← Back to search
+        â† Back to search
       </button>
 
-      {/* ===== ዋና ካርድ ===== */}
+      {/* ===== á‹‹áŠ“ áŠ«áˆ­á‹µ ===== */}
       <div className="property-card">
-        {/* የምስል ክፍል */}
+        {/* á‹¨áˆáˆµáˆ áŠ­ááˆ */}
         <div className="property-image-section">
           {property?.images && property.images.length > 0 ? (
             <>
@@ -265,22 +265,22 @@ const PropertyDetail = () => {
               )}
             </>
           ) : (
-            <div className="property-no-image">📸 No image</div>
+            <div className="property-no-image">ðŸ“¸ No image</div>
           )}
         </div>
 
-        {/* የመረጃ ክፍል */}
+        {/* á‹¨áˆ˜áˆ¨áŒƒ áŠ­ááˆ */}
         <div className="property-info">
           <div className="property-header">
             <h1 className="property-title">{property?.title}</h1>
             <div className="property-header-actions">
               {property?.isVerified && property?.verificationStatus === 'approved' ? (
-                <span className="property-badge property-badge-verified">✅ Verified</span>
+                <span className="property-badge property-badge-verified">âœ… Verified</span>
               ) : (
-                <span className="property-badge property-badge-pending">⏳ Not yet verified</span>
+                <span className="property-badge property-badge-pending">â³ Not yet verified</span>
               )}
               
-              {/* የተወዳጅ ቁልፍ (Tenant ብቻ) */}
+              {/* á‹¨á‰°á‹ˆá‹³áŒ… á‰áˆá (Tenant á‰¥á‰») */}
               {user?.role === 'tenant' && (
                 <button 
                   onClick={(event) => {
@@ -290,36 +290,36 @@ const PropertyDetail = () => {
                   }}
                   className={`property-fav-btn ${isFavorite ? 'active' : ''}`}
                 >
-                  {isFavorite ? '❤️' : '🤍'}
+                  {isFavorite ? 'â¤ï¸' : 'ðŸ¤'}
                 </button>
               )}
             </div>
           </div>
 
-          <p className="property-location">📍 {property?.location}</p>
+          <p className="property-location">ðŸ“ {property?.location}</p>
           {property?.region && (
             <div className="property-address-details">
-              <p>📍 Region: {property.region}</p>
-              <p>📍 Zone: {property.zone}</p>
-              <p>📍 Wereda: {property.wereda}</p>
-              <p>🏙️ City: {property.city}</p>
-              <p>🏙️ Sub-city: {property.subCity}</p>
-              <p>📍 Kebele: {property.kebele}</p>
-              <p>🏠 House Number: {property.houseNumber}</p>
+              <p>ðŸ“ Region: {property.region}</p>
+              <p>ðŸ“ Zone: {property.zone}</p>
+              <p>ðŸ“ Wereda: {property.wereda}</p>
+              <p>ðŸ™ï¸ City: {property.city}</p>
+              <p>ðŸ™ï¸ Sub-city: {property.subCity}</p>
+              <p>ðŸ“ Kebele: {property.kebele}</p>
+              <p>ðŸ  House Number: {property.houseNumber}</p>
             </div>
           )}
-          <p className="property-price">💰 ETB {property?.price?.toLocaleString()}</p>
-          <p className="property-bedrooms">🛏️ {property?.bedrooms} bedrooms</p>
+          <p className="property-price">ðŸ’° ETB {property?.price?.toLocaleString()}</p>
+          <p className="property-bedrooms">ðŸ›ï¸ {property?.bedrooms} bedrooms</p>
           
           <div className="property-divider"></div>
           
-          <h3 className="property-section-title">📝 Description</h3>
+          <h3 className="property-section-title">ðŸ“ Description</h3>
           <p className="property-description">{property?.description}</p>
 
           <div className="property-divider"></div>
 
-          {/* ===== የባለቤት መረጃ ===== */}
-          <h3 className="property-section-title">👤 Landlord information</h3>
+          {/* ===== á‹¨á‰£áˆˆá‰¤á‰µ áˆ˜áˆ¨áŒƒ ===== */}
+          <h3 className="property-section-title">ðŸ‘¤ Landlord information</h3>
           <div className="property-landlord-profile">
             {property?.landlord?.profilePhoto ? (
               <img
@@ -328,7 +328,7 @@ const PropertyDetail = () => {
                 className="property-landlord-photo"
               />
             ) : (
-              <div className="property-landlord-photo-fallback">👤</div>
+              <div className="property-landlord-photo-fallback">ðŸ‘¤</div>
             )}
             <div>
               <p className="property-landlord">
@@ -352,7 +352,7 @@ const PropertyDetail = () => {
                 onClick={() => handleAdminPropertyAction('verify')}
                 disabled={adminActionLoading !== false}
               >
-                {adminActionLoading === 'verify' ? '⏳ Verifying...' : '✅ Verify / Approve'}
+                {adminActionLoading === 'verify' ? 'â³ Verifying...' : 'âœ… Verify / Approve'}
               </button>
               <button
                 type="button"
@@ -360,31 +360,31 @@ const PropertyDetail = () => {
                 onClick={() => handleAdminPropertyAction('reject')}
                 disabled={adminActionLoading !== false}
               >
-                {adminActionLoading === 'reject' ? '⏳ Rejecting...' : '❌ Reject'}
+                {adminActionLoading === 'reject' ? 'â³ Rejecting...' : 'âŒ Reject'}
               </button>
             </div>
           )}
 
-          {/* ===== የመገናኛ ቁልፍ (Tenant ብቻ) ===== */}
+          {/* ===== á‹¨áˆ˜áŒˆáŠ“áŠ› á‰áˆá (Tenant á‰¥á‰») ===== */}
           {user?.role === 'tenant' && (
             <div className="property-contact-section">
               <button 
                 onClick={contactLandlord}
                 className="property-contact-btn"
               >
-                📞 Contact now
+                ðŸ“ž Contact now
               </button>
               {showContact && (
                 <div className="property-contact-info">
-                  <p><strong>📱 Phone:</strong> {property?.landlord?.phone || 'Not available'}</p>
-                  <p><strong>✉️ Email:</strong> {property?.landlord?.email || 'Not available'}</p>
+                  <p><strong>ðŸ“± Phone:</strong> {property?.landlord?.phone || 'Not available'}</p>
+                  <p><strong>âœ‰ï¸ Email:</strong> {property?.landlord?.email || 'Not available'}</p>
                   <p><small>Contact the landlord directly for more information.</small></p>
                 </div>
               )}
             </div>
           )}
 
-          {/* ===== "ተከራይቻለሁ" ቁልፍ (Tenant ብቻ) ===== */}
+          {/* ===== "á‰°áŠ¨áˆ«á‹­á‰»áˆˆáˆ" á‰áˆá (Tenant á‰¥á‰») ===== */}
           {user?.role === 'tenant' && (
             (property?.isVerified && property?.verificationStatus === 'approved' && property?.availabilityStatus === 'available') ||
             (location.state?.fromRejectedRequest && location.state.property?._id === id)
@@ -394,20 +394,20 @@ const PropertyDetail = () => {
                 onClick={() => setShowRentModal(true)}
                 className="property-rent-btn"
               >
-                🏠 Request to Rent
+                ðŸ  Request to Rent
               </button>
               <p className="property-rent-info">
                 Click the button to request this property. An admin will review your request.
               </p>
               {rentalMessage && (
-                <p className={`property-rental-message ${rentalMessage.includes('✅') ? 'success' : 'error'}`}>
+                <p className={`property-rental-message ${rentalMessage.includes('âœ…') ? 'success' : 'error'}`}>
                   {rentalMessage}
                 </p>
               )}
             </div>
           )}
           {user?.role === 'tenant' && property?.isVerified && property?.availabilityStatus === 'rented' && (
-            <p className="property-rental-message error">❌ This property has been rented.</p>
+            <p className="property-rental-message error">âŒ This property has been rented.</p>
           )}
 
           {user?.role === 'tenant' && rentalRequest &&
@@ -416,23 +416,23 @@ const PropertyDetail = () => {
             String(property?.rentedBy) === String(user.id) && (
               <div className="property-rent-section">
                 <button type="button" onClick={() => navigate(`/tenant/rented-property?propertyId=${property._id}`)} className="property-rent-btn">
-                  🏠 Rented Property
+                  ðŸ  Rented Property
                 </button>
               </div>
             )}
 
-          {/* ===== የኪራይ ጥያቄ ሞዳል ===== */}
+          {/* ===== á‹¨áŠªáˆ«á‹­ áŒ¥á‹«á‰„ áˆžá‹³áˆ ===== */}
           {showRentModal && (
             <div className="property-modal-overlay" onClick={() => setShowRentModal(false)}>
               <div className="property-modal" onClick={(e) => e.stopPropagation()}>
-                <h3 className="property-modal-title">🏠 Submit a rental request</h3>
+                <h3 className="property-modal-title">ðŸ  Submit a rental request</h3>
                 <p className="property-modal-subtitle">
                   You are requesting <strong>{property?.title}</strong>
                 </p>
                 
                 <form onSubmit={handleRentRequest} className="property-modal-form">
                   <div className="property-modal-field">
-                    <label className="property-modal-label">📞 Phone *</label>
+                    <label className="property-modal-label">ðŸ“ž Phone *</label>
                     <input
                       type="tel"
                       className="property-modal-input"
@@ -442,7 +442,7 @@ const PropertyDetail = () => {
                     />
                   </div>
                   <div className="property-modal-field">
-                    <label className="property-modal-label">📝 Message *</label>
+                    <label className="property-modal-label">ðŸ“ Message *</label>
                     <textarea
                       className="property-modal-input property-modal-textarea"
                       placeholder="What would you like to tell the landlord?"
@@ -453,7 +453,7 @@ const PropertyDetail = () => {
                   </div>
                   
                   <div className="property-modal-field">
-                    <label className="property-modal-label">📅 Move-in date *</label>
+                    <label className="property-modal-label">ðŸ“… Move-in date *</label>
                     <input
                       type="date"
                       className="property-modal-input"
@@ -469,14 +469,14 @@ const PropertyDetail = () => {
                       className="property-modal-btn property-modal-btn-cancel"
                       onClick={() => setShowRentModal(false)}
                     >
-                      ✖ Cancel
+                      âœ– Cancel
                     </button>
                     <button
                       type="submit"
                       className="property-modal-btn property-modal-btn-submit"
                       disabled={submittingRent}
                     >
-                      {submittingRent ? '⏳ Sending...' : '📤 Submit request'}
+                      {submittingRent ? 'â³ Sending...' : 'ðŸ“¤ Submit request'}
                     </button>
                   </div>
                 </form>
@@ -489,7 +489,7 @@ const PropertyDetail = () => {
               <div className="property-divider"></div>
               <div className="property-reviews-section">
                 <div className="property-reviews-header">
-                  <h3 className="property-section-title">⭐ Reviews</h3>
+                  <h3 className="property-section-title">â­ Reviews</h3>
                 </div>
                 <div className="property-reviews-list">
                   {reviews.map((review) => (
@@ -497,7 +497,7 @@ const PropertyDetail = () => {
                       <div className="property-review-header">
                         <strong>{review.tenant?.name || 'Tenant'}</strong>
                         <span className="property-review-rating">
-                          {'⭐'.repeat(review.rating)}
+                          {'â­'.repeat(review.rating)}
                         </span>
                         <small className="property-review-date">{new Date(review.createdAt).toLocaleDateString()}</small>
                       </div>
@@ -515,3 +515,4 @@ const PropertyDetail = () => {
 };
 
 export default PropertyDetail;
+

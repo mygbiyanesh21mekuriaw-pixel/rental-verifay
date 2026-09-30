@@ -13,7 +13,7 @@ const SearchPage = () => {
     verified: false,
   });
 
-  // fetchProperties ን በ useCallback ይከተቱ
+  // fetchProperties áŠ• á‰  useCallback á‹­áŠ¨á‰°á‰±
   const fetchProperties = useCallback(async () => {
     setLoading(true);
     try {
@@ -25,7 +25,7 @@ const SearchPage = () => {
       if (filters.verified) params.append('verified', 'true');
 
       const res = await axios.get(
-        `http://localhost:5000/api/properties?${params.toString()}`
+        `${process.env.REACT_APP_API_URL}/api/properties?${params.toString()}`
       );
       setProperties(res.data);
     } catch (error) {
@@ -33,9 +33,9 @@ const SearchPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]); // filters ሲቀየር እንደገና ይፈጠር
+  }, [filters]); // filters áˆ²á‰€á‹¨áˆ­ áŠ¥áŠ•á‹°áŒˆáŠ“ á‹­áˆáŒ áˆ­
 
-  // useEffect በትክክለኛው ቦታ
+  // useEffect á‰ á‰µáŠ­áŠ­áˆˆáŠ›á‹ á‰¦á‰³
   useEffect(() => {
     fetchProperties();
   }, [fetchProperties]);
@@ -55,7 +55,7 @@ const SearchPage = () => {
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>🔍 Property Search</h2>
+      <h2 style={styles.title}>ðŸ” Property Search</h2>
 
       <form onSubmit={handleSearch} style={styles.filterForm}>
         <input
@@ -97,15 +97,15 @@ const SearchPage = () => {
             checked={filters.verified}
             onChange={handleFilterChange}
           />
-          ✅ Verified only
+          âœ… Verified only
         </label>
         <button type="submit" style={styles.searchBtn}>Search</button>
       </form>
 
       {loading ? (
-        <div style={styles.loading}>⏳ Loading...</div>
+        <div style={styles.loading}>â³ Loading...</div>
       ) : properties.length === 0 ? (
-        <div style={styles.noResults}>😕 No properties found</div>
+        <div style={styles.noResults}>ðŸ˜• No properties found</div>
       ) : (
         <div style={styles.grid}>
           {properties.map((property) => (
@@ -118,29 +118,29 @@ const SearchPage = () => {
                     style={styles.image}
                   />
                 ) : (
-                  <div style={styles.noImage}>📸 No image</div>
+                  <div style={styles.noImage}>ðŸ“¸ No image</div>
                 )}
                 {property.isVerified && (
-                  <div style={styles.verifiedBadge}>✅ Verified</div>
+                  <div style={styles.verifiedBadge}>âœ… Verified</div>
                 )}
                 {!property.isVerified && property.verificationStatus === 'pending' && (
-                  <div style={styles.pendingBadge}>⏳ Under review</div>
+                  <div style={styles.pendingBadge}>â³ Under review</div>
                 )}
                 {!property.isVerified && property.verificationStatus === 'rejected' && (
-                  <div style={styles.rejectedBadge}>❌ Rejected</div>
+                  <div style={styles.rejectedBadge}>âŒ Rejected</div>
                 )}
               </div>
               
               <div style={styles.cardContent}>
                 <h3 style={styles.cardTitle}>{property.title}</h3>
-                <p style={styles.cardLocation}>📍 {property.location}</p>
-                <p style={styles.cardPrice}>💰 ETB {property.price.toLocaleString()}</p>
-                <p style={styles.cardBedrooms}>🛏️ {property.bedrooms} bedrooms</p>
+                <p style={styles.cardLocation}>ðŸ“ {property.location}</p>
+                <p style={styles.cardPrice}>ðŸ’° ETB {property.price.toLocaleString()}</p>
+                <p style={styles.cardBedrooms}>ðŸ›ï¸ {property.bedrooms} bedrooms</p>
                 <Link 
                   to={`/property/${property._id}`}
                   style={styles.detailBtn}
                 >
-                  📖 View details
+                  ðŸ“– View details
                 </Link>
               </div>
             </div>

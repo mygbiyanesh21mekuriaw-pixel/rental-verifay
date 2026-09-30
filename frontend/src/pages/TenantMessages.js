@@ -22,8 +22,8 @@ const TenantMessages = () => {
     try {
       const token = localStorage.getItem('token');
       const endpoint = conversationId
-        ? `http://localhost:5000/api/messages/conversations/${conversationId}`
-        : 'http://localhost:5000/api/messages/tenant/conversations';
+        ? `${process.env.REACT_APP_API_URL}/api/messages/conversations/${conversationId}`
+        : `${process.env.REACT_APP_API_URL}/api/messages/tenant/conversations`;
       const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -51,7 +51,7 @@ const TenantMessages = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        `http://localhost:5000/api/messages/conversations/${conversationId}/messages`,
+        `${process.env.REACT_APP_API_URL}/api/messages/conversations/${conversationId}/messages`,
         { body },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -67,14 +67,14 @@ const TenantMessages = () => {
     }
   };
 
-  if (loading) return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>⏳ Loading...</span></div>;
+  if (loading) return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>â³ Loading...</span></div>;
   if (error) return (
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
-        <h1 className="tenant-title">✉️ Messages</h1>
+        <h1 className="tenant-title">âœ‰ï¸ Messages</h1>
         <BackToDashboard
           dashboardRoute={location.state?.from || '/tenant-dashboard'}
-          label="← Back to Previous Page"
+          label="â† Back to Previous Page"
         />
       </div>
       <div className="tenant-empty"><p>{error}</p></div>
@@ -84,21 +84,21 @@ const TenantMessages = () => {
   return (
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
-        <h1 className="tenant-title">✉️ Messages</h1>
+        <h1 className="tenant-title">âœ‰ï¸ Messages</h1>
         {conversation && <>
-          <p className="tenant-subtitle">{conversation.property?.title} · {conversation.property?.location}</p>
+          <p className="tenant-subtitle">{conversation.property?.title} Â· {conversation.property?.location}</p>
           <p className="tenant-subtitle">Landlord: {conversation.landlord?.name}</p>
         </>}
         <BackToDashboard
           dashboardRoute={location.state?.from || '/tenant-dashboard'}
-          label="← Back to Previous Page"
+          label="â† Back to Previous Page"
         />
       </div>
       <section className="tenant-section tenant-message-panel">
         {!conversationId && !conversation && conversations.length === 0 && <p className="tenant-empty">No conversations yet.</p>}
         {!conversationId && !conversation && conversations.map(item => (
           <button type="button" className="tenant-message-conversation" key={item._id} onClick={() => navigate(`/tenant/messages?conversationId=${item._id}`)}>
-            {item.property?.title || 'Property'} · Landlord: {item.landlord?.name || 'Landlord'}
+            {item.property?.title || 'Property'} Â· Landlord: {item.landlord?.name || 'Landlord'}
           </button>
         ))}
         {conversation && <>
@@ -124,3 +124,5 @@ const TenantMessages = () => {
 };
 
 export default TenantMessages;
+
+

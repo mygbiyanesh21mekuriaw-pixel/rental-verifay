@@ -18,7 +18,7 @@ const AdminNotifications = () => {
     setLoadError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/notifications', {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/notifications`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const records = Array.isArray(response.data) ? response.data : response.data?.notifications;
@@ -36,7 +36,7 @@ const AdminNotifications = () => {
     setActionError('');
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:5000/api/notifications/${notificationId}/read`, {}, {
+      await axios.put(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setNotifications((current) => current.map((notification) => (
@@ -53,7 +53,7 @@ const AdminNotifications = () => {
     setActionError('');
     try {
       const token = localStorage.getItem('token');
-      await axios.put('http://localhost:5000/api/notifications/read-all', {}, {
+      await axios.put(`${process.env.REACT_APP_API_URL}/api/notifications/read-all`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
@@ -76,7 +76,7 @@ const AdminNotifications = () => {
     setActionError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.delete(`http://localhost:5000/api/notifications/${notificationId}`, {
+      const response = await axios.delete(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       console.log('DELETE response status:', response.status);
@@ -105,16 +105,16 @@ const AdminNotifications = () => {
       <BackToDashboard dashboardRoute="/admin-dashboard" />
 
       <div className="tenant-header">
-        <h1 className="tenant-title">🔔 Notifications</h1>
+        <h1 className="tenant-title">ðŸ”” Notifications</h1>
       </div>
 
       {loading ? (
-        <div className="tenant-loading">⏳ Loading notifications...</div>
+        <div className="tenant-loading">â³ Loading notifications...</div>
       ) : loadError ? (
         <div className="tenant-empty">{loadError}</div>
       ) : notifications.length === 0 ? (
         <div className="tenant-empty">
-          <span className="tenant-empty-icon">🔔</span>
+          <span className="tenant-empty-icon">ðŸ””</span>
           <p>No notifications yet.</p>
         </div>
       ) : (
@@ -147,7 +147,7 @@ const AdminNotifications = () => {
                     </button>
                   )}
                   <button type="button" className="notification-delete-btn" onClick={() => handleDelete(notification._id)} disabled={deletingId === notification._id} aria-label="Delete notification" title="Delete notification">
-                    {deletingId === notification._id ? '...' : '🗑️'}
+                    {deletingId === notification._id ? '...' : 'ðŸ—‘ï¸'}
                   </button>
                 </div>
               </div>
@@ -163,3 +163,5 @@ const AdminNotifications = () => {
 };
 
 export default AdminNotifications;
+
+

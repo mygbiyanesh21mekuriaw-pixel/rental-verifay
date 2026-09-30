@@ -27,9 +27,9 @@ const ROLE_OPTIONS = ['All', 'admin', 'landlord', 'tenant'];
 const STATUS_OPTIONS = ['All', 'success', 'failed', 'pending'];
 
 const formatDateTime = (value) => {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return 'â€”';
   return new Intl.DateTimeFormat('en-GB', {
     year: 'numeric',
     month: '2-digit',
@@ -87,7 +87,7 @@ const AdminSystemLogs = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/admin/system-logs?${buildQuery}`, {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/admin/system-logs?${buildQuery}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -105,7 +105,7 @@ const AdminSystemLogs = () => {
         navigate('/login', { replace: true });
         return;
       }
-      setError('❌ Failed to load system logs.');
+      setError('âŒ Failed to load system logs.');
       setLogs([]);
     } finally {
       setLoading(false);
@@ -143,7 +143,7 @@ const AdminSystemLogs = () => {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
-          <span>📋</span>
+          <span>ðŸ“‹</span>
           <span>System Logs</span>
         </h1>
         <p className="mt-2 text-slate-600">
@@ -231,14 +231,14 @@ const AdminSystemLogs = () => {
             onClick={handleSearch}
             className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition"
           >
-            🔎 Search
+            ðŸ”Ž Search
           </button>
           <button
             type="button"
             onClick={handleClearFilters}
             className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
           >
-            🧹 Clear Filters
+            ðŸ§¹ Clear Filters
           </button>
         </div>
       </div>
@@ -251,9 +251,9 @@ const AdminSystemLogs = () => {
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-slate-600">⏳ Loading system logs...</div>
+          <div className="p-8 text-center text-slate-600">â³ Loading system logs...</div>
         ) : logs.length === 0 ? (
-          <div className="p-8 text-center text-slate-600">📋 No system logs found.</div>
+          <div className="p-8 text-center text-slate-600">ðŸ“‹ No system logs found.</div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -303,9 +303,9 @@ const AdminSystemLogs = () => {
                                 <div><strong>Role:</strong> {getRoleLabel(log.role)}</div>
                                 <div><strong>Action:</strong> {log.action}</div>
                                 <div className="md:col-span-2"><strong>Description:</strong> {log.description}</div>
-                                <div><strong>Property ID:</strong> {log.property || '—'}</div>
-                                <div><strong>Rental Request ID:</strong> {log.rentalRequest || '—'}</div>
-                                <div><strong>Payment ID:</strong> {log.payment || '—'}</div>
+                                <div><strong>Property ID:</strong> {log.property || 'â€”'}</div>
+                                <div><strong>Rental Request ID:</strong> {log.rentalRequest || 'â€”'}</div>
+                                <div><strong>Payment ID:</strong> {log.payment || 'â€”'}</div>
                                 <div><strong>Status:</strong> {log.status}</div>
                                 <div><strong>Date/Time:</strong> {formatDateTime(log.createdAt)}</div>
                               </div>
@@ -321,7 +321,7 @@ const AdminSystemLogs = () => {
 
             <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-4 py-3 bg-slate-50 border-t border-slate-200 text-sm text-slate-600">
               <div>
-                Showing {logs.length ? (pagination.page - 1) * pagination.limit + 1 : 0}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} logs
+                Showing {logs.length ? (pagination.page - 1) * pagination.limit + 1 : 0}â€“{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} logs
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -353,3 +353,4 @@ const AdminSystemLogs = () => {
 };
 
 export default AdminSystemLogs;
+

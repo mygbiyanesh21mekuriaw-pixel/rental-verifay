@@ -23,7 +23,7 @@ const Navbar = () => {
         const token = localStorage.getItem('token');
 
         const response = await axios.get(
-          'http://localhost:5000/api/notifications/unread-count',
+          `${process.env.REACT_APP_API_URL}/api/notifications/unread-count`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -66,9 +66,9 @@ const Navbar = () => {
   // ==============================
   const getRoleName = (role) => {
     const roles = {
-      landlord: '🏠 Landlord',
-      tenant: '👤 Tenant',
-      admin: '⚙️ Admin',
+      landlord: 'ðŸ  Landlord',
+      tenant: 'ðŸ‘¤ Tenant',
+      admin: 'âš™ï¸ Admin',
     };
 
     return roles[role] || role;
@@ -96,80 +96,80 @@ const Navbar = () => {
   // LANDLORD SIDEBAR
   // =========================================================
   const landlordLinks = [
-    ['📊', 'Dashboard', '/landlord-dashboard'],
+    ['ðŸ“Š', 'Dashboard', '/landlord-dashboard'],
 
-    ['➕', 'Add House', '/landlord/add-property'],
+    ['âž•', 'Add House', '/landlord/add-property'],
 
-    ['🏠', 'My Properties', '/landlord/my-properties'],
+    ['ðŸ ', 'My Properties', '/landlord/my-properties'],
 
-    ['✅', 'Verified Properties', '/landlord/verified-properties'],
+    ['âœ…', 'Verified Properties', '/landlord/verified-properties'],
 
-    ['📄', 'Rental Requests', '/landlord/rental-requests'],
+    ['ðŸ“„', 'Rental Requests', '/landlord/rental-requests'],
 
-    ['🏘️', 'Rented Properties', '/landlord/rented-properties'],
+    ['ðŸ˜ï¸', 'Rented Properties', '/landlord/rented-properties'],
 
-    ['⏳', 'Under Review', '/landlord/under-review'],
+    ['â³', 'Under Review', '/landlord/under-review'],
 
-    ['❌', 'Rejected', '/landlord/rejected'],
+    ['âŒ', 'Rejected', '/landlord/rejected'],
 
-    ['💰', 'Rent Payments', '/landlord/rent-payments'],
+    ['ðŸ’°', 'Rent Payments', '/landlord/rent-payments'],
 
-    ['🔔', 'Notifications', '/landlord/notifications'],
+    ['ðŸ””', 'Notifications', '/landlord/notifications'],
 
     // PROFILE BUTTON
-    ['👤', 'Profile', '/landlord/profile'],
+    ['ðŸ‘¤', 'Profile', '/landlord/profile'],
   ];
 
   // =========================================================
   // TENANT SIDEBAR
   // =========================================================
   const tenantLinks = [
-    ['📊', 'Dashboard', '/tenant-dashboard'],
-    ['✅', 'Verified Properties', '/tenant/verified-properties'],
-    ['❤️', 'Favorites', '/tenant/favorites'],
-    ['📝', 'Rental Requests', '/tenant/rental-requests'],
-    ['🏠', 'Rented Property', '/tenant/rented-property'],
-    ['🔎', 'Search Properties', '/tenant/search'],
-    ['🔔', 'Notifications', '/tenant/notifications'],
+    ['ðŸ“Š', 'Dashboard', '/tenant-dashboard'],
+    ['âœ…', 'Verified Properties', '/tenant/verified-properties'],
+    ['â¤ï¸', 'Favorites', '/tenant/favorites'],
+    ['ðŸ“', 'Rental Requests', '/tenant/rental-requests'],
+    ['ðŸ ', 'Rented Property', '/tenant/rented-property'],
+    ['ðŸ”Ž', 'Search Properties', '/tenant/search'],
+    ['ðŸ””', 'Notifications', '/tenant/notifications'],
   ];
 
   // =========================================================
   // PLATFORM ADMIN SIDEBAR
   // =========================================================
   const platformAdminLinks = [
-    ['⚙️', 'Dashboard', '/admin-dashboard'],
-    ['🛡️', 'Admin Management', '/admin-dashboard/admin-management'],
-    ['📋', 'System Logs', '/admin-dashboard/system-logs'],
-    ['📊', 'Admin Analytics', '/admin-dashboard/analytics'],
-    ['👤', 'Users', '/admin-dashboard/all-users'],
-    ['💳', 'Payment Period', '/admin-dashboard/payment-period'],
-    ['🔔', 'Notifications', '/admin-dashboard/notifications'],
-    ['✉️', 'Contact Messages', '/admin-dashboard/contact-messages'],
-    ['👤', 'Profile', '/admin-dashboard/profile'],
+    ['âš™ï¸', 'Dashboard', '/admin-dashboard'],
+    ['ðŸ›¡ï¸', 'Admin Management', '/admin-dashboard/admin-management'],
+    ['ðŸ“‹', 'System Logs', '/admin-dashboard/system-logs'],
+    ['ðŸ“Š', 'Admin Analytics', '/admin-dashboard/analytics'],
+    ['ðŸ‘¤', 'Users', '/admin-dashboard/all-users'],
+    ['ðŸ’³', 'Payment Period', '/admin-dashboard/payment-period'],
+    ['ðŸ””', 'Notifications', '/admin-dashboard/notifications'],
+    ['âœ‰ï¸', 'Contact Messages', '/admin-dashboard/contact-messages'],
+    ['ðŸ‘¤', 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
   // AREA ADMIN SIDEBAR
   // =========================================================
   const areaAdminLinks = [
-    ['🏠', 'Dashboard', '/admin-dashboard'],
-    ['🏠', 'Properties', '/admin-dashboard/all-properties'],
-    ['✅', 'Verified Properties', '/admin-dashboard/verified'],
-    ['❌', 'Rejected', '/admin-dashboard/rejected'],
-    ['📋', 'Rental Requests', '/admin-dashboard/rental-requests'],
-    ['🔎', 'Under Review', '/admin-dashboard/pending'],
-    ['🔔', 'Notifications', '/admin-dashboard/notifications'],
-    ['👤', 'Profile', '/admin-dashboard/profile'],
+    ['ðŸ ', 'Dashboard', '/admin-dashboard'],
+    ['ðŸ ', 'Properties', '/admin-dashboard/all-properties'],
+    ['âœ…', 'Verified Properties', '/admin-dashboard/verified'],
+    ['âŒ', 'Rejected', '/admin-dashboard/rejected'],
+    ['ðŸ“‹', 'Rental Requests', '/admin-dashboard/rental-requests'],
+    ['ðŸ”Ž', 'Under Review', '/admin-dashboard/pending'],
+    ['ðŸ””', 'Notifications', '/admin-dashboard/notifications'],
+    ['ðŸ‘¤', 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
   // DEFAULT ADMIN SIDEBAR
   // =========================================================
   const defaultAdminLinks = [
-    ['⚙️', 'Dashboard', '/admin-dashboard'],
-    ['🏠', 'Properties', '/admin-dashboard/all-properties'],
-    ['🔔', 'Notifications', '/admin-dashboard/notifications'],
-    ['👤', 'Profile', '/admin-dashboard/profile'],
+    ['âš™ï¸', 'Dashboard', '/admin-dashboard'],
+    ['ðŸ ', 'Properties', '/admin-dashboard/all-properties'],
+    ['ðŸ””', 'Notifications', '/admin-dashboard/notifications'],
+    ['ðŸ‘¤', 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
@@ -198,7 +198,7 @@ const Navbar = () => {
             onClick={handleLogout}
             className="navbar-top-logout-btn"
           >
-            🚪 Logout
+            ðŸšª Logout
           </button>
         </div>
       )}
@@ -246,7 +246,7 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  🏠 Home
+                  ðŸ  Home
                 </Link>
 
                 <Link
@@ -257,7 +257,7 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  ℹ️ About Us
+                  â„¹ï¸ About Us
                 </Link>
 
                 <Link
@@ -268,7 +268,7 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  📞 Contact Us
+                  ðŸ“ž Contact Us
                 </Link>
 
                 <Link
@@ -279,14 +279,14 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  🔐 Login
+                  ðŸ” Login
                 </Link>
 
                 <Link
                   to="/register"
                   className={`navbar-link ${location.pathname === '/register' ? 'active' : ''}`}
                 >
-                  ✍️ Register
+                  âœï¸ Register
                 </Link>
               </>
             )}
@@ -382,3 +382,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+

@@ -21,7 +21,7 @@ const AdminMessages = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        'http://localhost:5000/api/messages/admin/conversations',
+        `${process.env.REACT_APP_API_URL}/api/messages/admin/conversations`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const records = Array.isArray(response.data) ? response.data : [];
@@ -64,7 +64,7 @@ const AdminMessages = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        `http://localhost:5000/api/messages/admin/conversations/${selectedConversation._id}/messages`,
+        `${process.env.REACT_APP_API_URL}/api/messages/admin/conversations/${selectedConversation._id}/messages`,
         { body, recipientId: selectedRecipient._id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -88,7 +88,7 @@ const AdminMessages = () => {
         <div className="admin-title-wrapper">
           <div>
             <h1 className="admin-title">
-              <span className="admin-title-gradient">💬 Messages</span>
+              <span className="admin-title-gradient">ðŸ’¬ Messages</span>
             </h1>
             <p className="admin-subtitle">Admin communication with users</p>
           </div>
@@ -97,14 +97,14 @@ const AdminMessages = () => {
             className="admin-close-btn admin-back-dashboard"
             onClick={() => navigate('/admin-dashboard')}
           >
-            ← Back to Admin Dashboard
+            â† Back to Admin Dashboard
           </button>
         </div>
       </div>
 
       <section className="admin-detail-section admin-dedicated-content">
         {loading ? (
-          <div className="admin-loading-small">⏳ Loading conversations...</div>
+          <div className="admin-loading-small">â³ Loading conversations...</div>
         ) : loadError ? (
           <div className="admin-empty-text">{loadError}</div>
         ) : recipients.length === 0 ? (
@@ -114,7 +114,7 @@ const AdminMessages = () => {
             {recipients.map(({ user, conversation }) => (
               <div key={user._id} className="admin-recipient-item">
                 <div>
-                  <h4 className="admin-conversation-title">👤 {user.name || 'User'}</h4>
+                  <h4 className="admin-conversation-title">ðŸ‘¤ {user.name || 'User'}</h4>
                   <p className="admin-recipient-email">{user.email || 'Email unavailable'}</p>
                 </div>
                 <button
@@ -122,7 +122,7 @@ const AdminMessages = () => {
                   className="admin-message-reply-button"
                   onClick={() => selectConversation(conversation, user)}
                 >
-                  💬 Reply Message
+                  ðŸ’¬ Reply Message
                 </button>
               </div>
             ))}
@@ -133,7 +133,7 @@ const AdminMessages = () => {
           <div className="admin-message-reply-panel">
             <div className="admin-conversation-header">
               <h2 className="admin-conversation-title">
-                💬 Reply to {selectedRecipient?.name || 'selected user'}
+                ðŸ’¬ Reply to {selectedRecipient?.name || 'selected user'}
               </h2>
               <button
                 type="button"
@@ -196,3 +196,5 @@ const AdminMessages = () => {
 };
 
 export default AdminMessages;
+
+
