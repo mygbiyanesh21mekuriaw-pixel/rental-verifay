@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import BackToDashboard from '../components/BackToDashboard';
@@ -7,6 +7,7 @@ import './TenantDashboard.css';
 
 const TenantMessages = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const conversationId = searchParams.get('conversationId');
@@ -71,7 +72,10 @@ const TenantMessages = () => {
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
         <h1 className="tenant-title">✉️ Messages</h1>
-        <BackToDashboard />
+        <BackToDashboard
+          dashboardRoute={location.state?.from || '/tenant-dashboard'}
+          label="← Back to Previous Page"
+        />
       </div>
       <div className="tenant-empty"><p>{error}</p></div>
     </div>
@@ -85,7 +89,10 @@ const TenantMessages = () => {
           <p className="tenant-subtitle">{conversation.property?.title} · {conversation.property?.location}</p>
           <p className="tenant-subtitle">Landlord: {conversation.landlord?.name}</p>
         </>}
-        <BackToDashboard />
+        <BackToDashboard
+          dashboardRoute={location.state?.from || '/tenant-dashboard'}
+          label="← Back to Previous Page"
+        />
       </div>
       <section className="tenant-section tenant-message-panel">
         {!conversationId && !conversation && conversations.length === 0 && <p className="tenant-empty">No conversations yet.</p>}

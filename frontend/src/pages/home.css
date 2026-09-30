@@ -1,6 +1,6 @@
 .home-container {
-  min-height: 100vh;
-  background: #f6f3ed;
+  min-height: 100%;
+  background: transparent;
   color: #18332d;
 }
 
@@ -8,7 +8,7 @@
   padding: 76px 24px;
   text-align: center;
   color: #fff;
-  background: linear-gradient(120deg, #173b34, #24594b 62%, #d88b55 62.1%);
+  background: transparent;
 }
 
 .home-logo-wrap {

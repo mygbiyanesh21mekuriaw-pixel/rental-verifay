@@ -50,7 +50,9 @@ const Contact = () => {
   };
 
   return (
-    <div className="contact-container">
+    <div className="public-page">
+      <div className="public-content">
+        <div className="contact-container">
       <div className="contact-hero">
         <h1 className="contact-title">📞 Contact Us</h1>
         <p className="contact-subtitle">
@@ -138,6 +140,8 @@ const Contact = () => {
               </button>
             </form>
           )}
+        </div>
+      </div>
         </div>
       </div>
     </div>

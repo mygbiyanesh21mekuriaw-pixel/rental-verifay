@@ -84,9 +84,14 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true, user: authUser };
     } catch (error) {
+      const responseMessage = error.response?.data?.message;
+      const developmentDetail = error.response?.data?.error;
+
       return {
         success: false,
-        error: error.response?.data?.message || 'Login failed',
+        error: process.env.NODE_ENV === 'development' && developmentDetail
+          ? `${responseMessage || 'Login failed'}: ${developmentDetail}`
+          : responseMessage || 'Login failed',
       };
     }
   };

@@ -10,7 +10,7 @@ const TenantDashboard = () => {
   }, []);
 
   return (
-    <div className="tenant-container">
+    <div className="tenant-container tenant-dashboard-home">
       <div className="tenant-header">
         <h1 className="tenant-title">👤 Tenant Dashboard</h1>
         <p className="tenant-subtitle tenant-welcome">Welcome, {user?.name}!</p>

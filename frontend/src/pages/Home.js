@@ -7,7 +7,8 @@ const Home = () => {
   const { user } = useAuth();
 
   return (
-    <div className="home-container">
+    <div className="public-page home-page">
+      <div className="home-container">
       {/* ===== የራስ ገፅ (Hero) ===== */}
       <div className="home-hero">
         <h1 className="home-title">🏠 House Rental Management System</h1>
@@ -58,6 +59,7 @@ const Home = () => {
             Find your next home in just a few steps.
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

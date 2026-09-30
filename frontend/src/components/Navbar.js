@@ -191,9 +191,6 @@ const Navbar = () => {
 
   return (
     <>
-      {/* =====================================================
-          TOP LOGOUT BAR
-      ===================================================== */}
       {user && (
         <div className="navbar-topbar">
           <button
@@ -377,6 +374,7 @@ const Navbar = () => {
               </>
             )}
           </div>
+
         </div>
       </nav>
     </>

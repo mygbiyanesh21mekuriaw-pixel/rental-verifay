@@ -439,6 +439,11 @@ const verifyProperty = async (req, res) => {
 
     res.json({ message: 'Property verified successfully', property });
   } catch (error) {
+    console.error('Verify property failed', {
+      propertyId: req.params.id,
+      adminId: req.user?.id,
+      message: error.message,
+    });
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -502,6 +507,11 @@ const rejectProperty = async (req, res) => {
 
     res.json({ message: 'Property rejected', property });
   } catch (error) {
+    console.error('Reject property failed', {
+      propertyId: req.params.id,
+      adminId: req.user?.id,
+      message: error.message,
+    });
     res.status(500).json({ message: 'Server error' });
   }
 };

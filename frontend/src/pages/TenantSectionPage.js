@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { getFavoriteIds, toggleFavorite } from '../utils/favorites';
@@ -226,7 +226,7 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
   );
 };
 
-const RequestList = ({ requests, userId, notifications = [], showActiveRentalActions = false }) => {
+const RequestList = ({ requests, userId, notifications = [], showActiveRentalActions = false, originPath }) => {
   const navigate = useNavigate();
   const [openingRequestId, setOpeningRequestId] = useState(null);
 
@@ -237,7 +237,9 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
       const response = await axios.post('http://localhost:5000/api/messages/conversations/open', {
         propertyId: request.property?._id,
       }, { headers: { Authorization: `Bearer ${token}` } });
-      navigate(`/tenant/messages?conversationId=${response.data._id}`);
+      navigate(`/tenant/messages?conversationId=${response.data._id}`, {
+        state: { from: originPath },
+      });
     } catch (error) {
       alert(error.response?.data?.message || 'Unable to open messaging.');
     } finally {
@@ -305,7 +307,13 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
               <button type="button" className="tenant-request-message-btn" onClick={() => openMessage(request)} disabled={openingRequestId === request._id}>
                 {openingRequestId === request._id ? 'Opening...' : '✉️ Message Landlord'}
               </button>
-              <button type="button" className="tenant-request-pay-btn" onClick={() => navigate(`/tenant/rent-payment/${request.property?._id}`)}>
+              <button
+                type="button"
+                className="tenant-request-pay-btn"
+                onClick={() => navigate(`/tenant/rent-payment/${request.property?._id}`, {
+                  state: { from: '/tenant/rented-property' },
+                })}
+              >
                 💳 Pay Rent
               </button>
             </>
@@ -318,6 +326,7 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
 
 const TenantSectionPage = ({ type }) => {
   const { user } = useAuth();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const rentedPropertyId = searchParams.get('propertyId');
   const [searchTerm, setSearchTerm] = useState('');
@@ -398,7 +407,13 @@ const TenantSectionPage = ({ type }) => {
         {items.length === 0 ? (
           <div className="tenant-empty"><span className="tenant-empty-icon">😕</span><p>{config.empty}</p></div>
         ) : type === 'rentalRequests' || type === 'rented' ? (
-          <RequestList requests={items} userId={user.id} notifications={notifications} showActiveRentalActions={type === 'rented'} />
+          <RequestList
+            requests={items}
+            userId={user.id}
+            notifications={notifications}
+            showActiveRentalActions={type === 'rented'}
+            originPath={`${location.pathname}${location.search}`}
+          />
         ) : (
           <div className="tenant-grid">{items.map(property => (
             <PropertyCard 

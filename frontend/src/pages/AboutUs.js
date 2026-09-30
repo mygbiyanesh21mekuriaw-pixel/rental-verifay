@@ -3,7 +3,9 @@ import './aboutUs.css';
 
 const About = () => {
   return (
-    <div className="about-container">
+    <div className="public-page">
+      <div className="public-content">
+        <div className="about-container">
       <div className="about-hero">
         <h1 className="about-title">ℹ️ About Us</h1>
         <p className="about-subtitle">
@@ -58,6 +60,8 @@ const About = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
         </div>
       </div>
     </div>

@@ -1192,19 +1192,45 @@
   outline:none;
 }
 
-.tenant-request-message-btn {
-  align-self:flex-start;
-  background:#2563eb;
-  border:0;
-  border-radius:8px;
-  color:#fff;
-  cursor:pointer;
-  font:inherit;
-  font-weight:700;
-  padding:10px 16px;
+.tenant-request-confirmed-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
 }
 
-.tenant-request-message-btn:disabled {
+.tenant-request-message-btn,
+.tenant-request-pay-btn {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 132px;
+  height: 52px;
+  min-height: 52px;
+  padding: 6px 8px;
+  background: #2563eb;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tenant-request-message-btn:hover,
+.tenant-request-pay-btn:hover {
+  background: #1d4ed8;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+}
+
+.tenant-request-message-btn:disabled,
+.tenant-request-pay-btn:disabled {
   cursor:not-allowed;
   opacity:.6;
 }

@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
 const morgan = require('morgan');
 const multer = require('multer');
@@ -9,6 +11,43 @@ const createAdmin = require('./create-admin');
 
 // የአካባቢ ተለዋዋጮችን ጫን
 dotenv.config();
+
+const getDevelopmentJwtSecret = () => {
+  const secretPath = path.join(__dirname, '.jwt-secret');
+
+  try {
+    const savedSecret = fs.readFileSync(secretPath, 'utf8').trim();
+    if (savedSecret) return savedSecret;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+
+  const generatedSecret = crypto.randomBytes(64).toString('hex');
+
+  try {
+    fs.writeFileSync(secretPath, `${generatedSecret}\n`, {
+      encoding: 'utf8',
+      flag: 'wx',
+      mode: 0o600,
+    });
+    return generatedSecret;
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    const existingSecret = fs.readFileSync(secretPath, 'utf8').trim();
+    if (existingSecret) return existingSecret;
+    fs.writeFileSync(secretPath, `${generatedSecret}\n`, 'utf8');
+    return generatedSecret;
+  }
+};
+
+if (!process.env.JWT_SECRET?.trim()) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be configured in production.');
+  }
+
+  process.env.JWT_SECRET = getDevelopmentJwtSecret();
+  console.warn('JWT_SECRET was missing; using a locally generated development secret.');
+}
 
 const app = express();
 

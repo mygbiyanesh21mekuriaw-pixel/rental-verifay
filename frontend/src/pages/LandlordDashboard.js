@@ -479,6 +479,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         navigate('/landlord/my-properties');
       } else {
         setActiveSection('underReview');
+        navigate('/landlord/under-review');
       }
     } catch (error) {
       setFormError(

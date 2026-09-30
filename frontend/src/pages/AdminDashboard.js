@@ -8,7 +8,7 @@ const AdminDashboard = () => {
   const adminLabel = user?.adminType === 'area' ? 'Area Admin' : 'Platform Admin';
 
   return (
-    <div className="admin-container">
+    <div className="admin-container admin-dashboard-home">
       <div className="admin-header admin-dashboard-header">
         <div className="admin-title-wrapper">
           <div>

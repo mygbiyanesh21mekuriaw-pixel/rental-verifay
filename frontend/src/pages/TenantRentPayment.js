@@ -219,7 +219,10 @@ const TenantRentPayment = () => {
   };
 
   if (loading) return <div className="payment-page-state">Loading rent payment details...</div>;
-  if (error && !context) return <div className="payment-page payment-page-state"><p className="payment-error">{error}</p><BackToDashboard /></div>;
+  const previousPage = location.state?.from || '/tenant/rented-property';
+  const backButton = <BackToDashboard dashboardRoute={previousPage} label="← Back to Previous Page" />;
+
+  if (error && !context) return <div className="payment-page payment-page-state"><p className="payment-error">{error}</p>{backButton}</div>;
   if (!context) return <div className="payment-page-state">Loading rent payment details...</div>;
 
   const latestPayment = context.currentPayment || context.latestPayment || context.payments[0] || null;
@@ -237,7 +240,7 @@ const TenantRentPayment = () => {
           <h1>Pay Rent</h1>
           <p>Submit your rent payment for this rented property.</p>
         </div>
-        <BackToDashboard />
+        {backButton}
       </div>
 
       <div className="payment-layout">

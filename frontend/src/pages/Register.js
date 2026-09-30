@@ -130,7 +130,7 @@ const Register = () => {
   };
 
   return (
-    <div className="auth-shell">
+    <div className="public-page auth-page">
       <div className="auth-card">
         <span className="rv-kicker">House Rental Management System</span>
         <h2>Create your account</h2>

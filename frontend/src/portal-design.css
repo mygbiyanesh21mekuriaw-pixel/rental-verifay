@@ -191,9 +191,9 @@ main {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.96);
+  background: linear-gradient(135deg, #f8fbff, #eaf3ff);
   border-bottom: 1px solid var(--rv-border);
-  box-shadow: var(--rv-shadow);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .navbar:not(.navbar-authenticated) .navbar-container {
@@ -208,6 +208,12 @@ main {
 .navbar:not(.navbar-authenticated) .navbar-link.active { color: var(--rv-brand); background: var(--rv-brand-soft); transform: none; }
 .navbar:not(.navbar-authenticated) .navbar-register-btn { background: var(--rv-brand); box-shadow: none; }
 .navbar:not(.navbar-authenticated) .navbar-register-btn:hover { background: var(--rv-brand-dark); box-shadow: none; }
+
+.app:not(:has(.navbar-authenticated)) .app-main {
+  width: 100%;
+  margin-left: 0;
+  padding: 0 !important;
+}
 
 .rv-page {
   animation: rv-enter 0.35s ease both;
@@ -350,8 +356,21 @@ main {
 
 html,
 body {
-    overflow-x: hidden;
+  overflow-x: clip;
     margin:0;
+}
+
+html:has(.public-page:not(.home-page):not(.auth-page)) {
+  overflow-y: scroll;
+}
+
+html:has(.public-page.auth-page) {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+html:has(.public-page.auth-page)::-webkit-scrollbar {
+  display: none;
 }
 
 
@@ -456,7 +475,7 @@ body {
 html,
 body,
 #root {
-  overflow-x: hidden !important;
+  overflow-x: clip !important;
 }
 
 /* ===================================
@@ -512,7 +531,7 @@ body,
 
 /* Remove browser page vertical overflow */
 body {
-  overflow-x: hidden !important;
+  overflow-x: clip !important;
 }/* =========================================
    SIDEBAR EMPTY SPACE FIX
 ========================================= */
@@ -522,15 +541,17 @@ body {
   height: 100vh !important;
   min-height: 0 !important;
   overflow: hidden !important;
+  overflow-y: hidden !important;
 }
 
 /* Sidebar content */
 .navbar-authenticated .navbar-container {
-  height: auto !important;
+  height: 100% !important;
   min-height: 0 !important;
   padding: 12px 14px !important;
   display: flex !important;
   flex-direction: column !important;
+  justify-content: flex-start !important;
   gap: 0 !important;
 }
 
@@ -567,6 +588,168 @@ body {
 /* Prevent flex from pushing user card to bottom */
 .navbar-authenticated .navbar-container > * {
   flex-shrink: 0 !important;
+}
+
+.navbar-authenticated .navbar-logout-btn {
+  flex-shrink: 0;
+  align-self: stretch;
+  width: 100%;
+  margin: auto 0 0 !important;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.24);
+}
+
+.navbar-authenticated .navbar-logout-btn:hover {
+  background: #4338ca;
+  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.28);
+  transform: none;
+}
+
+@media (min-width: 1024px) and (min-height: 640px) {
+  .app:has(.home-page) {
+    height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  .app:has(.home-page) .navbar:not(.navbar-authenticated) {
+    flex: 0 0 74px;
+    height: 74px;
+    padding: 0;
+  }
+
+  .app:has(.home-page) .navbar-container {
+    height: 100%;
+    padding: 0 5%;
+  }
+
+  .app:has(.home-page) .app-main {
+    flex: 1 1 0;
+    height: 0;
+    min-height: 0 !important;
+    width: 100%;
+    margin: 0;
+    padding: 0 !important;
+    overflow: hidden;
+  }
+
+  .app:has(.home-page) .home-page {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .app:has(.home-page) .home-container {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .app:has(.home-page) .home-hero {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(12px, 2vh, 24px);
+    border-radius: 0;
+  }
+
+  .app:has(.home-page) .home-title {
+    font-size: clamp(32px, 3.4vw, 42px);
+    line-height: 1.05;
+    margin-bottom: 10px;
+  }
+
+  .app:has(.home-page) .home-subtitle {
+    margin-bottom: 14px;
+    font-size: 16px;
+  }
+
+  .app:has(.home-page) .home-buttons {
+    flex-shrink: 0;
+  }
+
+  .app:has(.home-page) .home-features {
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: repeat(3, minmax(0, 250px));
+    justify-content: center;
+    gap: 14px;
+    max-width: none;
+    margin: 0 auto;
+    padding: 0 20px 12px;
+  }
+
+  .app:has(.home-page) .home-feature-card {
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .app:has(.home-page) .app-footer {
+    flex: 0 0 auto;
+    margin-top: 0;
+    padding: 12px 20px 8px;
+  }
+
+  .app:has(.home-page) .app-footer-content {
+    gap: 16px;
+  }
+
+  .app:has(.home-page) .app-footer-brand,
+  .app:has(.home-page) .app-footer-links,
+  .app:has(.home-page) .app-footer-contact {
+    gap: 4px;
+  }
+
+  .app:has(.home-page) .app-footer-bottom {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+}
+
+
+
+
+
+@media (min-width: 1024px) and (min-height: 640px) {
+  .app:has(.navbar-authenticated .navbar-user-role.landlord),
+  .app:has(.navbar-authenticated .navbar-user-role.tenant),
+  .app:has(.navbar-authenticated .navbar-user-role.admin) {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+  }
+
+  .app:has(.navbar-authenticated .navbar-user-role.landlord) .app-main,
+  .app:has(.navbar-authenticated .navbar-user-role.tenant) .app-main,
+  .app:has(.navbar-authenticated .navbar-user-role.admin) .app-main {
+    flex: 1 1 0;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 100%;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    box-sizing: border-box;
+  }
+
+  .app:has(.navbar-authenticated .navbar-user-role.landlord) .app-footer,
+  .app:has(.navbar-authenticated .navbar-user-role.tenant) .app-footer,
+  .app:has(.navbar-authenticated .navbar-user-role.admin) .app-footer {
+    flex: 0 0 auto;
+    margin-top: 0;
+  }
 }
 
 

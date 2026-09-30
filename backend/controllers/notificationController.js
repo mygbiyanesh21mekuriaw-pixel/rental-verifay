@@ -4,6 +4,33 @@ const RentalRequest = require('../models/RentalRequest');
 
 const getUserId = (user) => user.id || user._id;
 
+const createLandlordNotification = async (
+  landlordId,
+  propertyId,
+  propertyTitle,
+  message,
+  type = 'info',
+  instructions = ''
+) => {
+  if (!landlordId || !propertyId) return null;
+
+  try {
+    return await Notification.create({
+      landlord: landlordId,
+      recipientRole: 'landlord',
+      property: propertyId,
+      propertyTitle: propertyTitle || 'Property',
+      message,
+      type,
+      instructions,
+      read: false,
+    });
+  } catch (error) {
+    console.error('Create landlord notification failed:', error.message);
+    return null;
+  }
+};
+
 /**
  * Get notifications for tenant
  */
@@ -415,6 +442,7 @@ const deleteNotification = async (req, res) => {
 };
 
 module.exports = {
+  createLandlordNotification,
   getMyNotifications,
   getLandlordNotifications,
   getAdminNotifications,
