@@ -4,6 +4,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 
 jest.mock('axios');
+jest.mock('./pages/TenantSearch', () => () => null);
 
 const renderApp = () => render(
   <AuthProvider>
@@ -20,8 +21,11 @@ beforeEach(() => {
 test('renders only the public navigation before login', async () => {
   renderApp();
 
-  const navbar = await screen.findByRole('navigation');
+  const [navbar] = await screen.findAllByRole('navigation');
   expect(await screen.findByRole('heading', { name: /house rental management system/i })).toBeInTheDocument();
+  expect(within(navbar).getByRole('img', { name: /mekdela amba university logo/i })).toHaveAttribute('src', '/mekdela-amba-logo.jpeg');
+  expect(within(navbar).getByText('House Rental')).toBeInTheDocument();
+  expect(within(navbar).getByRole('button', { name: /open navigation menu/i })).toBeInTheDocument();
   expect(within(navbar).getByRole('link', { name: /home/i })).toBeInTheDocument();
   expect(within(navbar).getByRole('link', { name: /about us/i })).toBeInTheDocument();
   expect(within(navbar).getByRole('link', { name: /contact us/i })).toBeInTheDocument();
@@ -29,7 +33,37 @@ test('renders only the public navigation before login', async () => {
   expect(within(navbar).getByRole('link', { name: /register/i })).toBeInTheDocument();
   expect(within(navbar).queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
   expect(within(navbar).queryByRole('link', { name: /admin/i })).not.toBeInTheDocument();
+
+  const footer = screen.getByRole('contentinfo');
+  const footerNavigation = within(footer).getByRole('navigation', { name: /footer navigation/i });
+  expect(within(footerNavigation).getByRole('link', { name: 'Home' })).toBeInTheDocument();
+  expect(within(footerNavigation).getByRole('link', { name: 'About Us' })).toBeInTheDocument();
+  expect(within(footerNavigation).getByRole('link', { name: 'Contact Us' })).toBeInTheDocument();
+  expect(within(footerNavigation).queryByRole('link', { name: /login|register/i })).not.toBeInTheDocument();
 });
+
+test('toggles the mobile navigation and closes it after navigation', async () => {
+  renderApp();
+
+  const [navbar] = await screen.findAllByRole('navigation');
+  const menuButton = within(navbar).getByRole('button', { name: /open navigation menu/i });
+
+  expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(menuButton);
+  expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+
+  fireEvent.click(within(navbar).getByRole('link', { name: /about us/i }));
+  expect(await within(navbar).findByRole('button', { name: /open navigation menu/i })).toHaveAttribute('aria-expanded', 'false');
+});
+
+test.each(['/login', '/register'])(
+  'hides the footer on %s', (path) => {
+    window.history.pushState({}, '', path);
+    renderApp();
+
+    expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+  }
+);
 
 test.each(['/admin-dashboard', '/tenant-dashboard', '/landlord-dashboard'])(
   'redirects logged-out users from %s to login', (path) => {
@@ -49,6 +83,7 @@ test('show landlord dashboard actions for the main sections', async () => {
   renderApp();
 
   expect(await screen.findByRole('heading', { name: /landlord dashboard/i })).toBeInTheDocument();
+  expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /rental requests/i })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /rent payments/i })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /messages/i })).toBeInTheDocument();

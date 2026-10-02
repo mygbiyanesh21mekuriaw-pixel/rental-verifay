@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import PropertyImage from '../components/PropertyImage';
+import { getPropertyImages } from '../utils/propertyMedia';
 
 const SearchPage = () => {
   const [properties, setProperties] = useState([]);
@@ -111,15 +113,13 @@ const SearchPage = () => {
           {properties.map((property) => (
             <div key={property._id} style={styles.card}>
               <div style={styles.cardImage}>
-                {property.images && property.images.length > 0 ? (
-                  <img 
-                    src={property.images[0]} 
-                    alt={property.title}
-                    style={styles.image}
-                  />
-                ) : (
-                  <div style={styles.noImage}>ðŸ“¸ No image</div>
-                )}
+                <PropertyImage
+                  src={getPropertyImages(property)}
+                  alt={property.title}
+                  style={styles.image}
+                  fallbackStyle={styles.noImage}
+                  fallbackText="No image"
+                />
                 {property.isVerified && (
                   <div style={styles.verifiedBadge}>âœ… Verified</div>
                 )}

@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PropertyImage from '../components/PropertyImage';
+import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
+import { getPropertyImages } from '../utils/propertyMedia';
 import './adminDashboard.css';
 
 const sectionConfig = {
@@ -28,13 +31,6 @@ const getAdminAreaValue = (adminAreas) => {
   if (!firstArea) return '';
   if (typeof firstArea === 'string') return firstArea;
   return firstArea.city || firstArea.region || firstArea.zone || firstArea.wereda || firstArea.subCity || '';
-};
-
-const getPropertyImageUrl = (property) => {
-  const image = property?.images?.[0] || property?.image;
-  if (!image) return '';
-  if (/^https?:\/\//i.test(image)) return image;
-  return `${process.env.REACT_APP_API_URL}/${String(image).replace(/\\/g, '/').replace(/^\/+/, '')}`;
 };
 
 const AdminSectionPage = ({ type }) => {
@@ -351,12 +347,18 @@ const AdminSectionPage = ({ type }) => {
                   {admin.phone && <p className="admin-card-detail">ðŸ“± {admin.phone}</p>}
                   <p className="admin-card-detail">ðŸ“ Area: {(admin.adminAreas?.[0]?.city || admin.adminAreas?.[0]?.region || admin.adminAreas?.[0]?.zone || admin.adminAreas?.[0]?.wereda || admin.adminAreas?.[0]?.subCity || 'Unassigned')}</p>
                   <div className="admin-card-actions">
-                    <button type="button" onClick={() => handleEditAdmin(admin)} className="admin-btn admin-btn-primary">Edit</button>
+                    <button
+                      type="button"
+                      onClick={() => handleEditAdmin(admin)}
+                      className="admin-btn admin-management-edit-btn"
+                    >
+                      Edit
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteAdmin(admin)}
                       disabled={adminActionLoading === admin._id}
-                      className="admin-btn admin-btn-reject"
+                      className="admin-btn admin-management-delete-btn"
                     >
                       {adminActionLoading === admin._id ? 'Deleting...' : 'Delete'}
                     </button>
@@ -413,15 +415,13 @@ const AdminSectionPage = ({ type }) => {
               <h2 id="rental-request-details-title" className="admin-card-title">ðŸ“„ Rental Request Details</h2>
               <button type="button" className="admin-card-link" onClick={() => setSelectedRentalRequest(null)}>Close</button>
             </div>
-            {getPropertyImageUrl(selectedRentalRequest.property) ? (
-              <img
-                src={getPropertyImageUrl(selectedRentalRequest.property)}
-                alt={selectedRentalRequest.property?.title || 'Property'}
-                className="admin-request-modal-image"
-              />
-            ) : (
-              <div className="admin-request-modal-image admin-empty-text" role="img" aria-label="No property image available">ðŸ“· No property image</div>
-            )}
+            <PropertyImage
+              src={getPropertyImages(selectedRentalRequest.property)}
+              alt={selectedRentalRequest.property?.title || 'Property'}
+              className="admin-request-modal-image"
+              fallbackClassName="admin-request-modal-image admin-empty-text"
+              fallbackText="No property image available"
+            />
             <h3 className="admin-card-title">ðŸ  {selectedRentalRequest.property?.title || 'Property'}</h3>
             <p className="admin-card-detail">ðŸ‘¤ Tenant: {selectedRentalRequest.tenant?.name || selectedRentalRequest.tenantName || 'Unknown tenant'}</p>
             <p className="admin-card-detail">ðŸ  Landlord: {selectedRentalRequest.landlord?.name || 'Unknown landlord'}</p>
@@ -430,6 +430,13 @@ const AdminSectionPage = ({ type }) => {
             <p className="admin-card-detail">ðŸ“ Request: {selectedRentalRequest.message || 'No message provided'}</p>
             <p className="admin-card-detail">ðŸ“… Requested: {selectedRentalRequest.createdAt ? new Date(selectedRentalRequest.createdAt).toLocaleString() : 'Date unavailable'}</p>
             <p className="admin-card-detail">ðŸ“Œ Status: {selectedRentalRequest.status || 'pending'}</p>
+            <PropertyOwnershipProof
+              src={selectedRentalRequest.property?.verificationDocument}
+              title={selectedRentalRequest.property?.title}
+              className="admin-card-detail"
+              imageClassName="admin-card-image"
+              fallbackClassName="admin-empty-text"
+            />
             {rentalRequestFeedback && <p className="admin-request-feedback">{rentalRequestFeedback}</p>}
             {canManageRentalRequests && (
               <div className="admin-card-actions">
@@ -483,7 +490,13 @@ const AdminSectionPage = ({ type }) => {
             <div className="admin-grid">
               {items.map(property => (
                 <div key={property._id} className="admin-card">
-                  {property.images?.[0] && <img src={property.images[0]} alt={property.title} className="admin-card-image" />}
+                  <PropertyImage
+                    src={getPropertyImages(property)}
+                    alt={property.title}
+                    className="admin-card-image"
+                    fallbackClassName="admin-card-image admin-empty-text"
+                    fallbackText="No property image available"
+                  />
                   <h4 className="admin-card-title">{property.title}</h4>
                   <p className="admin-card-detail">ðŸ“ {property.location}</p>
                   <p className="admin-card-price">ðŸ’° ETB {Number(property.price).toLocaleString()}</p>
@@ -494,16 +507,13 @@ const AdminSectionPage = ({ type }) => {
                   <p className="admin-card-detail">
                     ðŸ“Œ Status: {displayVerificationStatus(property)}
                   </p>
-                  {property.verificationDocument && (
-                    <div className="admin-card-detail">
-                      <strong>ðŸ“„ Proof of Ownership</strong>
-                      <img
-                        src={property.verificationDocument}
-                        alt={`Proof of ownership for ${property.title}`}
-                        className="admin-card-image"
-                      />
-                    </div>
-                  )}
+                  <PropertyOwnershipProof
+                    src={property.verificationDocument}
+                    title={property.title}
+                    className="admin-card-detail"
+                    imageClassName="admin-card-image"
+                    fallbackClassName="admin-empty-text"
+                  />
                   {canManageVerification && (
                     <div className="admin-card-actions">
                       <button
@@ -538,6 +548,3 @@ const AdminSectionPage = ({ type }) => {
 };
 
 export default AdminSectionPage;
-
-
-

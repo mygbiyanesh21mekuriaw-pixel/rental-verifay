@@ -36,6 +36,8 @@ import LandlordRequests from './pages/LandlordRequests';
 import LandlordRequestDetail from './pages/LandlordRequestDetail';
 import LandlordNotifications from './pages/LandlordNotifications';
 import LandlordProfile from './pages/LandlordProfile';
+import LandlordAccountSettings from './pages/LandlordAccountSettings';
+import LandlordBankInformation from './pages/LandlordBankInformation';
 import LandlordReviews from './pages/LandlordReviews';
 import TenantRentalRequestDetail from './pages/TenantRentalRequestDetail';
 import AdminSystemLogs from './pages/AdminSystemLogs';
@@ -142,9 +144,40 @@ const PublicAliasRoute = ({ target }) => {
   return <Navigate to={target} replace />;
 };
 
-function App() {
-  const { user } = useAuth();
+const AppFooter = () => {
+  const { pathname } = useLocation();
 
+  if (!['/', '/about', '/contact'].includes(pathname)) return null;
+
+  return (
+    <footer className="app-footer">
+      <div className="app-footer-content">
+        <div className="app-footer-brand">
+          <strong>House Rental Management System</strong>
+          <span>Student Academic Project</span>
+          <span>Mekdela Amba University</span>
+          <span>College of Computing and Informatics</span>
+        </div>
+        <nav className="app-footer-links" aria-label="Footer navigation">
+          <span className="app-footer-heading">Quick links</span>
+          <Link to="/">Home</Link>
+          <Link to="/about">About Us</Link>
+          <Link to="/contact">Contact Us</Link>
+        </nav>
+        <div className="app-footer-contact">
+          <span className="app-footer-heading">Contact</span>
+          <a href="mailto:info@rentalverify.com">info@rentalverify.com</a>
+        </div>
+      </div>
+      <div className="app-footer-bottom">
+        <span>© {new Date().getFullYear()} House Rental Management System</span>
+        <span>All Rights Reserved.</span>
+      </div>
+    </footer>
+  );
+};
+
+function App() {
   return (
     <div className="app">
       <Router>
@@ -208,6 +241,8 @@ function App() {
             <Route path="/landlord/messages" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordMessages /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/notifications" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordNotifications /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/profile" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordProfile /></LandlordLayout></PrivateRoute>} />
+            <Route path="/landlord/account-settings" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordAccountSettings /></LandlordLayout></PrivateRoute>} />
+            <Route path="/landlord/bank-information" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordBankInformation /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/rent-payments" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordPayments /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/rental-requests" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordRequests /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/rental-requests/:requestId" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordRequestDetail /></LandlordLayout></PrivateRoute>} />
@@ -324,39 +359,13 @@ function App() {
           </Routes>
         </main>
 
-        <footer className="app-footer">
-          <div className="app-footer-content">
-            <div className="app-footer-brand">
-              <strong>House Rental Management System</strong>
-              <span>Student Academic Project</span>
-              <span>Mekdela Amba University</span>
-              <span>College of Computing and Informatics</span>
-            </div>
-            <nav className="app-footer-links" aria-label="Footer navigation">
-              <span className="app-footer-heading">Quick links</span>
-              <Link to="/">Home</Link>
-              <Link to="/about">About Us</Link>
-              <Link to="/contact">Contact Us</Link>
-              {!user && <Link to="/login">Login</Link>}
-              {!user && <Link to="/register">Register</Link>}
-            </nav>
-            <div className="app-footer-contact">
-              <span className="app-footer-heading">Contact</span>
-              <a href="mailto:info@rentalverify.com">info@rentalverify.com</a>
-            </div>
-          </div>
-          <div className="app-footer-bottom">
-            <span>© {new Date().getFullYear()} House Rental Management System</span>
-            <span>All Rights Reserved.</span>
-          </div>
-        </footer>
+        <AppFooter />
       </Router>
     </div>
   );
 }
 
 export default App;
-
 
 
 

@@ -7,6 +7,8 @@ import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
 import { getFavoriteIds, toggleFavorite } from '../utils/favorites';
 import BackToDashboard from '../components/BackToDashboard';
+import PropertyImage from '../components/PropertyImage';
+import { getPropertyImages } from '../utils/propertyMedia';
 import './TenantDashboard.css';
 
 const DEFAULT_MAP_CENTER = [9.145, 40.4897];
@@ -162,7 +164,13 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token, selected, onS
       }}
     >
       <div className="tenant-card-image">
-        {property.images?.[0] ? <img src={property.images[0]} alt={property.title} /> : <div className="tenant-card-no-image">ðŸ“¸</div>}
+        <PropertyImage
+          src={getPropertyImages(property)}
+          alt={property.title}
+          className="tenant-card-property-image"
+          fallbackClassName="tenant-card-no-image"
+          fallbackText="No photo"
+        />
         <span className="tenant-card-badge">âœ… Verified</span>
       </div>
       <div className="tenant-card-content">
@@ -576,4 +584,3 @@ const TenantSearch = () => {
 };
 
 export default TenantSearch;
-

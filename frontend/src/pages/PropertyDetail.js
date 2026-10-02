@@ -4,6 +4,9 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import './PropertyDetail.css';
 import { getFavoriteIds, toggleFavorite as toggleFavoriteStorage } from '../utils/favorites';
+import PropertyImage from '../components/PropertyImage';
+import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
+import { getPropertyImages } from '../utils/propertyMedia';
 
 const PropertyDetail = () => {
   const { id } = useParams();
@@ -244,17 +247,17 @@ const PropertyDetail = () => {
       <div className="property-card">
         {/* á‹¨áˆáˆµáˆ áŠ­ááˆ */}
         <div className="property-image-section">
-          {property?.images && property.images.length > 0 ? (
+          {getPropertyImages(property).length > 0 ? (
             <>
-              <img
-                src={property.images[0]}
+              <PropertyImage
+                src={getPropertyImages(property)}
                 alt={property.title}
                 className="property-image"
               />
-              {property.images.length > 1 && (
+              {getPropertyImages(property).length > 1 && (
                 <div className="property-image-thumbnails">
-                  {property.images.slice(1, 5).map((image, index) => (
-                    <img
+                  {getPropertyImages(property).slice(1, 5).map((image, index) => (
+                    <PropertyImage
                       key={`${image}-${index}`}
                       src={image}
                       alt={`${property.title} ${index + 2}`}
@@ -271,6 +274,13 @@ const PropertyDetail = () => {
 
         {/* á‹¨áˆ˜áˆ¨áŒƒ áŠ­ááˆ */}
         <div className="property-info">
+          {user?.role !== 'tenant' && (
+            <PropertyOwnershipProof
+              src={property?.verificationDocument}
+              title={property?.title}
+              imageClassName="property-image-thumbnail"
+            />
+          )}
           <div className="property-header">
             <h1 className="property-title">{property?.title}</h1>
             <div className="property-header-actions">
@@ -515,4 +525,3 @@ const PropertyDetail = () => {
 };
 
 export default PropertyDetail;
-

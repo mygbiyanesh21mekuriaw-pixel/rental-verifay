@@ -85,8 +85,9 @@
 }
 
 .admin-profile-page {
-  width: min(100%, 1000px);
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: 24px 20px;
   box-sizing: border-box;
 }
@@ -1844,6 +1845,31 @@
 }
 
 .admin-btn-reject:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-management-edit-btn,
+.admin-management-delete-btn {
+  flex: 1 1 100px;
+  min-width: 100px;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid #2563eb;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.admin-management-edit-btn:hover:not(:disabled),
+.admin-management-delete-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28);
+}
+
+.admin-management-edit-btn:disabled,
+.admin-management-delete-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

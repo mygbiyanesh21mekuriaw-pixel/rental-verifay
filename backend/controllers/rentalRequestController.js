@@ -50,7 +50,7 @@ const getAdminRentalRequests = async (req, res) => {
     if (propertyIds.length === 0) return res.json([]);
 
     const requests = await RentRequest.find({ property: { $in: propertyIds } })
-      .populate('property', 'title location region zone wereda city subCity kebele houseNumber images image')
+      .populate('property', 'title location region zone wereda city subCity kebele houseNumber images propertyImages image verificationDocument')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
@@ -280,7 +280,7 @@ const createRentRequest = async (req, res) => {
 const getMyRentRequests = async (req, res) => {
   try {
     const requests = await RentRequest.find({ tenant: req.user.id })
-      .populate('property', 'title location price images verificationDocument availabilityStatus rentedBy rentedAt')
+      .populate('property', 'title location price images propertyImages image availabilityStatus rentedBy rentedAt')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
 
@@ -294,7 +294,7 @@ const getMyRentRequests = async (req, res) => {
 const getMyRentalRequestById = async (req, res) => {
   try {
     const request = await RentRequest.findOne({ _id: req.params.id, tenant: req.user.id })
-      .populate('property', 'title location price images description bedrooms availabilityStatus rentedBy')
+      .populate('property', 'title location price images propertyImages image description bedrooms availabilityStatus rentedBy')
       .populate('landlord', 'name email phone');
     if (!request) return res.status(404).json({ message: 'Rental request not found' });
     res.json(request);
@@ -340,7 +340,7 @@ const getLandlordRentRequests = async (req, res) => {
     }
 
     const requests = await RentRequest.find(filter)
-      .populate('property', 'title location price images description bedrooms')
+      .populate('property', 'title location price images propertyImages image description bedrooms')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
@@ -438,7 +438,7 @@ const getRentRequestForLandlord = async (req, res) => {
     const landlordId = req.user.id;
 
     const request = await RentRequest.findById(id)
-      .populate('property', 'title location price images description bedrooms landlord')
+      .populate('property', 'title location price images propertyImages image description bedrooms landlord')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .populate({

@@ -33,6 +33,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUser = (userData) => {
+    setUser(userData);
+    persistUser(userData);
+  };
+
   const loadUser = useCallback(async (currentToken = token) => {
     if (!currentToken) {
       setUser(null);
@@ -135,6 +140,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     loadUser,
+    updateUser,
   };
 
   return (
@@ -143,4 +149,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-

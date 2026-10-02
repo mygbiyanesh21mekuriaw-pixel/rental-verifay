@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PropertyImage from '../components/PropertyImage';
+import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
+import { getPropertyImages } from '../utils/propertyMedia';
 
 const sectionConfig = {
   myProperties: {
@@ -143,15 +146,13 @@ const LandlordSectionPage = ({ type }) => {
         <div style={styles.grid}>
           {properties.map((property) => (
             <div key={property._id} style={styles.card}>
-              {property.images && property.images.length > 0 ? (
-                <img
-                  src={property.images[0]}
-                  alt={property.title}
-                  style={styles.cardImage}
-                />
-              ) : (
-                <div style={styles.cardImagePlaceholder}>ðŸ“¸ No photo</div>
-              )}
+              <PropertyImage
+                src={getPropertyImages(property)}
+                alt={property.title}
+                style={styles.cardImage}
+                fallbackStyle={styles.cardImagePlaceholder}
+                fallbackText="No photo"
+              />
               <div style={styles.cardHeader}>
                 <h3 style={styles.cardTitle}>{property.title}</h3>
                 {(() => {
@@ -164,16 +165,12 @@ const LandlordSectionPage = ({ type }) => {
               {type === 'rented' && property.rentedBy?.name && (
                 <p style={styles.cardLocation}>ðŸ‘¤ Tenant: {property.rentedBy.name}</p>
               )}
-              {property.verificationDocument && (
-                <div style={styles.documentSection}>
-                  <strong>ðŸ“„ Proof of Ownership</strong>
-                  <img
-                    src={property.verificationDocument}
-                    alt={`Proof of ownership for ${property.title}`}
-                    style={styles.documentImage}
-                  />
-                </div>
-              )}
+              <PropertyOwnershipProof
+                src={property.verificationDocument}
+                title={property.title}
+                style={styles.documentSection}
+                imageStyle={styles.documentImage}
+              />
               {type === 'rented' && (() => {
                 const propertyReviews = reviews.filter((review) => (
                   String(review.property?._id || review.property) === String(property._id)
@@ -504,5 +501,3 @@ const styles = {
 };
 
 export default LandlordSectionPage;
-
-

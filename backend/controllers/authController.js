@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { createSystemLog } = require('./systemLogController');
 const { listChapaBanks } = require('../utils/payoutProvider');
 const sendEmail = require('../utils/email');
+const { uploadFilesToUrls } = require('../utils/uploadMedia');
 
 const registrationNamePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
 const registrationEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -206,8 +207,13 @@ const updateProfile = async (req, res) => {
           return res.status(400).json({ message: 'Bank, account name and account number are required' });
         }
         const bankResult = await listChapaBanks();
+        if (!bankResult.ok) {
+          return res.status(503).json({
+            message: bankResult.message || 'Unable to verify supported banks right now. Please try again.',
+          });
+        }
         const selectedBank = bankResult.banks.find((bank) => bank.code === String(bankCode).trim());
-        if (!bankResult.ok || !selectedBank) {
+        if (!selectedBank) {
           return res.status(400).json({ message: 'Select a valid Chapa-supported bank' });
         }
         user.bankAccountName = String(bankAccountName).trim();
@@ -233,6 +239,40 @@ const updateProfile = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateProfilePhoto = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Choose a JPG, PNG, or WEBP profile photo.' });
+  }
+
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const [profilePhoto] = await uploadFilesToUrls([req.file], req, 'image');
+    user.profilePhoto = profilePhoto;
+    await user.save();
+
+    await createSystemLog({
+      user: user._id,
+      role: user.role,
+      action: 'USER_UPDATED',
+      description: `User ${user.name} updated their profile photo.`,
+      status: 'success',
+      ipAddress: req.ip || '',
+    });
+
+    return res.json({
+      message: 'Profile photo updated successfully.',
+      user: serializeUser(user),
+    });
+  } catch (error) {
+    console.error('Profile photo upload error:', error);
+    return res.status(500).json({ message: 'Unable to update profile photo.' });
   }
 };
 
@@ -398,4 +438,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, changePassword, requestPasswordReset, resetPassword, logout };
+module.exports = { register, login, getMe, updateProfile, updateProfilePhoto, changePassword, requestPasswordReset, resetPassword, logout };

@@ -10,7 +10,7 @@ const connectDB = require('./config/db');
 const createAdmin = require('./create-admin');
 
 // የአካባቢ ተለዋዋጮችን ጫን
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const getDevelopmentJwtSecret = () => {
   const secretPath = path.join(__dirname, '.jwt-secret');
@@ -51,6 +51,7 @@ if (!process.env.JWT_SECRET?.trim()) {
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

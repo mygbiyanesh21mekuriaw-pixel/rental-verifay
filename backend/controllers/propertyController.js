@@ -3,55 +3,18 @@ const User = require('../models/User');
 const Notification = require('../models/Notification');
 const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
-const cloudinary = require('../config/cloudinary');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
 const { createSystemLog } = require('./systemLogController');
+const {
+  hasCloudinaryCredentials,
+  uploadBuffer,
+  saveLocalUpload,
+  uploadFilesToUrls,
+} = require('../utils/uploadMedia');
 const {
   normalizeAdminAreaObject,
   propertyMatchesAdminAreas,
   buildAdminAreaQuery,
 } = require('../utils/adminArea');
-
-const hasCloudinaryCredentials = [
-  process.env.CLOUDINARY_CLOUD_NAME,
-  process.env.CLOUDINARY_API_KEY,
-  process.env.CLOUDINARY_API_SECRET,
-].every(value => value && !/^your_|change|replace|example|xxxxx/i.test(value));
-
-const uploadBuffer = (buffer, resourceType = 'auto') => new Promise((resolve, reject) => {
-  const stream = cloudinary.uploader.upload_stream(
-    { resource_type: resourceType },
-    (error, result) => (error ? reject(error) : resolve(result))
-  );
-  stream.end(buffer);
-});
-
-const saveLocalUpload = (file, req) => {
-  const uploadsDirectory = path.join(__dirname, '..', 'uploads');
-  fs.mkdirSync(uploadsDirectory, { recursive: true });
-  const extension = path.extname(file.originalname).toLowerCase() || '.bin';
-  const filename = `${crypto.randomUUID()}${extension}`;
-  fs.writeFileSync(path.join(uploadsDirectory, filename), file.buffer);
-  return `${req.protocol}://${req.get('host')}/uploads/${filename}`;
-};
-
-const uploadFilesToUrls = async (files, req, resourceType = 'image') => {
-  if (!files || files.length === 0) return [];
-
-  const urls = [];
-  for (const file of files) {
-    if (hasCloudinaryCredentials) {
-      const result = await uploadBuffer(file.buffer, resourceType);
-      urls.push(result.secure_url);
-    } else {
-      urls.push(saveLocalUpload(file, req));
-    }
-  }
-
-  return urls;
-};
 
 // አዲስ ንብረት መፍጠር (Landlord ብቻ)
 const normalizeCoordinate = (value, fieldName) => {
@@ -100,6 +63,10 @@ const createProperty = async (req, res) => {
     // የባለቤትነት ማስረጃ ፋይል መኖሩን ያረጋግጡ
     if (!req.files || !req.files.document) {
       return res.status(400).json({ message: 'Verification document is required' });
+    }
+
+    if (!req.files.images || req.files.images.length === 0) {
+      return res.status(400).json({ message: 'At least one property image is required' });
     }
 
     // ምስሎችን ወደ Cloudinary ይላኩ
@@ -412,7 +379,15 @@ const getAllProperties = async (req, res) => {
       });
     }
 
-    res.json(properties);
+    const responseProperties = properties.map((property) => {
+      const responseProperty = property.toObject();
+      if (!req.user || req.user.role === 'tenant') {
+        delete responseProperty.verificationDocument;
+      }
+      return responseProperty;
+    });
+
+    res.json(responseProperties);
   } catch (error) {
     if (error.message && /must be a non-negative number|Minimum price cannot be greater than maximum price/.test(error.message)) {
       return res.status(400).json({ message: error.message });
@@ -435,7 +410,9 @@ const getPropertyById = async (req, res) => {
       if (!property.isVerified || property.verificationStatus !== 'approved') {
         return res.status(403).json({ message: 'This property is not verified yet' });
       }
-      return res.json(property);
+      const publicProperty = property.toObject();
+      delete publicProperty.verificationDocument;
+      return res.json(publicProperty);
     }
 
     if (!['tenant', 'landlord', 'admin'].includes(req.user.role)) {
@@ -470,7 +447,11 @@ const getPropertyById = async (req, res) => {
       }
     }
 
-    res.json(property);
+    const responseProperty = property.toObject();
+    if (req.user.role === 'tenant') {
+      delete responseProperty.verificationDocument;
+    }
+    res.json(responseProperty);
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Server error' });
   }

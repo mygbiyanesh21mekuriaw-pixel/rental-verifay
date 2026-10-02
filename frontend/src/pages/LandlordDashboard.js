@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { FaBars, FaSignOutAlt, FaTimes } from 'react-icons/fa';
 import LandlordSectionPage from './LandlordSectionPage';
 import LandlordRequests from './LandlordRequests';
 import LandlordPayments from './LandlordPayments';
 import LandlordProfile from './LandlordProfile';
 import LandlordNotifications from './LandlordNotifications';
+import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
+import ProfileAvatar from '../components/ProfileAvatar';
 import './landlordDashboard.css';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -45,10 +48,16 @@ export const landlordSidebarItems = [
   { key: 'rejected', label: 'Rejected', icon: 'âŒ', path: '/landlord/rejected' },
   { key: 'rentPayments', label: 'Rent Payments', icon: 'ðŸ’°', path: '/landlord/rent-payments' },
   { key: 'notifications', label: 'Notifications', icon: 'ðŸ””', path: '/landlord/notifications' },
-  { key: 'profile', label: 'Profile', icon: 'ðŸ‘¤', path: '/landlord/profile' },
+  { key: 'accountSettings', label: 'Account Settings', icon: 'âš™ï¸', path: '/landlord/account-settings' },
+  { key: 'bankInformation', label: 'Bank Information', icon: 'ðŸ¦', path: '/landlord/bank-information' },
 ];
 
-export const LandlordSidebar = ({ user, notificationCount = 0 }) => {
+export const LandlordSidebar = ({
+  user,
+  notificationCount = 0,
+  isOpen = false,
+  onNavigate,
+}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -68,7 +77,10 @@ export const LandlordSidebar = ({ user, notificationCount = 0 }) => {
   const activeSection = getActiveKey();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 flex w-[260px] translate-x-0 flex-col border-r border-slate-700 bg-slate-900 text-slate-200 shadow-lg">
+    <aside
+      id="landlord-navigation"
+      className={`landlord-sidebar fixed inset-y-0 left-0 z-40 flex w-[260px] translate-x-0 flex-col border-r border-slate-700 bg-slate-900 text-slate-200 shadow-lg ${isOpen ? 'is-open' : ''}`}
+    >
         <div className="flex items-center gap-3 border-b border-slate-700 px-5 py-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm">ðŸ </div>
           <div>
@@ -86,6 +98,7 @@ export const LandlordSidebar = ({ user, notificationCount = 0 }) => {
               <Link
                 key={key}
                 to={path}
+                onClick={onNavigate}
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-slate-800 text-white shadow-sm ring-1 ring-white/10'
@@ -108,9 +121,6 @@ export const LandlordSidebar = ({ user, notificationCount = 0 }) => {
 
         <div className="border-t border-slate-700 p-4">
           <div className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-slate-100">
-              {(user?.name || 'U').charAt(0).toUpperCase()}
-            </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{user?.name || 'User'}</p>
               <p className="truncate text-xs text-slate-400">{user?.email || 'user@example.com'}</p>
@@ -122,16 +132,64 @@ export const LandlordSidebar = ({ user, notificationCount = 0 }) => {
   );
 };
 
-export const LandlordLayout = ({ children, user = null, notificationCount = 0 }) => (
-  <div className="min-h-screen bg-slate-50 text-slate-900">
-    <div className="pl-[260px]">
-      <LandlordSidebar user={user} notificationCount={notificationCount} />
-      <main className="min-h-screen px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+export const LandlordLayout = ({ children, user: suppliedUser = null, notificationCount = 0 }) => {
+  const { user: authUser, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const user = suppliedUser || authUser;
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  return (
+    <div className="landlord-layout min-h-screen bg-slate-50 text-slate-900">
+      <header className="landlord-mobile-header">
+        <button
+          type="button"
+          className="landlord-menu-toggle"
+          aria-label={menuOpen ? 'Close landlord navigation' : 'Open landlord navigation'}
+          aria-expanded={menuOpen}
+          aria-controls="landlord-navigation"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? <FaTimes aria-hidden="true" /> : <FaBars aria-hidden="true" />}
+        </button>
+        <span className="landlord-mobile-title">House Rental</span>
+        <Link to="/landlord/profile" className="landlord-mobile-profile-link" aria-label="Profile">
+          <ProfileAvatar user={user} className="landlord-mobile-profile-avatar" />
+          <span>Profile</span>
+        </Link>
+        <button type="button" className="landlord-mobile-logout" onClick={handleLogout}>
+          <FaSignOutAlt aria-hidden="true" />
+          <span>Logout</span>
+        </button>
+      </header>
+      <button
+        type="button"
+        className={`landlord-sidebar-backdrop ${menuOpen ? 'is-open' : ''}`}
+        onClick={() => setMenuOpen(false)}
+        aria-label="Close landlord navigation"
+        tabIndex={menuOpen ? 0 : -1}
+      />
+      <LandlordSidebar
+        user={user}
+        notificationCount={notificationCount}
+        isOpen={menuOpen}
+        onNavigate={() => setMenuOpen(false)}
+      />
+      <main className="landlord-layout-main min-h-screen px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
         <div className="mx-auto max-w-[1440px]">{children}</div>
       </main>
     </div>
-  </div>
-);
+  );
+};
 
 const LandlordDashboard = ({ initialShowForm = false }) => {
   const navigate = useNavigate();
@@ -410,6 +468,11 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
       return;
     }
 
+    if (!isEditMode && imageFiles.length === 0) {
+      setFormError('You must upload at least one property image');
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
 
@@ -650,6 +713,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                     name="images"
                     accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                     multiple
+                    required={!isEditMode}
                     onChange={handleFileChange}
                     className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
                   />
@@ -659,7 +723,16 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                 <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <label className="block text-sm font-semibold text-slate-700">ðŸ“· Proof of ownership</label>
                   {existingProofOfOwnership && (
-                    <span className="block text-sm font-medium text-emerald-700">âœ… {existingProofOfOwnership.split('/').pop()}</span>
+                    <>
+                      <span className="block text-sm font-medium text-emerald-700">âœ… {existingProofOfOwnership.split('/').pop()}</span>
+                      <PropertyOwnershipProof
+                        src={existingProofOfOwnership}
+                        title={formData.title}
+                        className="mt-2 grid gap-2 text-sm"
+                        imageClassName="max-h-40 w-full rounded-lg object-contain"
+                        showLabel={false}
+                      />
+                    </>
                   )}
                   <input
                     type="file"
@@ -813,5 +886,3 @@ const styles = {
 };
 
 export default LandlordDashboard;
-
-

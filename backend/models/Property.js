@@ -86,6 +86,13 @@ const PropertySchema = new mongoose.Schema({
   images: [{
     type: String, // Cloudinary URLs ይሆናሉ
   }],
+  propertyImages: [{
+    type: String,
+  }],
+  image: {
+    type: String,
+    default: '',
+  },
   isVerified: {
     type: Boolean,
     default: false,

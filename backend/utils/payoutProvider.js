@@ -13,6 +13,11 @@ const hasTransferConfig = () => {
   return config.provider === 'chapa' && Boolean(config.secretKey && config.baseUrl);
 };
 
+const hasBankListConfig = () => {
+  const config = transferConfig();
+  return Boolean(config.secretKey && config.baseUrl);
+};
+
 const fetchTransferJson = async (url, options = {}) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TRANSFER_TIMEOUT_MS);
@@ -32,6 +37,13 @@ const normalizeTransferStatus = (status) => {
   if (['reverted', 'reversed'].includes(normalized)) return 'REVERTED';
   if (['pending', 'processing', 'queued', 'initiated'].includes(normalized)) return 'PROCESSING';
   return 'PENDING';
+};
+
+const normalizeChapaBank = (bank) => {
+  const name = bank?.name || bank?.bank_name || bank?.bankName;
+  const code = String(bank?.bank_code ?? bank?.code ?? bank?.id ?? bank?.bank_slug ?? bank?.slug ?? '').trim();
+  const slug = String(bank?.bank_slug ?? bank?.slug ?? '').trim();
+  return name && code ? { name, code, slug } : null;
 };
 
 const initiateChapaTransfer = async ({ accountName, accountNumber, amount, bankCode, reference }) => {
@@ -77,19 +89,39 @@ const verifyChapaTransfer = async (reference) => {
 };
 
 const listChapaBanks = async () => {
-  if (!hasTransferConfig()) return { ok: false, banks: [], message: 'Chapa transfer configuration is missing' };
+  if (!hasBankListConfig()) {
+    return {
+      ok: false,
+      banks: [],
+      message: 'Chapa bank list configuration is missing. Configure CHAPA_SECRET_KEY and CHAPA_BASE_URL in backend/.env, then restart the backend.',
+    };
+  }
   const config = transferConfig();
-  const { response, payload } = await fetchTransferJson(`${config.baseUrl}/v1/banks`, {
-    headers: { Authorization: `Bearer ${config.secretKey}` },
-  });
-  const records = Array.isArray(payload?.data) ? payload.data : [];
-  const banks = records.map((bank) => ({
-    name: bank.name || bank.bank_name || bank.bankName,
-    code: String(bank.bank_code ?? bank.code ?? bank.id ?? '').trim(),
-  })).filter((bank) => bank.name && bank.code);
-  return { ok: response.ok, banks, message: payload?.message || '' };
+  try {
+    const { response, payload } = await fetchTransferJson(`${config.baseUrl}/v1/banks`, {
+      headers: { Authorization: `Bearer ${config.secretKey}` },
+    });
+    const records = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.data?.banks)
+        ? payload.data.banks
+        : Array.isArray(payload?.banks)
+          ? payload.banks
+          : [];
+    const banks = records.map(normalizeChapaBank).filter(Boolean);
+    if (response.ok && banks.length) return { ok: true, banks, message: payload?.message || '' };
+    console.error('Chapa bank list request failed:', payload?.message || response.status);
+    return {
+      ok: false,
+      banks: [],
+      message: payload?.message || 'Unable to load Chapa-supported banks. Please try again.',
+    };
+  } catch (error) {
+    console.error('Chapa bank list request error:', error.message);
+    return { ok: false, banks: [], message: 'Unable to reach Chapa to load supported banks. Please try again.' };
+  }
 };
 
 const createPayoutReference = () => `PO-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-module.exports = { hasTransferConfig, initiateChapaTransfer, verifyChapaTransfer, listChapaBanks, createPayoutReference, normalizeTransferStatus };
+module.exports = { hasTransferConfig, hasBankListConfig, initiateChapaTransfer, verifyChapaTransfer, listChapaBanks, createPayoutReference, normalizeTransferStatus, normalizeChapaBank };

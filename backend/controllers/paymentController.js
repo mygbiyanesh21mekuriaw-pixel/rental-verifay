@@ -64,6 +64,12 @@ const getConfirmedRental = async (propertyId, tenantId) => {
   return request;
 };
 
+const hasCompletePayoutBankDetails = (landlord) => Boolean(
+  landlord?.bankAccountName?.trim() &&
+  landlord?.bankAccountNumber?.trim() &&
+  landlord?.bankCode?.trim()
+);
+
 
 const createOrProcessPayout = async (payment) => {
   if (!payment || payment.status !== 'paid') return null;
@@ -254,6 +260,14 @@ const createPayment = async (req, res) => {
     if (!property.landlord || !Number.isFinite(Number(property.price)) || Number(property.price) <= 0) {
       return res.status(409).json({ message: 'Rented property payment details are incomplete' });
     }
+    const landlordPayoutDetails = await User.findById(property.landlord)
+      .select('bankAccountName bankAccountNumber bankCode');
+    if (!hasCompletePayoutBankDetails(landlordPayoutDetails)) {
+      return res.status(409).json({
+        message: 'The landlord has not completed bank information. Please contact the landlord before paying rent.',
+        code: 'LANDLORD_BANK_INFORMATION_INCOMPLETE',
+      });
+    }
     const tenant = await User.findById(req.user.id).select('email phone');
     if (!tenant) return res.status(403).json({ message: 'Authenticated tenant not found' });
     const existing = await Payment.findOne({ tenant: req.user.id, property: propertyId, paymentPeriod: period });
@@ -423,6 +437,8 @@ const getTenantPaymentContext = async (req, res) => {
     if (!property) return res.status(403).json({ message: 'You can only view payments for your rented property' });
     const rental = await getConfirmedRental(property._id, req.user.id);
     if (!rental) return res.status(403).json({ message: 'Payment is only available for your approved or confirmed rented property.' });
+    const landlordPayoutDetails = await User.findById(property.landlord._id)
+      .select('bankAccountName bankAccountNumber bankCode');
     const paymentRecords = await Payment.find({ tenant: req.user.id, property: property._id }).sort({ createdAt: -1 });
     for (const payment of paymentRecords) await reconcilePayment(payment, req);
     const payments = await paymentView(Payment.find({ tenant: req.user.id, property: property._id }).sort({ createdAt: -1 }));
@@ -431,7 +447,17 @@ const getTenantPaymentContext = async (req, res) => {
       return new Date(payment.createdAt || 0).getTime() > new Date(latest.createdAt || 0).getTime() ? payment : latest;
     }, null);
     const canonicalPayout = canonicalPayment ? await Payout.findOne({ payment: canonicalPayment._id }).select('status payoutReference providerReference failureReason') : null;
-    res.json({ property, landlord: property.landlord, payments, currentPayment: canonicalPayment, latestPayment: canonicalPayment, paymentStatus: canonicalPayment?.status || null, payoutStatus: canonicalPayout?.status || null, payout: canonicalPayout });
+    res.json({
+      property,
+      landlord: property.landlord,
+      landlordBankInformationComplete: hasCompletePayoutBankDetails(landlordPayoutDetails),
+      payments,
+      currentPayment: canonicalPayment,
+      latestPayment: canonicalPayment,
+      paymentStatus: canonicalPayment?.status || null,
+      payoutStatus: canonicalPayout?.status || null,
+      payout: canonicalPayout,
+    });
   } catch (error) {
     console.error('Get tenant payment context error:', error);
     res.status(500).json({ message: 'Server error' });

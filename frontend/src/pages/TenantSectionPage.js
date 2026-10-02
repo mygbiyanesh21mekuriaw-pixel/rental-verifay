@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { getFavoriteIds, toggleFavorite } from '../utils/favorites';
 import BackToDashboard from '../components/BackToDashboard';
+import PropertyImage from '../components/PropertyImage';
+import { getPropertyImages } from '../utils/propertyMedia';
 import './TenantDashboard.css';
 
 const isValidProperty = (property) => (
@@ -36,11 +38,6 @@ const isConfirmedRental = (request, userId) => ['approved', 'confirmed'].include
   && String(request.property?.rentedBy) === String(userId);
 
 const isActiveRental = (request, userId) => isConfirmedRental(request, userId);
-
-const resolveAssetUrl = (assetPath) => {
-  if (!assetPath || /^https?:\/\//i.test(assetPath)) return assetPath;
-  return `${process.env.REACT_APP_API_URL}${assetPath.startsWith('/') ? '' : '/'}${assetPath}`;
-};
 
 const displayRequestStatus = (status, isRented = false) => {
   const normalizedStatus = typeof status === 'string' && status.trim()
@@ -191,8 +188,14 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
   return (
   <div className="tenant-card">
     <div className="tenant-card-image">
-      {property.images?.[0] ? <img src={property.images[0]} alt={property.title} /> : <div className="tenant-card-no-image">ðŸ“¸</div>}
-      <span className="tenant-card-badge">âœ… Verified</span>
+    <PropertyImage
+      src={getPropertyImages(property)}
+      alt={property.title}
+      className="tenant-card-property-image"
+      fallbackClassName="tenant-card-no-image"
+      fallbackText="No photo"
+    />
+    <span className="tenant-card-badge">âœ… Verified</span>
     </div>
     <div className="tenant-card-content">
       <h3 className="tenant-card-title">{property.title}</h3>
@@ -202,16 +205,6 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
       <p className="tenant-card-detail">ðŸ‘¤ Landlord: {property.landlord?.name || 'Not available'}</p>
       <p className="tenant-card-description">{property.description}</p>
       <p className="tenant-card-detail">âœ… Verification status: Approved</p>
-      {property.verificationDocument && (
-        <div className="tenant-proof-section">
-          <strong>ðŸ“„ Proof of Ownership</strong>
-          <img
-            src={resolveAssetUrl(property.verificationDocument)}
-            alt={`Proof of ownership for ${property.title}`}
-            className="tenant-proof-image"
-          />
-        </div>
-      )}
       <button 
         type="button" 
         className={`tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`} 
@@ -251,8 +244,14 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
     {requests.map((request) => (
       <div key={request._id} className="tenant-request-card">
         <div>
-          {showActiveRentalActions && request.property?.images?.[0] && (
-            <img className="tenant-request-image" src={request.property.images[0]} alt={request.property.title || 'Rented property'} />
+          {showActiveRentalActions && (
+            <PropertyImage
+              className="tenant-request-image"
+              fallbackClassName="tenant-request-image tenant-card-no-image"
+              src={getPropertyImages(request.property)}
+              alt={request.property?.title || 'Rented property'}
+              fallbackText="No property photo"
+            />
           )}
           <h3 className="tenant-request-title">ðŸ  {request.property?.title}</h3>
           <p className="tenant-request-detail">ðŸ“ {request.property?.location}</p>
@@ -260,16 +259,6 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
           <p className="tenant-request-detail">ðŸ‘¤ Landlord: {request.landlord?.name || 'Not available'}</p>
           <p className="tenant-request-detail">ðŸ“… Move-in date: {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString() : 'Not provided'}</p>
           {showActiveRentalActions && request.property?.rentedAt && <p className="tenant-request-detail">ðŸ“… Rental started: {new Date(request.property.rentedAt).toLocaleDateString()}</p>}
-          {request.property?.verificationDocument && (
-            <div className="tenant-proof-section">
-              <strong>ðŸ“„ Proof of Ownership</strong>
-              <img
-                src={resolveAssetUrl(request.property.verificationDocument)}
-                alt={`Proof of ownership for ${request.property.title || 'rented property'}`}
-                className="tenant-proof-image"
-              />
-            </div>
-          )}
           {isActiveRental(request, userId) && <div className="tenant-rented-notice">ðŸ  This property has been rented in your name.</div>}
           {showActiveRentalActions && isConfirmedRental(request, userId) && (
             <RentalReview propertyId={request.property?._id} />
@@ -431,5 +420,3 @@ const TenantSectionPage = ({ type }) => {
 };
 
 export default TenantSectionPage;
-
-

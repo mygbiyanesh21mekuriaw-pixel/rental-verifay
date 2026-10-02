@@ -38,7 +38,7 @@ const getMyViewHistory = async (req, res) => {
     const history = await ViewHistory.find({ viewer: req.user.id })
       .populate({
         path: 'property',
-        select: 'title description location price bedrooms images isVerified verificationStatus availabilityStatus landlord',
+        select: 'title description location price bedrooms images propertyImages image isVerified verificationStatus availabilityStatus landlord',
         populate: { path: 'landlord', select: 'role' },
       })
       .sort({ viewedAt: -1 });

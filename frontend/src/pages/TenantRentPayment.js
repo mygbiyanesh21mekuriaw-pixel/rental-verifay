@@ -256,13 +256,20 @@ const TenantRentPayment = () => {
         <section className="payment-card">
           <h2>Submit a payment</h2>
           <p className="payment-muted">Complete the secure provider checkout to confirm this payment.</p>
+          {!context.landlordBankInformationComplete && (
+            <p className="payment-error" role="alert">
+              The landlord has not completed bank information. Please contact the landlord before paying rent.
+            </p>
+          )}
           {error && <p className="payment-error">{error}</p>}
           {success && <p className="payment-success">{success}</p>}
           <form onSubmit={submitPayment} className="payment-form">
             <label htmlFor="payment-period">Payment period</label>
             <input id="payment-period" type="month" value={paymentPeriod} onChange={event => setPaymentPeriod(event.target.value)} required />
             <div className="payment-amount"><span>Amount due</span><strong>ETB {Number(context.property.price).toLocaleString()}</strong></div>
-            <button type="submit" disabled={submitting || !paymentPeriod}>{submitting ? 'Submitting...' : 'Pay Rent'}</button>
+            <button type="submit" disabled={submitting || !paymentPeriod || !context.landlordBankInformationComplete}>
+              {submitting ? 'Submitting...' : 'Pay Rent'}
+            </button>
           </form>
         </section>
       </div>
@@ -282,5 +289,4 @@ const TenantRentPayment = () => {
 };
 
 export default TenantRentPayment;
-
 

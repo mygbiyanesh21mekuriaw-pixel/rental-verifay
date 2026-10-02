@@ -102,7 +102,7 @@ const AdminProfile = () => {
     return (
       <div className="admin-profile-page">
         <BackToDashboard dashboardRoute="/admin-dashboard" />
-        <h1 className="admin-profile-heading">ðŸ‘¤ Profile</h1>
+        <h1 className="admin-profile-heading">Account Settings</h1>
         <p className={loadError ? 'admin-profile-message error' : 'admin-profile-message'}>
           {loading ? 'Loading profile...' : loadError || 'Profile is unavailable.'}
         </p>
@@ -118,7 +118,7 @@ const AdminProfile = () => {
       <header className="admin-profile-heading-row">
         <div>
           <p className="admin-profile-eyebrow">ACCOUNT SETTINGS</p>
-          <h1 className="admin-profile-heading">ðŸ‘¤ Profile</h1>
+          <h1 className="admin-profile-heading">Account Settings</h1>
         </div>
         <span className="admin-profile-role">{roleName}</span>
       </header>
@@ -128,7 +128,7 @@ const AdminProfile = () => {
           <h2 id="admin-profile-details-title">Account information</h2>
           {!editingProfile && (
             <button type="button" className="admin-profile-edit-button" onClick={() => setEditingProfile(true)}>
-              âœï¸ Edit Profile
+              Edit Account
             </button>
           )}
         </div>
@@ -146,7 +146,7 @@ const AdminProfile = () => {
                 setEditingProfile(false);
               }}>Cancel</button>
               <button type="submit" className="admin-profile-submit-button" disabled={savingProfile}>
-                {savingProfile ? 'Saving...' : 'Save Profile'}
+                {savingProfile ? 'Saving...' : 'Save Account'}
               </button>
             </div>
           </form>
@@ -198,5 +198,4 @@ const AdminProfile = () => {
 };
 
 export default AdminProfile;
-
 

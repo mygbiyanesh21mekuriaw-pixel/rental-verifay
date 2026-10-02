@@ -1,393 +1,119 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import ProfilePhotoControl from '../components/ProfilePhotoControl';
 
 const LandlordProfile = () => {
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  const [banks, setBanks] = useState([]);
-
-  const [bankDetails, setBankDetails] = useState({
-    bankAccountName: '',
-    bankAccountNumber: '',
-    bankCode: '',
-  });
-
+  const { user, updateUser } = useAuth();
+  const [profile, setProfile] = useState(user);
+  const [form, setForm] = useState({ name: user?.name || '', phone: user?.phone || '' });
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(!user);
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        setLoading(true);
-        setErrorMessage('');
-
-        const token = localStorage.getItem('token');
-
-        if (!token) {
-          setErrorMessage('Login token not found. Please login again.');
-          return;
-        }
-
-        // ==============================
-        // GET CURRENT USER
-        // ==============================
-        const response = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/auth/me`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const loadedProfile =
-          response.data?.user || response.data;
-
-        if (!loadedProfile) {
-          setErrorMessage('User profile was not returned by the server.');
-          return;
-        }
-
-        setProfile(loadedProfile);
-
-        setBankDetails({
-          bankAccountName:
-            loadedProfile.bankAccountName || '',
-          bankAccountNumber: '',
-          bankCode:
-            loadedProfile.bankCode || '',
-        });
-
-        // ==============================
-        // GET BANKS
-        // ==============================
-        try {
-          const banksResponse = await axios.get(
-            `${process.env.REACT_APP_API_URL}/api/payments/banks`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          setBanks(
-            Array.isArray(banksResponse.data)
-              ? banksResponse.data
-              : banksResponse.data?.banks || []
-          );
-        } catch (bankError) {
-          console.error(
-            'Bank loading error:',
-            bankError
-          );
-
-          setBanks([]);
-        }
-      } catch (error) {
-        console.error(
-          'Profile loading error:',
-          error
-        );
-
-        if (error.response) {
-          setErrorMessage(
-            error.response.data?.message ||
-              `Server error: ${error.response.status}`
-          );
-        } else if (error.request) {
-          setErrorMessage(
-            'Backend server is not responding. Make sure the backend is running on port 5000.'
-          );
-        } else {
-          setErrorMessage(
-            error.message ||
-              'Unable to load profile.'
-          );
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile();
+    let active = true;
+    axios.get(`${process.env.REACT_APP_API_URL}/api/auth/me`)
+      .then((response) => {
+        if (!active) return;
+        const account = response.data?.user || response.data;
+        setProfile(account);
+        setForm({ name: account.name || '', phone: account.phone || '' });
+      })
+      .catch((error) => {
+        if (active) setMessage(error.response?.data?.message || 'Unable to load your profile.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
   }, []);
 
-  // ==============================
-  // SAVE BANK DETAILS
-  // ==============================
-  const saveBankDetails = async (event) => {
+  const saveProfile = async (event) => {
     event.preventDefault();
-
     setSaving(true);
-    setSaveMessage('');
-
+    setMessage('');
     try {
-      const token = localStorage.getItem('token');
-
-      if (!token) {
-        setSaveMessage(
-          'Login token not found. Please login again.'
-        );
-        return;
-      }
-
       const response = await axios.put(
         `${process.env.REACT_APP_API_URL}/api/auth/profile`,
-        bankDetails,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        form
       );
-
-      const updatedUser =
-        response.data?.user;
-
-      if (updatedUser) {
-        setProfile(updatedUser);
-      }
-
-      setSaveMessage(
-        response.data?.message ||
-          'Bank details saved successfully.'
-      );
-
-      setBankDetails((current) => ({
-        ...current,
-        bankAccountNumber: '',
-      }));
+      if (!response.data?.user) throw new Error('The server did not return the updated profile.');
+      setProfile(response.data.user);
+      setForm({ name: response.data.user.name || '', phone: response.data.user.phone || '' });
+      updateUser(response.data.user);
+      setEditing(false);
+      setMessage(response.data.message || 'Profile updated successfully.');
     } catch (error) {
-      console.error(
-        'Bank details save error:',
-        error
-      );
-
-      setSaveMessage(
-        error.response?.data?.message ||
-          'Unable to save bank details.'
-      );
+      setMessage(error.response?.data?.message || error.message || 'Unable to update your profile.');
     } finally {
       setSaving(false);
     }
   };
 
-  // ==============================
-  // LOADING
-  // ==============================
   if (loading) {
-    return (
-      <div className="tenant-container tenant-section-page">
-        <div className="tenant-header">
-          <h1 className="tenant-title">
-            ðŸ‘¤ Profile
-          </h1>
-        </div>
-
-        <div className="tenant-loading">
-          Loading profile...
-        </div>
-      </div>
-    );
-  }
-
-  // ==============================
-  // ERROR
-  // ==============================
-  if (!profile) {
-    return (
-      <div className="tenant-container tenant-section-page">
-        <div className="tenant-header">
-          <h1 className="tenant-title">
-            ðŸ‘¤ Profile
-          </h1>
-        </div>
-
-        <div className="tenant-empty">
-          <h2>Profile could not be loaded</h2>
-
-          <p>
-            {errorMessage ||
-              'Profile not available.'}
-          </p>
-
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
+    return <section className="landlord-account-page"><p>Loading profile...</p></section>;
   }
 
   return (
-    <div className="tenant-container tenant-section-page">
-      <div className="tenant-header">
-        <h1 className="tenant-title">
-          ðŸ‘¤ Profile
-        </h1>
-      </div>
-
-      {/* ==============================
-          PROFILE INFORMATION
-      ============================== */}
-      <div className="tenant-request-detail-card">
-
-        <div className="tenant-request-detail-row">
-          <strong>Name:</strong>
-          <span>
-            {profile.name || 'N/A'}
-          </span>
+    <section className="landlord-account-page">
+      <header className="landlord-account-heading">
+        <div>
+          <p>LANDLORD</p>
+          <h1>Profile</h1>
+          <span>Manage your name, phone number, and profile photo.</span>
         </div>
-
-        <div className="tenant-request-detail-row">
-          <strong>Email:</strong>
-          <span>
-            {profile.email || 'N/A'}
-          </span>
-        </div>
-
-        <div className="tenant-request-detail-row">
-          <strong>Phone:</strong>
-          <span>
-            {profile.phone || 'N/A'}
-          </span>
-        </div>
-
-        <div className="tenant-request-detail-row">
-          <strong>Role:</strong>
-          <span>
-            {profile.role || 'landlord'}
-          </span>
-        </div>
-
-        {/* ==============================
-            BANK DETAILS
-        ============================== */}
-
-        <form
-          onSubmit={saveBankDetails}
-          className="payment-form"
-        >
-          <h2>
-            Chapa payout bank details
-          </h2>
-
-          <p className="payment-muted">
-            Bank details are sent securely to
-            the backend for landlord payouts.
-          </p>
-
-          {profile.bankAccountMasked && (
-            <p className="payment-muted">
-              Bank:{' '}
-              {profile.bankName ||
-                'Configured'}
-              {' Â· '}
-              Account:{' '}
-              {profile.bankAccountMasked}
-              {' Â· '}
-              Status: Configured
-            </p>
-          )}
-
-          {/* BANK */}
-          <label htmlFor="bank-code">
-            Bank
-          </label>
-
-          <select
-            id="bank-code"
-            value={bankDetails.bankCode}
-            onChange={(event) =>
-              setBankDetails({
-                ...bankDetails,
-                bankCode:
-                  event.target.value,
-              })
-            }
-            required
-          >
-            <option value="" disabled>
-              Select a bank
-            </option>
-
-            {banks.map((bank) => (
-              <option
-                key={bank.code}
-                value={bank.code}
-              >
-                {bank.name}
-              </option>
-            ))}
-          </select>
-
-          {/* ACCOUNT NAME */}
-          <label htmlFor="bank-account-name">
-            Account name
-          </label>
-
-          <input
-            id="bank-account-name"
-            type="text"
-            value={
-              bankDetails.bankAccountName
-            }
-            onChange={(event) =>
-              setBankDetails({
-                ...bankDetails,
-                bankAccountName:
-                  event.target.value,
-              })
-            }
-            required
-          />
-
-          {/* ACCOUNT NUMBER */}
-          <label htmlFor="bank-account-number">
-            Account number
-          </label>
-
-          <input
-            id="bank-account-number"
-            type="password"
-            value={
-              bankDetails.bankAccountNumber
-            }
-            onChange={(event) =>
-              setBankDetails({
-                ...bankDetails,
-                bankAccountNumber:
-                  event.target.value,
-              })
-            }
-            required
-          />
-
-          <button
-            type="submit"
-            disabled={saving}
-          >
-            {saving
-              ? 'Saving...'
-              : 'Save bank details'}
+        {!editing && (
+          <button type="button" className="landlord-account-button" onClick={() => setEditing(true)}>
+            Edit Profile
           </button>
+        )}
+      </header>
 
-          {saveMessage && (
-            <p className="payment-muted">
-              {saveMessage}
-            </p>
-          )}
-        </form>
+      <div className="landlord-account-card landlord-profile-card">
+        <ProfilePhotoControl user={user || profile} showLabel />
+        {editing ? (
+          <form className="landlord-account-form" onSubmit={saveProfile}>
+            <label>
+              Name
+              <input
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                required
+              />
+            </label>
+            <label>
+              Phone
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+              />
+            </label>
+            <div className="landlord-account-actions">
+              <button type="button" className="landlord-account-button secondary" onClick={() => {
+                setForm({ name: profile?.name || '', phone: profile?.phone || '' });
+                setEditing(false);
+                setMessage('');
+              }}>
+                Cancel
+              </button>
+              <button type="submit" className="landlord-account-button" disabled={saving}>
+                {saving ? 'Saving...' : 'Save Profile'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <dl className="landlord-account-details">
+            <div><dt>Name</dt><dd>{profile?.name || 'Not set'}</dd></div>
+            <div><dt>Phone</dt><dd>{profile?.phone || 'Not set'}</dd></div>
+          </dl>
+        )}
+        {message && <p className="landlord-account-message" role="status">{message}</p>}
       </div>
-    </div>
+    </section>
   );
 };
 
 export default LandlordProfile;
-

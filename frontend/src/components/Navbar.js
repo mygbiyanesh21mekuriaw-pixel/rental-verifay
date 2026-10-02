@@ -2,9 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import ProfilePhotoControl from './ProfilePhotoControl';
+import ProfileAvatar from './ProfileAvatar';
 import './navbar.css';
 
 import {
+  FaBars,
   FaHome,
   FaUser,
   FaCog,
@@ -32,11 +35,20 @@ import {
 const Navbar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  // ==============================
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // ==========================================
+  // CLOSE MOBILE MENU WHEN PAGE CHANGES
+  // ==========================================
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  // ==========================================
   // UNREAD NOTIFICATIONS
-  // ==============================
+  // ==========================================
   useEffect(() => {
     if (!user) {
       setUnreadCount(0);
@@ -56,7 +68,9 @@ const Navbar = () => {
           }
         );
 
-        setUnreadCount(Number(response.data?.unreadCount || 0));
+        setUnreadCount(
+          Number(response.data?.unreadCount || 0)
+        );
       } catch (error) {
         setUnreadCount(0);
       }
@@ -69,12 +83,14 @@ const Navbar = () => {
       30000
     );
 
-    return () => window.clearInterval(refreshInterval);
+    return () => {
+      window.clearInterval(refreshInterval);
+    };
   }, [user, location.pathname]);
 
-  // ==============================
+  // ==========================================
   // LOGOUT
-  // ==============================
+  // ==========================================
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -84,16 +100,16 @@ const Navbar = () => {
     window.location.href = '/login';
   };
 
-  // ==============================
+  // ==========================================
   // USER INITIAL
-  // ==============================
+  // ==========================================
   const getInitial = (name) => {
     return name?.charAt(0).toUpperCase() || '?';
   };
 
-  // ==============================
+  // ==========================================
   // ROLE NAME
-  // ==============================
+  // ==========================================
   const getRoleName = (role) => {
     const roles = {
       landlord: 'Landlord',
@@ -104,16 +120,16 @@ const Navbar = () => {
     return roles[role] || role;
   };
 
-  // ==============================
+  // ==========================================
   // ROLE CLASS
-  // ==============================
+  // ==========================================
   const getRoleClass = (role) => {
     return `navbar-user-role ${role}`;
   };
 
-  // ==============================
+  // ==========================================
   // ADMIN TYPES
-  // ==============================
+  // ==========================================
   const isPlatformAdmin =
     user?.role === 'admin' &&
     user?.adminType === 'platform';
@@ -122,9 +138,9 @@ const Navbar = () => {
     user?.role === 'admin' &&
     user?.adminType === 'area';
 
-  // =========================================================
+  // ==========================================
   // LANDLORD SIDEBAR
-  // =========================================================
+  // ==========================================
   const landlordLinks = [
     [FaChartBar, 'Dashboard', '/landlord-dashboard'],
 
@@ -132,102 +148,231 @@ const Navbar = () => {
 
     [FaHome, 'My Properties', '/landlord/my-properties'],
 
-    [FaCheck, 'Verified Properties', '/landlord/verified-properties'],
+    [
+      FaCheck,
+      'Verified Properties',
+      '/landlord/verified-properties',
+    ],
 
-    [FaFileAlt, 'Rental Requests', '/landlord/rental-requests'],
+    [
+      FaFileAlt,
+      'Rental Requests',
+      '/landlord/rental-requests',
+    ],
 
-    [FaHardHat, 'Rented Properties', '/landlord/rented-properties'],
+    [
+      FaHardHat,
+      'Rented Properties',
+      '/landlord/rented-properties',
+    ],
 
-    [FaHourglassHalf, 'Under Review', '/landlord/under-review'],
+    [
+      FaHourglassHalf,
+      'Under Review',
+      '/landlord/under-review',
+    ],
 
     [FaTimes, 'Rejected', '/landlord/rejected'],
 
-    [FaMoneyBill, 'Rent Payments', '/landlord/rent-payments'],
+    [
+      FaMoneyBill,
+      'Rent Payments',
+      '/landlord/rent-payments',
+    ],
 
-    [FaBell, 'Notifications', '/landlord/notifications'],
+    [
+      FaBell,
+      'Notifications',
+      '/landlord/notifications',
+    ],
 
-    [FaUser, 'Profile', '/landlord/profile'],
+    [FaCog, 'Account Settings', '/landlord/account-settings'],
+    [FaMoneyBill, 'Bank Information', '/landlord/bank-information'],
   ];
 
-  // =========================================================
+  // ==========================================
   // TENANT SIDEBAR
-  // =========================================================
+  // ==========================================
   const tenantLinks = [
     [FaChartBar, 'Dashboard', '/tenant-dashboard'],
 
-    [FaCheck, 'Verified Properties', '/tenant/verified-properties'],
+    [
+      FaCheck,
+      'Verified Properties',
+      '/tenant/verified-properties',
+    ],
 
     [FaHeart, 'Favorites', '/tenant/favorites'],
 
-    [FaEdit, 'Rental Requests', '/tenant/rental-requests'],
+    [
+      FaEdit,
+      'Rental Requests',
+      '/tenant/rental-requests',
+    ],
 
-    [FaHome, 'Rented Property', '/tenant/rented-property'],
+    [
+      FaHome,
+      'Rented Property',
+      '/tenant/rented-property',
+    ],
 
-    [FaSearch, 'Search Properties', '/tenant/search'],
+    [
+      FaSearch,
+      'Search Properties',
+      '/tenant/search',
+    ],
 
-    [FaBell, 'Notifications', '/tenant/notifications'],
+    [
+      FaBell,
+      'Notifications',
+      '/tenant/notifications',
+    ],
   ];
 
-  // =========================================================
+  // ==========================================
   // PLATFORM ADMIN SIDEBAR
-  // =========================================================
+  // ==========================================
   const platformAdminLinks = [
-    [FaCog, 'Dashboard', '/admin-dashboard'],
+    [
+      FaCog,
+      'Dashboard',
+      '/admin-dashboard',
+    ],
 
-    [FaShieldAlt, 'Admin Management', '/admin-dashboard/admin-management'],
+    [
+      FaShieldAlt,
+      'Admin Management',
+      '/admin-dashboard/admin-management',
+    ],
 
-    [FaClipboardList, 'System Logs', '/admin-dashboard/system-logs'],
+    [
+      FaClipboardList,
+      'System Logs',
+      '/admin-dashboard/system-logs',
+    ],
 
-    [FaChartBar, 'Admin Analytics', '/admin-dashboard/analytics'],
+    [
+      FaChartBar,
+      'Admin Analytics',
+      '/admin-dashboard/analytics',
+    ],
 
-    [FaUser, 'Users', '/admin-dashboard/all-users'],
+    [
+      FaUser,
+      'Users',
+      '/admin-dashboard/all-users',
+    ],
 
-    [FaCreditCard, 'Payment Period', '/admin-dashboard/payment-period'],
+    [
+      FaCreditCard,
+      'Payment Period',
+      '/admin-dashboard/payment-period',
+    ],
 
-    [FaBell, 'Notifications', '/admin-dashboard/notifications'],
+    [
+      FaBell,
+      'Notifications',
+      '/admin-dashboard/notifications',
+    ],
 
-    [FaEnvelope, 'Contact Messages', '/admin-dashboard/contact-messages'],
+    [
+      FaEnvelope,
+      'Contact Messages',
+      '/admin-dashboard/contact-messages',
+    ],
 
-    [FaUser, 'Profile', '/admin-dashboard/profile'],
+    [
+      FaUser,
+      'Account Settings',
+      '/admin-dashboard/profile',
+    ],
   ];
 
-  // =========================================================
+  // ==========================================
   // AREA ADMIN SIDEBAR
-  // =========================================================
+  // ==========================================
   const areaAdminLinks = [
-    [FaHome, 'Dashboard', '/admin-dashboard'],
+    [
+      FaHome,
+      'Dashboard',
+      '/admin-dashboard',
+    ],
 
-    [FaHome, 'Properties', '/admin-dashboard/all-properties'],
+    [
+      FaHome,
+      'Properties',
+      '/admin-dashboard/all-properties',
+    ],
 
-    [FaCheck, 'Verified Properties', '/admin-dashboard/verified'],
+    [
+      FaCheck,
+      'Verified Properties',
+      '/admin-dashboard/verified',
+    ],
 
-    [FaTimes, 'Rejected', '/admin-dashboard/rejected'],
+    [
+      FaTimes,
+      'Rejected',
+      '/admin-dashboard/rejected',
+    ],
 
-    [FaClipboardList, 'Rental Requests', '/admin-dashboard/rental-requests'],
+    [
+      FaClipboardList,
+      'Rental Requests',
+      '/admin-dashboard/rental-requests',
+    ],
 
-    [FaSearch, 'Under Review', '/admin-dashboard/pending'],
+    [
+      FaSearch,
+      'Under Review',
+      '/admin-dashboard/pending',
+    ],
 
-    [FaBell, 'Notifications', '/admin-dashboard/notifications'],
+    [
+      FaBell,
+      'Notifications',
+      '/admin-dashboard/notifications',
+    ],
 
-    [FaUser, 'Profile', '/admin-dashboard/profile'],
+    [
+      FaUser,
+      'Account Settings',
+      '/admin-dashboard/profile',
+    ],
   ];
 
-  // =========================================================
+  // ==========================================
   // DEFAULT ADMIN SIDEBAR
-  // =========================================================
+  // ==========================================
   const defaultAdminLinks = [
-    [FaCog, 'Dashboard', '/admin-dashboard'],
+    [
+      FaCog,
+      'Dashboard',
+      '/admin-dashboard',
+    ],
 
-    [FaHome, 'Properties', '/admin-dashboard/all-properties'],
+    [
+      FaHome,
+      'Properties',
+      '/admin-dashboard/all-properties',
+    ],
 
-    [FaBell, 'Notifications', '/admin-dashboard/notifications'],
+    [
+      FaBell,
+      'Notifications',
+      '/admin-dashboard/notifications',
+    ],
 
-    [FaUser, 'Profile', '/admin-dashboard/profile'],
+    [
+      FaUser,
+      'Account Settings',
+      '/admin-dashboard/profile',
+    ],
   ];
 
-  // =========================================================
-  // SELECT LINKS BY USER ROLE
-  // =========================================================
+  // ==========================================
+  // SELECT SIDEBAR BASED ON USER ROLE
+  // ==========================================
   let sidebarLinks = [];
 
   if (user?.role === 'landlord') {
@@ -244,6 +389,9 @@ const Navbar = () => {
 
   return (
     <>
+      {/* ==========================================
+          TOP LOGOUT BAR
+      ========================================== */}
       {user && (
         <div className="navbar-topbar">
           <button
@@ -251,26 +399,45 @@ const Navbar = () => {
             onClick={handleLogout}
             className="navbar-top-logout-btn"
           >
-            <FaSignOutAlt />
+            <FaSignOutAlt aria-hidden="true" />
             <span>Logout</span>
           </button>
+          {user.role === 'landlord' ? (
+            <Link to="/landlord/profile" className="navbar-top-profile-link" aria-label="Profile">
+              <ProfileAvatar user={user} className="navbar-top-profile-avatar" />
+              <span>Profile</span>
+            </Link>
+          ) : (
+            <ProfilePhotoControl user={user} className="navbar-top-profile-photo" showLabel />
+          )}
         </div>
       )}
 
-      {/* =====================================================
-          NAVBAR
-      ===================================================== */}
+      {/* ==========================================
+          MAIN NAVBAR
+      ========================================== */}
       <nav
         className={`navbar ${
           user ? 'navbar-authenticated' : ''
+        } ${
+          user?.role === 'landlord'
+            ? 'navbar-landlord'
+            : ''
+        } ${
+          !user && location.pathname === '/'
+            ? 'navbar-home'
+            : ''
         }`}
       >
         <div className="navbar-container">
 
-          {/* =================================================
+          {/* ========================================
               LOGO
-          ================================================= */}
-          <Link to="/" className="navbar-logo">
+          ======================================== */}
+          <Link
+            to="/"
+            className="navbar-logo"
+          >
             <img
               src="/mekdela-amba-logo.jpeg"
               alt="Mekdela Amba University logo"
@@ -278,18 +445,75 @@ const Navbar = () => {
             />
 
             <span className="navbar-logo-text">
-              House Rental Management System
+              {user ? (
+                <>
+                  <span className="navbar-name-desktop">House Rental Management System</span>
+                  <span className="navbar-name-mobile">House Rental</span>
+                </>
+              ) : location.pathname === '/' ? (
+                <>
+                  <span className="navbar-home-name-desktop">House Rental Management System</span>
+                  <span className="navbar-home-name-mobile">House Rental</span>
+                </>
+              ) : (
+                'House Rental Management System'
+              )}
             </span>
           </Link>
 
-          {/* =================================================
-              NAVIGATION
-          ================================================= */}
-          <div className="navbar-links">
+          {/* ========================================
+              MOBILE HAMBURGER
+          ======================================== */}
+          <button
+            type="button"
+            className="navbar-hamburger"
+            aria-label={
+              menuOpen
+                ? 'Close navigation menu'
+                : 'Open navigation menu'
+            }
+            aria-expanded={menuOpen}
+            aria-controls="primary-navigation"
+            onClick={() =>
+              setMenuOpen((isOpen) => !isOpen)
+            }
+          >
+            {menuOpen ? (
+              <FaTimes aria-hidden="true" />
+            ) : (
+              <FaBars aria-hidden="true" />
+            )}
+          </button>
 
-            {/* =================================================
+          {user && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="navbar-mobile-header-logout"
+            >
+              <FaSignOutAlt aria-hidden="true" />
+              <span>Logout</span>
+            </button>
+          )}
+
+          {/* ========================================
+              NAVIGATION LINKS
+          ======================================== */}
+          <div
+            id="primary-navigation"
+            className={`navbar-links ${
+              menuOpen ? 'is-open' : ''
+            }`}
+            onClick={(event) => {
+              if (event.target.closest('a')) {
+                setMenuOpen(false);
+              }
+            }}
+          >
+
+            {/* ======================================
                 PUBLIC NAVIGATION
-            ================================================= */}
+            ====================================== */}
             {!user && (
               <>
                 <Link
@@ -300,7 +524,7 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  <FaHome />
+                  <FaHome aria-hidden="true" />
                   <span>Home</span>
                 </Link>
 
@@ -312,7 +536,7 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  <FaUser />
+                  <FaUser aria-hidden="true" />
                   <span>About Us</span>
                 </Link>
 
@@ -324,7 +548,7 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  <FaPhone />
+                  <FaPhone aria-hidden="true" />
                   <span>Contact Us</span>
                 </Link>
 
@@ -336,7 +560,7 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  <FaLock />
+                  <FaLock aria-hidden="true" />
                   <span>Login</span>
                 </Link>
 
@@ -348,35 +572,33 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  <FaEdit />
+                  <FaEdit aria-hidden="true" />
                   <span>Register</span>
                 </Link>
               </>
             )}
 
-            {/* =================================================
+            {/* ======================================
                 AUTHENTICATED USER
-            ================================================= */}
+            ====================================== */}
             {user && (
               <>
-                {/* WORKSPACE */}
+                {/* WORKSPACE LABEL */}
                 <div className="navbar-section-label">
                   Workspace
                 </div>
 
-                {/* =================================================
-                    SIDEBAR BUTTONS
-                ================================================= */}
+                {/* SIDEBAR LINKS */}
                 {sidebarLinks.map(
                   ([Icon, label, path]) => {
-
                     const isNotificationsItem =
                       label === 'Notifications';
 
                     const isActive =
                       location.pathname === path ||
                       (
-                        path !== '/landlord-dashboard' &&
+                        path !==
+                          '/landlord-dashboard' &&
                         location.pathname.startsWith(
                           `${path}/`
                         )
@@ -403,7 +625,7 @@ const Navbar = () => {
                           {label}
                         </span>
 
-                        {/* NOTIFICATION COUNT */}
+                        {/* NOTIFICATION BADGE */}
                         {isNotificationsItem &&
                           unreadCount > 0 && (
                             <span className="navbar-notification-badge">
@@ -415,31 +637,40 @@ const Navbar = () => {
                   }
                 )}
 
-                {/* =================================================
+                {/* ==================================
                     USER INFORMATION
-                ================================================= */}
-                <div className="navbar-user-info">
+                ================================== */}
+                {!(user.role === 'admin' && ['area', 'platform'].includes(user.adminType)) && (
+                  <div className="navbar-user-info">
+                    <span>
+                      {user.name}
 
-                  <span className="navbar-user-avatar">
-                    {getInitial(user.name)}
-                  </span>
-
-                  <span>
-                    {user.name}
-
-                    <span
-                      className={getRoleClass(
-                        user.role
-                      )}
-                    >
-                      {getRoleName(user.role)}
+                      <span
+                        className={getRoleClass(
+                          user.role
+                        )}
+                      >
+                        {getRoleName(user.role)}
+                      </span>
                     </span>
-                  </span>
+                  </div>
+                )}
 
-                </div>
+                {/* ==================================
+                    MOBILE LOGOUT
+                ================================== */}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="navbar-mobile-logout"
+                >
+                  <FaSignOutAlt
+                    aria-hidden="true"
+                  />
+                  <span>Logout</span>
+                </button>
               </>
             )}
-
           </div>
         </div>
       </nav>

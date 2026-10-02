@@ -64,7 +64,7 @@ const getMyFavorites = async (req, res) => {
     const favorites = await Favorite.find({ tenant: tenantId })
       .populate({
         path: 'property',
-        select: 'title description location price bedrooms images isVerified verificationStatus availabilityStatus landlord',
+        select: 'title description location price bedrooms images propertyImages image isVerified verificationStatus availabilityStatus landlord',
         populate: { path: 'landlord', select: 'name email phone profilePhoto role' },
       })
       .sort({ createdAt: -1 });

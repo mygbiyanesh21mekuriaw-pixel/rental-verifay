@@ -6,6 +6,15 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 ## Available Scripts
 
+## API configuration
+
+The frontend uses environment-specific API URLs:
+
+- `npm start` loads `.env.development` and connects to `http://localhost:5000`.
+- `npm run build` loads `.env.production` and connects to `https://rental-verifay.onrender.com`.
+
+For a different deployment backend, set `REACT_APP_API_URL` in the Render frontend service's environment variables and redeploy. This value is public frontend configuration; never put API secrets in frontend environment variables.
+
 In the project directory, you can run:
 
 ### `npm start`
