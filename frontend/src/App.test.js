@@ -22,7 +22,7 @@ test('renders only the public navigation before login', async () => {
   renderApp();
 
   const [navbar] = await screen.findAllByRole('navigation');
-  expect(await screen.findByRole('heading', { name: /house rental management system/i })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'House Rental' })).toBeInTheDocument();
   expect(within(navbar).getByRole('img', { name: /mekdela amba university logo/i })).toHaveAttribute('src', '/mekdela-amba-logo.jpeg');
   expect(within(navbar).getByText('House Rental')).toBeInTheDocument();
   expect(within(navbar).getByRole('button', { name: /open navigation menu/i })).toBeInTheDocument();

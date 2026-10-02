@@ -1212,3 +1212,498 @@ body {
     display: flex;
   }
 }
+
+/* Public homepage: one continuous house-photo backdrop */
+.app:has(.home-page) {
+  min-height: 100vh;
+  height: auto !important;
+  overflow: visible !important;
+  background:
+    linear-gradient(rgba(5, 20, 40, 0.58), rgba(5, 20, 40, 0.58)),
+    url('../public/images/modern-house.jpg') center / cover fixed no-repeat;
+}
+
+.app:has(.home-page) .navbar-home:not(.navbar-authenticated) {
+  position: relative;
+  top: auto;
+  z-index: 10;
+  min-height: 74px;
+  padding: 0;
+  background: rgba(5, 20, 40, 0.42);
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+.app:has(.home-page) .navbar-home .navbar-container {
+  width: 100%;
+  max-width: 1440px;
+  min-height: 74px;
+  margin: 0 auto;
+  padding: 10px clamp(20px, 5vw, 72px);
+  flex-wrap: nowrap;
+  gap: 24px;
+}
+
+.app:has(.home-page) .navbar-home .navbar-logo {
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 12px;
+}
+
+.app:has(.home-page) .navbar-home .navbar-logo-image {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.app:has(.home-page) .navbar-home .navbar-logo-text {
+  color: #fff;
+  background: none;
+  -webkit-text-fill-color: #fff;
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.app:has(.home-page) .navbar-home .navbar-links {
+  display: flex;
+  width: auto;
+  margin: 0 0 0 auto;
+  padding: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  border: 0;
+}
+
+.app:has(.home-page) .navbar-home .navbar-link {
+  width: auto;
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.app:has(.home-page) .navbar-home .navbar-link:hover,
+.app:has(.home-page) .navbar-home .navbar-link.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  transform: none;
+}
+
+.app:has(.home-page) .navbar-home .navbar-link:last-child {
+  margin-left: 4px;
+  padding-inline: 18px;
+  background: #e98b3a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.app:has(.home-page) .navbar-home .navbar-hamburger {
+  color: #fff;
+}
+
+.app:has(.home-page) .app-main {
+  flex: 1 0 auto;
+  height: auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  background: transparent;
+}
+
+.app:has(.home-page) .home-page {
+  display: flex;
+  min-height: max(640px, calc(100vh - 74px - 140px));
+  height: auto !important;
+  padding: clamp(32px, 6vh, 72px) 24px 40px;
+  overflow: visible !important;
+  background: transparent;
+}
+
+.app:has(.home-page) .home-container {
+  display: flex;
+  width: 100%;
+  max-width: 1240px;
+  min-height: 0;
+  margin: 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(32px, 6vh, 64px);
+  background: transparent;
+}
+
+.app:has(.home-page) .home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px;
+  text-align: center;
+  color: #fff;
+  background: transparent;
+  border-radius: 0;
+}
+
+.home-eyebrow {
+  margin-bottom: 16px;
+  color: #ffd29f;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.app:has(.home-page) .home-title {
+  max-width: 900px;
+  margin: 0 auto 16px;
+  color: #fff;
+  font-size: clamp(38px, 5.4vw, 68px);
+  line-height: 1.08;
+  text-shadow: 0 3px 20px rgba(0, 0, 0, 0.28);
+}
+
+.app:has(.home-page) .home-subtitle {
+  max-width: 650px;
+  margin: 0 auto 30px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: clamp(17px, 2vw, 21px);
+}
+
+.app:has(.home-page) .home-buttons {
+  justify-content: center;
+  gap: 12px;
+}
+
+.app:has(.home-page) .home-btn {
+  min-height: 48px;
+  padding: 13px 24px;
+  border-radius: 8px;
+}
+
+.app:has(.home-page) .home-btn-primary {
+  background: #e98b3a;
+  color: #fff;
+}
+
+.app:has(.home-page) .home-btn-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(5, 20, 40, 0.22);
+  color: #fff;
+}
+
+.app:has(.home-page) .home-features {
+  display: grid;
+  width: 100%;
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.app:has(.home-page) .home-feature-card {
+  min-height: 160px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(5, 20, 40, 0.18);
+}
+
+.app:has(.home-page) .home-feature-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 12px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff1e3;
+  color: #cf7025;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.app:has(.home-page) .home-feature-title {
+  margin: 0 0 8px;
+  color: #172b4d;
+  font-size: 18px;
+}
+
+.app:has(.home-page) .home-feature-desc {
+  color: #52627a;
+  font-size: 14px;
+}
+
+.app:has(.home-page) .home-image-credit {
+  display: none;
+}
+
+.app:has(.home-page) .app-footer {
+  flex: 0 0 auto;
+  margin: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 20, 40, 0.96);
+}
+
+@media (max-width: 1023px) {
+  .app:has(.home-page) .navbar-home .navbar-container {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .app:has(.home-page) .navbar-home .navbar-logo {
+    flex: 1 1 0;
+  }
+
+  .app:has(.home-page) .navbar-home .navbar-logo-image {
+    flex-basis: 40px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .app:has(.home-page) .navbar-home .navbar-hamburger {
+    display: inline-flex;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+  }
+
+  .app:has(.home-page) .navbar-home .navbar-links {
+    display: none;
+    width: 100%;
+    margin: 0;
+    padding: 8px 0 4px;
+    flex: 1 0 100%;
+    flex-direction: column;
+    align-items: stretch;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .app:has(.home-page) .navbar-home .navbar-links.is-open {
+    display: flex;
+  }
+
+  .app:has(.home-page) .navbar-home .navbar-link,
+  .app:has(.home-page) .navbar-home .navbar-link:last-child {
+    width: 100%;
+    margin: 0;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .app:has(.home-page) .home-page {
+    min-height: 0;
+    padding: 56px 18px 36px;
+  }
+
+  .app:has(.home-page) .home-container {
+    gap: 38px;
+  }
+
+  .app:has(.home-page) .home-hero {
+    padding: 0;
+  }
+
+  .app:has(.home-page) .home-title {
+    font-size: clamp(34px, 10vw, 48px);
+  }
+
+  .app:has(.home-page) .home-features {
+    max-width: 420px;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .app:has(.home-page) .home-feature-card {
+    min-height: 0;
+    padding: 20px;
+  }
+}
+
+.app:has(.navbar-public) {
+  min-height: 100vh;
+  background:
+    linear-gradient(rgba(5, 20, 40, 0.58), rgba(5, 20, 40, 0.58)),
+    url('../public/images/modern-house.jpg') center / cover fixed no-repeat;
+}
+
+.app:has(.navbar-public) .navbar-public {
+  position: relative;
+  top: auto;
+  z-index: 10;
+  min-height: 74px;
+  padding: 0;
+  background: rgba(5, 20, 40, 0.42);
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-container {
+  width: 100%;
+  max-width: 1440px;
+  min-height: 74px;
+  margin: 0 auto;
+  padding: 10px clamp(20px, 5vw, 72px);
+  flex-wrap: nowrap;
+  gap: 24px;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-logo {
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 12px;
+  color: #fff;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-logo-image {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-logo-text {
+  color: #fff;
+  background: none;
+  -webkit-text-fill-color: #fff;
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-links {
+  display: flex;
+  width: auto;
+  margin: 0 0 0 auto;
+  padding: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  border: 0;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-link {
+  width: auto;
+  padding: 10px 12px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-link:hover,
+.app:has(.navbar-public) .navbar-public .navbar-link.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  transform: none;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-link:last-child {
+  margin-left: 4px;
+  padding-inline: 18px;
+  background: #e98b3a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-hamburger {
+  color: #fff;
+}
+
+.app:has(.navbar-public) .app-main {
+  flex: 1 0 auto;
+  width: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent;
+}
+
+.app:has(.navbar-public) .public-page:not(.home-page) {
+  min-height: calc(100vh - 74px);
+  padding: clamp(28px, 5vh, 52px) 24px;
+  background: transparent;
+}
+
+.app:has(.navbar-public) .auth-page {
+  align-items: center;
+}
+
+.app:has(.navbar-public) .public-content {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+}
+
+.app:has(.navbar-public) .auth-shell {
+  min-height: calc(100vh - 74px);
+  background: transparent;
+}
+
+.app:has(.navbar-public) .app-footer {
+  margin: 0;
+}
+
+@media (max-width: 1023px) {
+  .app:has(.navbar-public) .navbar-public .navbar-container {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .app:has(.navbar-public) .navbar-public .navbar-logo {
+    flex: 1 1 0;
+  }
+
+  .app:has(.navbar-public) .navbar-public .navbar-logo-image {
+    flex-basis: 40px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .app:has(.navbar-public) .navbar-public .navbar-hamburger {
+    display: inline-flex;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+  }
+
+  .app:has(.navbar-public) .navbar-public .navbar-links {
+    display: none;
+    width: 100%;
+    margin: 0;
+    padding: 8px 0 4px;
+    flex: 1 0 100%;
+    flex-direction: column;
+    align-items: stretch;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .app:has(.navbar-public) .navbar-public .navbar-links.is-open {
+    display: flex;
+  }
+
+  .app:has(.navbar-public) .navbar-public .navbar-link,
+  .app:has(.navbar-public) .navbar-public .navbar-link:last-child {
+    width: 100%;
+    margin: 0;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .app:has(.navbar-public) .public-page:not(.home-page) {
+    min-height: calc(100vh - 74px);
+    padding: 28px 16px;
+  }
+}

@@ -9,7 +9,7 @@ const About = () => {
       <div className="about-hero">
         <h1 className="about-title">ℹ️ About Us</h1>
         <p className="about-subtitle">
-          House Rental Management System - secure and reliable
+          A secure and reliable way to find verified rentals.
         </p>
       </div>
 

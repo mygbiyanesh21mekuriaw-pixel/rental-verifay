@@ -153,7 +153,7 @@ const AppFooter = () => {
     <footer className="app-footer">
       <div className="app-footer-content">
         <div className="app-footer-brand">
-          <strong>House Rental Management System</strong>
+          <strong>House Rental</strong>
           <span>Student Academic Project</span>
           <span>Mekdela Amba University</span>
           <span>College of Computing and Informatics</span>
@@ -170,7 +170,7 @@ const AppFooter = () => {
         </div>
       </div>
       <div className="app-footer-bottom">
-        <span>© {new Date().getFullYear()} House Rental Management System</span>
+        <span>© {new Date().getFullYear()} House Rental</span>
         <span>All Rights Reserved.</span>
       </div>
     </footer>
@@ -366,8 +366,6 @@ function App() {
 }
 
 export default App;
-
-
 
 
 

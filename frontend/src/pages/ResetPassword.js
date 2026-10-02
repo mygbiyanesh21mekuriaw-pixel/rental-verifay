@@ -47,7 +47,7 @@ const ResetPassword = () => {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <span className="rv-kicker">House Rental Management System</span>
+        <span className="rv-kicker">House Rental</span>
         <h2>Create new password</h2>
         <p className="auth-subtitle">Choose a new password for your account.</p>
 
@@ -94,5 +94,4 @@ const ResetPassword = () => {
 };
 
 export default ResetPassword;
-
 

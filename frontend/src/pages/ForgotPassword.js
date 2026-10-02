@@ -29,7 +29,7 @@ const ForgotPassword = () => {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <span className="rv-kicker">House Rental Management System</span>
+        <span className="rv-kicker">House Rental</span>
         <h2>Forgot your password?</h2>
         <p className="auth-subtitle">Enter your registered email address and we&apos;ll send you a password reset link.</p>
 
@@ -66,5 +66,4 @@ const ForgotPassword = () => {
 };
 
 export default ForgotPassword;
-
 

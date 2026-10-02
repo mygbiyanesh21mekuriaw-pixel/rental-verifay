@@ -427,6 +427,10 @@ const Navbar = () => {
           !user && location.pathname === '/'
             ? 'navbar-home'
             : ''
+        } ${
+          !user && ['/', '/about', '/contact', '/login', '/register', '/forgot-password', '/reset-password'].includes(location.pathname)
+            ? 'navbar-public'
+            : ''
         }`}
       >
         <div className="navbar-container">
@@ -450,13 +454,8 @@ const Navbar = () => {
                   <span className="navbar-name-desktop">House Rental Management System</span>
                   <span className="navbar-name-mobile">House Rental</span>
                 </>
-              ) : location.pathname === '/' ? (
-                <>
-                  <span className="navbar-home-name-desktop">House Rental Management System</span>
-                  <span className="navbar-home-name-mobile">House Rental</span>
-                </>
               ) : (
-                'House Rental Management System'
+                'House Rental'
               )}
             </span>
           </Link>

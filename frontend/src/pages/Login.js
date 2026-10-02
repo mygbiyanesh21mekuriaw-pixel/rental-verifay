@@ -220,7 +220,7 @@ const Login = () => {
 
         {/* TITLE */}
         <span className="rv-kicker">
-          House Rental Management System
+          House Rental
         </span>
 
         <h2>
