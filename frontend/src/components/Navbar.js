@@ -4,6 +4,31 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import './navbar.css';
 
+import {
+  FaHome,
+  FaUser,
+  FaCog,
+  FaChartBar,
+  FaPlus,
+  FaCheck,
+  FaFileAlt,
+  FaHardHat,
+  FaHourglassHalf,
+  FaTimes,
+  FaMoneyBill,
+  FaBell,
+  FaHeart,
+  FaSearch,
+  FaEdit,
+  FaLock,
+  FaPhone,
+  FaSignOutAlt,
+  FaShieldAlt,
+  FaClipboardList,
+  FaCreditCard,
+  FaEnvelope,
+} from 'react-icons/fa';
+
 const Navbar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -38,7 +63,12 @@ const Navbar = () => {
     };
 
     fetchUnreadCount();
-    const refreshInterval = window.setInterval(fetchUnreadCount, 30000);
+
+    const refreshInterval = window.setInterval(
+      fetchUnreadCount,
+      30000
+    );
+
     return () => window.clearInterval(refreshInterval);
   }, [user, location.pathname]);
 
@@ -66,9 +96,9 @@ const Navbar = () => {
   // ==============================
   const getRoleName = (role) => {
     const roles = {
-      landlord: 'ðŸ  Landlord',
-      tenant: 'ðŸ‘¤ Tenant',
-      admin: 'âš™ï¸ Admin',
+      landlord: 'Landlord',
+      tenant: 'Tenant',
+      admin: 'Admin',
     };
 
     return roles[role] || role;
@@ -96,80 +126,103 @@ const Navbar = () => {
   // LANDLORD SIDEBAR
   // =========================================================
   const landlordLinks = [
-    ['ðŸ“Š', 'Dashboard', '/landlord-dashboard'],
+    [FaChartBar, 'Dashboard', '/landlord-dashboard'],
 
-    ['âž•', 'Add House', '/landlord/add-property'],
+    [FaPlus, 'Add House', '/landlord/add-property'],
 
-    ['ðŸ ', 'My Properties', '/landlord/my-properties'],
+    [FaHome, 'My Properties', '/landlord/my-properties'],
 
-    ['âœ…', 'Verified Properties', '/landlord/verified-properties'],
+    [FaCheck, 'Verified Properties', '/landlord/verified-properties'],
 
-    ['ðŸ“„', 'Rental Requests', '/landlord/rental-requests'],
+    [FaFileAlt, 'Rental Requests', '/landlord/rental-requests'],
 
-    ['ðŸ˜ï¸', 'Rented Properties', '/landlord/rented-properties'],
+    [FaHardHat, 'Rented Properties', '/landlord/rented-properties'],
 
-    ['â³', 'Under Review', '/landlord/under-review'],
+    [FaHourglassHalf, 'Under Review', '/landlord/under-review'],
 
-    ['âŒ', 'Rejected', '/landlord/rejected'],
+    [FaTimes, 'Rejected', '/landlord/rejected'],
 
-    ['ðŸ’°', 'Rent Payments', '/landlord/rent-payments'],
+    [FaMoneyBill, 'Rent Payments', '/landlord/rent-payments'],
 
-    ['ðŸ””', 'Notifications', '/landlord/notifications'],
+    [FaBell, 'Notifications', '/landlord/notifications'],
 
-    // PROFILE BUTTON
-    ['ðŸ‘¤', 'Profile', '/landlord/profile'],
+    [FaUser, 'Profile', '/landlord/profile'],
   ];
 
   // =========================================================
   // TENANT SIDEBAR
   // =========================================================
   const tenantLinks = [
-    ['ðŸ“Š', 'Dashboard', '/tenant-dashboard'],
-    ['âœ…', 'Verified Properties', '/tenant/verified-properties'],
-    ['â¤ï¸', 'Favorites', '/tenant/favorites'],
-    ['ðŸ“', 'Rental Requests', '/tenant/rental-requests'],
-    ['ðŸ ', 'Rented Property', '/tenant/rented-property'],
-    ['ðŸ”Ž', 'Search Properties', '/tenant/search'],
-    ['ðŸ””', 'Notifications', '/tenant/notifications'],
+    [FaChartBar, 'Dashboard', '/tenant-dashboard'],
+
+    [FaCheck, 'Verified Properties', '/tenant/verified-properties'],
+
+    [FaHeart, 'Favorites', '/tenant/favorites'],
+
+    [FaEdit, 'Rental Requests', '/tenant/rental-requests'],
+
+    [FaHome, 'Rented Property', '/tenant/rented-property'],
+
+    [FaSearch, 'Search Properties', '/tenant/search'],
+
+    [FaBell, 'Notifications', '/tenant/notifications'],
   ];
 
   // =========================================================
   // PLATFORM ADMIN SIDEBAR
   // =========================================================
   const platformAdminLinks = [
-    ['âš™ï¸', 'Dashboard', '/admin-dashboard'],
-    ['ðŸ›¡ï¸', 'Admin Management', '/admin-dashboard/admin-management'],
-    ['ðŸ“‹', 'System Logs', '/admin-dashboard/system-logs'],
-    ['ðŸ“Š', 'Admin Analytics', '/admin-dashboard/analytics'],
-    ['ðŸ‘¤', 'Users', '/admin-dashboard/all-users'],
-    ['ðŸ’³', 'Payment Period', '/admin-dashboard/payment-period'],
-    ['ðŸ””', 'Notifications', '/admin-dashboard/notifications'],
-    ['âœ‰ï¸', 'Contact Messages', '/admin-dashboard/contact-messages'],
-    ['ðŸ‘¤', 'Profile', '/admin-dashboard/profile'],
+    [FaCog, 'Dashboard', '/admin-dashboard'],
+
+    [FaShieldAlt, 'Admin Management', '/admin-dashboard/admin-management'],
+
+    [FaClipboardList, 'System Logs', '/admin-dashboard/system-logs'],
+
+    [FaChartBar, 'Admin Analytics', '/admin-dashboard/analytics'],
+
+    [FaUser, 'Users', '/admin-dashboard/all-users'],
+
+    [FaCreditCard, 'Payment Period', '/admin-dashboard/payment-period'],
+
+    [FaBell, 'Notifications', '/admin-dashboard/notifications'],
+
+    [FaEnvelope, 'Contact Messages', '/admin-dashboard/contact-messages'],
+
+    [FaUser, 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
   // AREA ADMIN SIDEBAR
   // =========================================================
   const areaAdminLinks = [
-    ['ðŸ ', 'Dashboard', '/admin-dashboard'],
-    ['ðŸ ', 'Properties', '/admin-dashboard/all-properties'],
-    ['âœ…', 'Verified Properties', '/admin-dashboard/verified'],
-    ['âŒ', 'Rejected', '/admin-dashboard/rejected'],
-    ['ðŸ“‹', 'Rental Requests', '/admin-dashboard/rental-requests'],
-    ['ðŸ”Ž', 'Under Review', '/admin-dashboard/pending'],
-    ['ðŸ””', 'Notifications', '/admin-dashboard/notifications'],
-    ['ðŸ‘¤', 'Profile', '/admin-dashboard/profile'],
+    [FaHome, 'Dashboard', '/admin-dashboard'],
+
+    [FaHome, 'Properties', '/admin-dashboard/all-properties'],
+
+    [FaCheck, 'Verified Properties', '/admin-dashboard/verified'],
+
+    [FaTimes, 'Rejected', '/admin-dashboard/rejected'],
+
+    [FaClipboardList, 'Rental Requests', '/admin-dashboard/rental-requests'],
+
+    [FaSearch, 'Under Review', '/admin-dashboard/pending'],
+
+    [FaBell, 'Notifications', '/admin-dashboard/notifications'],
+
+    [FaUser, 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
   // DEFAULT ADMIN SIDEBAR
   // =========================================================
   const defaultAdminLinks = [
-    ['âš™ï¸', 'Dashboard', '/admin-dashboard'],
-    ['ðŸ ', 'Properties', '/admin-dashboard/all-properties'],
-    ['ðŸ””', 'Notifications', '/admin-dashboard/notifications'],
-    ['ðŸ‘¤', 'Profile', '/admin-dashboard/profile'],
+    [FaCog, 'Dashboard', '/admin-dashboard'],
+
+    [FaHome, 'Properties', '/admin-dashboard/all-properties'],
+
+    [FaBell, 'Notifications', '/admin-dashboard/notifications'],
+
+    [FaUser, 'Profile', '/admin-dashboard/profile'],
   ];
 
   // =========================================================
@@ -198,7 +251,8 @@ const Navbar = () => {
             onClick={handleLogout}
             className="navbar-top-logout-btn"
           >
-            ðŸšª Logout
+            <FaSignOutAlt />
+            <span>Logout</span>
           </button>
         </div>
       )}
@@ -246,7 +300,8 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  ðŸ  Home
+                  <FaHome />
+                  <span>Home</span>
                 </Link>
 
                 <Link
@@ -257,7 +312,8 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  â„¹ï¸ About Us
+                  <FaUser />
+                  <span>About Us</span>
                 </Link>
 
                 <Link
@@ -268,7 +324,8 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  ðŸ“ž Contact Us
+                  <FaPhone />
+                  <span>Contact Us</span>
                 </Link>
 
                 <Link
@@ -279,14 +336,20 @@ const Navbar = () => {
                       : ''
                   }`}
                 >
-                  ðŸ” Login
+                  <FaLock />
+                  <span>Login</span>
                 </Link>
 
                 <Link
                   to="/register"
-                  className={`navbar-link ${location.pathname === '/register' ? 'active' : ''}`}
+                  className={`navbar-link ${
+                    location.pathname === '/register'
+                      ? 'active'
+                      : ''
+                  }`}
                 >
-                  âœï¸ Register
+                  <FaEdit />
+                  <span>Register</span>
                 </Link>
               </>
             )}
@@ -305,7 +368,7 @@ const Navbar = () => {
                     SIDEBAR BUTTONS
                 ================================================= */}
                 {sidebarLinks.map(
-                  ([icon, label, path]) => {
+                  ([Icon, label, path]) => {
 
                     const isNotificationsItem =
                       label === 'Notifications';
@@ -328,8 +391,11 @@ const Navbar = () => {
                         }`}
                       >
                         {/* ICON */}
-                        <span aria-hidden="true">
-                          {icon}
+                        <span
+                          aria-hidden="true"
+                          className="navbar-icon"
+                        >
+                          <Icon />
                         </span>
 
                         {/* LABEL */}
@@ -373,8 +439,8 @@ const Navbar = () => {
                 </div>
               </>
             )}
-          </div>
 
+          </div>
         </div>
       </nav>
     </>
@@ -382,4 +448,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-
