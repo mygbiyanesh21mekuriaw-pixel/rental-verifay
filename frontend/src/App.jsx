@@ -49,7 +49,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
 const { user, loading } = useAuth();
 
 if (loading) {
-return ( <div className="app-loading"> <div className="app-loading-spinner"></div> <span>⏳ Loading...</span> </div>
+return ( <div className="app-loading"> <div className="app-loading-spinner"></div> <span> Loading...</span> </div>
 );
 }
 
@@ -73,7 +73,7 @@ const PublicOnlyRoute = ({ children }) => {
 const { user, loading } = useAuth();
 
 if (loading) {
-return ( <div className="app-loading"> <div className="app-loading-spinner"></div> <span>⏳ Loading...</span> </div>
+return ( <div className="app-loading"> <div className="app-loading-spinner"></div> <span> Loading...</span> </div>
 );
 }
 
@@ -93,7 +93,7 @@ const AuthenticatedPublicRoute = ({ children }) => {
 const { user, loading } = useAuth();
 
 if (loading) {
-return ( <div className="app-loading"> <div className="app-loading-spinner"></div> <span>⏳ Loading...</span> </div>
+return ( <div className="app-loading"> <div className="app-loading-spinner"></div> <span> Loading...</span> </div>
 );
 }
 
@@ -113,7 +113,7 @@ const PublicAliasRoute = ({ target }) => {
 const { user, loading } = useAuth();
 
 if (loading) {
-return ( <div className="app-loading"> <div className="app-loading-spinner"></div> <span>⏳ Loading...</span> </div>
+return ( <div className="app-loading"> <div className="app-loading-spinner"></div> <span> Loading...</span> </div>
 );
 }
 
@@ -373,7 +373,7 @@ return ( <div className="app"> <Router> <Navbar />
           }
         />
 
-        {/* ⭐ NEW RENTED PROPERTIES ROUTE ⭐ */}
+        {/*  NEW RENTED PROPERTIES ROUTE  */}
 
         <Route
           path="/landlord/rented-properties"
@@ -531,7 +531,7 @@ return ( <div className="app"> <Router> <Navbar />
 
     <footer className="app-footer">
       <p>
-        🏠 House Rental Management System
+         House Rental Management System
         &copy; 2026
         <br />
         Built by <a href="/about">Internship Project</a>

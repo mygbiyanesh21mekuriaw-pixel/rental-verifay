@@ -61,7 +61,7 @@ const LandlordAccountSettings = () => {
 
   return (
     <section className="landlord-account-page">
-      <header className="landlord-account-heading">
+      <header className="landlord-account-heading landlord-account-settings-heading">
         <div>
           <p>LANDLORD</p>
           <h1>Account Settings</h1>
@@ -72,9 +72,8 @@ const LandlordAccountSettings = () => {
       <section className="landlord-account-card">
         <h2>Email address</h2>
         <form className="landlord-account-form" onSubmit={saveEmail}>
-          <label>
-            Email
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+          <label>Email
+            <input type="email" value={email} onChange={(event) =>setEmail(event.target.value)} required />
           </label>
           <button type="submit" className="landlord-account-button" disabled={savingEmail}>
             {savingEmail ? 'Saving...' : 'Save Email'}
@@ -86,34 +85,31 @@ const LandlordAccountSettings = () => {
       <section className="landlord-account-card">
         <h2>Password</h2>
         <form className="landlord-account-form" onSubmit={changePassword}>
-          <label>
-            Current password
+          <label>Current password
             <input
               type="password"
               autoComplete="current-password"
               value={passwordForm.currentPassword}
-              onChange={(event) => setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))}
+              onChange={(event) =>setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))}
               required
             />
           </label>
-          <label>
-            New password
+          <label>New password
             <input
               type="password"
               autoComplete="new-password"
               minLength={8}
               value={passwordForm.newPassword}
-              onChange={(event) => setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))}
+              onChange={(event) =>setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))}
               required
             />
           </label>
-          <label>
-            Confirm new password
+          <label>Confirm new password
             <input
               type="password"
               autoComplete="new-password"
               value={passwordForm.confirmPassword}
-              onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+              onChange={(event) =>setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))}
               required
             />
           </label>

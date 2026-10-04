@@ -49,7 +49,7 @@ const ForgotPassword = () => {
               type="email"
               autoComplete="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) =>setEmail(event.target.value)}
               placeholder="example@gmail.com"
               required
             />

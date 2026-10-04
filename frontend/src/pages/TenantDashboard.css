@@ -24,14 +24,14 @@
 .tenant-header {
   margin-bottom: 25px;
   padding: 22px 24px;
-  border: 1px solid #bbf7d0;
-  border-left: 4px solid #16a34a;
+  border: 1px solid #6675e8;
+  border-left: 4px solid #493ed6;
   border-radius: 10px;
-  background: linear-gradient(110deg, #f0fdf4 0%, #ffffff 100%);
+  background: linear-gradient(110deg, #493ed6 0%, #6675e8 100%);
 }
 
 .tenant-header .tenant-title {
-  color: #14532d;
+  color: #fff;
 }
 
 .tenant-title {
@@ -53,13 +53,20 @@
   margin-top: 8px;
   padding: 10px 16px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  background: #493ed6;
   color: #fff;
   font-size: 16px;
   font-weight: 700;
-  box-shadow: 0 8px 16px rgba(22, 163, 74, 0.2);
+  box-shadow: 0 8px 16px rgba(73, 62, 214, 0.2);
 }
 
+.tenant-header .tenant-subtitle {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tenant-header .tenant-welcome:hover {
+  background: #6675e8;
+}
 
 /* ===== Dashboard Cards ===== */
 
@@ -112,7 +119,7 @@
 
  font-size:25px;
 
- background:#f0fdf4;
+ background:#1d4ed8;
 
  margin-bottom:10px;
 
@@ -138,7 +145,48 @@
 
  font-weight:600;
 
-}/* ===== Dashboard Navigation ===== */
+}
+
+.tenant-dashboard-home .tenant-stat-card {
+  align-items: flex-start;
+  justify-content: space-between;
+  min-height: 136px;
+  text-align: left;
+}
+
+.tenant-dashboard-home .tenant-stat-number {
+  color: #0f172a;
+}
+
+.tenant-dashboard-stats-loading,
+.tenant-dashboard-stats-error {
+  margin: 0 0 24px;
+  padding: 16px 18px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #fff;
+  color: #475569;
+}
+
+.tenant-dashboard-stats-error {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+@media (max-width: 768px) {
+  .tenant-dashboard-home .tenant-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tenant-dashboard-home .tenant-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== Dashboard Navigation ===== */
 
 .tenant-dashboard-nav {
 
@@ -399,7 +447,7 @@
 
  padding:8px 16px;
 
- background:#6366f1;
+ background:#493ed6;
 
  color:white;
 
@@ -416,7 +464,7 @@
 
 .tenant-card-btn:hover {
 
- background:#4f46e5;
+ background:#6675e8;
 
 }
 
@@ -520,7 +568,55 @@
 
  background:#1d4ed8;
 
-}/* ===== Requests ===== */
+}
+
+.tenant-search-main-form .tenant-search-btn {
+  min-height: 50px;
+  padding: 10px 20px;
+  border: 1px solid #2563eb;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tenant-search-main-form .tenant-search-btn:not(.tenant-search-clear) {
+  min-width: 90px;
+}
+
+.tenant-search-main-form .tenant-search-btn:hover:not(:disabled) {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.18);
+}
+
+.tenant-search-main-form .tenant-search-btn.tenant-search-clear {
+  min-width: 128px;
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.tenant-search-main-form .tenant-search-btn.tenant-search-clear:hover:not(:disabled) {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.18);
+}
+
+.tenant-search-main-form .tenant-search-btn:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.25);
+  outline-offset: 2px;
+}
+
+.tenant-search-main-form .tenant-search-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ===== Requests ===== */
 
 .tenant-request-list {
 
@@ -910,7 +1006,7 @@
 .tenant-review-submit-btn {
   border: 0;
   border-radius: 8px;
-  background: #2563eb;
+  background: #493ed6;
   color: #fff;
   cursor: pointer;
   font: inherit;
@@ -920,7 +1016,7 @@
 
 .tenant-review-open-btn:hover,
 .tenant-review-submit-btn:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: #6675e8;
 }
 
 .tenant-review-form {
@@ -1238,7 +1334,7 @@
   height: 52px;
   min-height: 52px;
   padding: 6px 8px;
-  background: #2563eb;
+  background: #493ed6;
   border: 0;
   border-radius: 8px;
   color: #fff;
@@ -1253,7 +1349,7 @@
 
 .tenant-request-message-btn:hover,
 .tenant-request-pay-btn:hover {
-  background: #1d4ed8;
+  background: #6675e8;
   box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
 }
 

@@ -6,7 +6,7 @@ import { useAuth } from './context/AuthContext';
 import './App.css';
 import './portal-design.css';
 
-// ገፆች (Pages)
+//  (Pages)
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -42,7 +42,7 @@ import LandlordReviews from './pages/LandlordReviews';
 import TenantRentalRequestDetail from './pages/TenantRentalRequestDetail';
 import AdminSystemLogs from './pages/AdminSystemLogs';
 
-// ክፍሎች (Components)
+//  (Components)
 import Navbar from './components/Navbar';
 
 const ScrollToTop = () => {
@@ -67,7 +67,7 @@ const PrivateRoute = ({ children, allowedRoles, allowedAdminTypes }) => {
     return (
       <div className="app-loading">
         <div className="app-loading-spinner"></div>
-        <span>⏳ Loading...</span>
+        <span> Loading...</span>
       </div>
     );
   }
@@ -94,7 +94,7 @@ const PublicOnlyRoute = ({ children }) => {
     return (
       <div className="app-loading">
         <div className="app-loading-spinner"></div>
-        <span>⏳ Loading...</span>
+        <span> Loading...</span>
       </div>
     );
   }
@@ -113,7 +113,7 @@ const AuthenticatedPublicRoute = ({ children }) => {
     return (
       <div className="app-loading">
         <div className="app-loading-spinner"></div>
-        <span>⏳ Loading...</span>
+        <span> Loading...</span>
       </div>
     );
   }
@@ -132,7 +132,7 @@ const PublicAliasRoute = ({ target }) => {
     return (
       <div className="app-loading">
         <div className="app-loading-spinner"></div>
-        <span>⏳ Loading...</span>
+        <span> Loading...</span>
       </div>
     );
   }
@@ -170,7 +170,7 @@ const AppFooter = () => {
         </div>
       </div>
       <div className="app-footer-bottom">
-        <span>© {new Date().getFullYear()} House Rental</span>
+        <span> {new Date().getFullYear()} House Rental</span>
         <span>All Rights Reserved.</span>
       </div>
     </footer>
@@ -185,7 +185,7 @@ function App() {
         <ScrollToTop />
         <main className="app-main">
           <Routes>
-            {/* ===== ለሁሉም የሚገኙ ገፆች ===== */}
+            {/* =====    ===== */}
             <Route path="/" element={<AuthenticatedPublicRoute><Home /></AuthenticatedPublicRoute>} />
             <Route path="/search" element={<Navigate to="/tenant/verified-properties" replace />} />
             <Route path="/property/:id" element={<PropertyDetail />} />
@@ -219,7 +219,7 @@ function App() {
               }
             />
             
-            {/* ===== Tenant ብቻ ===== */}
+            {/* ===== Tenant  ===== */}
             <Route 
               path="/tenant-dashboard"
               element={
@@ -248,7 +248,7 @@ function App() {
             <Route path="/landlord/rental-requests/:requestId" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordRequestDetail /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/reviews" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordReviews /></LandlordLayout></PrivateRoute>} />
             
-            {/* ===== Landlord ብቻ ===== */}
+            {/* ===== Landlord  ===== */}
             <Route 
               path="/landlord-dashboard"
               element={
@@ -330,7 +330,7 @@ function App() {
               }
             />
             
-            {/* ===== Admin ብቻ ===== */}
+            {/* ===== Admin  ===== */}
             <Route 
               path="/admin-dashboard"
               element={

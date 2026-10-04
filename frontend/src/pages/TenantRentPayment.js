@@ -22,7 +22,7 @@ const getDefaultPaymentPeriod = () => {
 const readablePaymentMessage = (value, fallback) => {
   if (typeof value === 'string' && value.trim()) return value;
   if (Array.isArray(value)) {
-    const messages = value.map(item => readablePaymentMessage(item, '')).filter(Boolean);
+    const messages = value.map(item =>readablePaymentMessage(item, '')).filter(Boolean);
     if (messages.length > 0) return messages.join(', ');
   }
   if (value && typeof value === 'object') {
@@ -148,21 +148,21 @@ const TenantRentPayment = () => {
         finishPaymentReturn('failure');
         return;
       }
-      returnPollTimer = window.setTimeout(() => pollReturnedPayment(attempt + 1), 1000);
+      returnPollTimer = window.setTimeout(() =>pollReturnedPayment(attempt + 1), 1000);
     };
 
     loadContext(true).then((initialContext) => {
       if (isCurrentPaymentReturn) {
         pollReturnedPayment();
       }
-      const pendingPayment = initialContext?.payments?.some(payment => payment.status === 'pending');
+      const pendingPayment = initialContext?.payments?.some(payment =>payment.status === 'pending');
       if (cancelled || !pendingPayment) return;
 
       let attempts = 0;
       refreshTimer = window.setInterval(async () => {
         attempts += 1;
         const refreshedContext = await loadContext();
-        const hasPendingPayment = refreshedContext?.payments?.some(payment => payment.status === 'pending');
+        const hasPendingPayment = refreshedContext?.payments?.some(payment =>payment.status === 'pending');
         if (attempts >= 6 || !hasPendingPayment) {
           window.clearInterval(refreshTimer);
         }
@@ -220,7 +220,7 @@ const TenantRentPayment = () => {
 
   if (loading) return <div className="payment-page-state">Loading rent payment details...</div>;
   const previousPage = location.state?.from || '/tenant/rented-property';
-  const backButton = <BackToDashboard dashboardRoute={previousPage} label="â† Back to Previous Page" />;
+  const backButton = <BackToDashboard dashboardRoute={previousPage} label=" Back to Previous Page" />;
 
   if (error && !context) return <div className="payment-page payment-page-state"><p className="payment-error">{error}</p>{backButton}</div>;
   if (!context) return <div className="payment-page-state">Loading rent payment details...</div>;
@@ -247,7 +247,7 @@ const TenantRentPayment = () => {
         <section className="payment-card payment-property-card">
           <span className="payment-property-badge">Rented property</span>
           <h2>{context.property.title}</h2>
-          <p className="payment-property-location">ðŸ“ {context.property.location}</p>
+          <p className="payment-property-location"> {context.property.location}</p>
           <div className="payment-detail-row"><span>Landlord</span><strong>{context.landlord.name}</strong></div>
           <div className="payment-detail-row"><span>Monthly rent</span><strong>ETB {Number(context.property.price).toLocaleString()}</strong></div>
           <div className="payment-detail-row"><span>Payment status</span><strong className={`payment-status payment-status-${latestPayment?.status || 'pending'}`}>{formatStatus(latestPayment?.status || 'pending')}</strong></div>
@@ -257,15 +257,14 @@ const TenantRentPayment = () => {
           <h2>Submit a payment</h2>
           <p className="payment-muted">Complete the secure provider checkout to confirm this payment.</p>
           {!context.landlordBankInformationComplete && (
-            <p className="payment-error" role="alert">
-              The landlord has not completed bank information. Please contact the landlord before paying rent.
+            <p className="payment-error" role="alert">The landlord has not completed bank information. Please contact the landlord before paying rent.
             </p>
           )}
           {error && <p className="payment-error">{error}</p>}
           {success && <p className="payment-success">{success}</p>}
           <form onSubmit={submitPayment} className="payment-form">
             <label htmlFor="payment-period">Payment period</label>
-            <input id="payment-period" type="month" value={paymentPeriod} onChange={event => setPaymentPeriod(event.target.value)} required />
+            <input id="payment-period" type="month" value={paymentPeriod} onChange={event =>setPaymentPeriod(event.target.value)} required />
             <div className="payment-amount"><span>Amount due</span><strong>ETB {Number(context.property.price).toLocaleString()}</strong></div>
             <button type="submit" disabled={submitting || !paymentPeriod || !context.landlordBankInformationComplete}>
               {submitting ? 'Submitting...' : 'Pay Rent'}

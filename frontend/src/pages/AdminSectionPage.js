@@ -8,15 +8,15 @@ import { getPropertyImages } from '../utils/propertyMedia';
 import './adminDashboard.css';
 
 const sectionConfig = {
-  awaitingVerification: { title: 'â³ Properties awaiting verification', endpoint: 'pending-properties' },
-  allProperties: { title: 'ðŸ  Properties', status: 'all' },
-  pending: { title: 'ðŸ”Ž Under Review', endpoint: 'pending-properties' },
-  rentalRequests: { title: 'ðŸ“‹ Rental Requests', endpoint: 'rental-requests/admin-requests' },
-  rejected: { title: 'âŒ Rejected', status: 'rejected' },
-  allUsers: { title: 'ðŸ‘¤ All users', endpoint: 'users' },
-  adminManagement: { title: 'ðŸ›¡ï¸ Admin Management', endpoint: 'users' },
-  paymentPeriod: { title: 'ðŸ’³ Payment Period', endpoint: 'payment-periods' },
-  verified: { title: 'âœ… Verified Properties', status: 'approved' },
+  awaitingVerification: { title: 'Properties awaiting verification', endpoint: 'pending-properties' },
+  allProperties: { title: 'Properties', status: 'all' },
+  pending: { title: 'Under Review', endpoint: 'pending-properties' },
+  rentalRequests: { title: 'Rental Requests', endpoint: 'rental-requests/admin-requests' },
+  rejected: { title: 'Rejected', status: 'rejected' },
+  allUsers: { title: 'All users', endpoint: 'users' },
+  adminManagement: { title: 'Admin Management', endpoint: 'users' },
+  paymentPeriod: { title: 'Payment Period', endpoint: 'payment-periods' },
+  verified: { title: 'Verified Properties', status: 'approved' },
 };
 
 const displayVerificationStatus = (property) => {
@@ -83,8 +83,8 @@ const AdminSectionPage = ({ type }) => {
         ? response.data
         : Array.isArray(response.data?.properties) ? response.data.properties : [];
       setItems(isAdminManagementPage
-        ? records.filter(user => user && user._id != null && user.role === 'admin' && user.adminType === 'area')
-        : records.filter(property => property && property._id != null));
+        ? records.filter(user =>user && user._id != null && user.role === 'admin' && user.adminType === 'area')
+        : records.filter(property =>property && property._id != null));
     } catch (error) {
       console.error('Error fetching admin section:', error);
       setItems([]);
@@ -136,7 +136,7 @@ const AdminSectionPage = ({ type }) => {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       await fetchItems();
-      setSelectedRentalRequest((current) => current && current._id === requestId
+      setSelectedRentalRequest((current) =>current && current._id === requestId
         ? { ...current, status: response.data?.request?.status || status }
         : current);
       setRentalRequestFeedback(response.data?.message || `Rental request ${status}.`);
@@ -159,7 +159,7 @@ const AdminSectionPage = ({ type }) => {
       const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/properties/${request.property._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setSelectedRentalRequest((current) => current && current._id === request._id
+      setSelectedRentalRequest((current) =>current && current._id === request._id
         ? { ...current, property: { ...current.property, ...response.data } }
         : current);
     } catch (error) {
@@ -266,15 +266,14 @@ const AdminSectionPage = ({ type }) => {
           <button
             type="button"
             className="admin-close-btn admin-back-dashboard"
-            onClick={() => navigate('/admin-dashboard')}
-          >
-            â† Back to Admin Dashboard
+            onClick={() =>navigate('/admin-dashboard')}
+          >Back to Admin Dashboard
           </button>
         </div>
       </div>
 
       {isAdminManagementPage && isPlatformAdmin && (
-        <section className="admin-detail-section admin-dedicated-content">
+        <section className="admin-detail-section admin-dedicated-content admin-management-panel">
           <h2 className="admin-card-title">{editingAdminId ? 'Edit Area Admin' : 'Create Area Admin Account'}</h2>
           <p className="admin-subtitle">Only the Platform Admin can create area-specific admin accounts.</p>
           {adminFormError && <div className="admin-empty-text">{adminFormError}</div>}
@@ -292,8 +291,7 @@ const AdminSectionPage = ({ type }) => {
               required
               className="admin-card-detail"
             />
-            <div className="admin-card-detail" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              Admin Type: <strong style={{ marginLeft: 8 }}>Area Admin</strong>
+            <div className="admin-card-detail" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Admin Type: <strong style={{ marginLeft: 8 }}>Area Admin</strong>
             </div>
             <button type="submit" disabled={adminFormLoading} className="admin-btn admin-btn-primary">
               {adminFormLoading ? 'Saving...' : editingAdminId ? 'Save Changes' : 'Create Admin'}
@@ -304,24 +302,24 @@ const AdminSectionPage = ({ type }) => {
       )}
 
       {type === 'paymentPeriod' && isPlatformAdmin && (
-        <section className="admin-detail-section admin-dedicated-content">
+        <section className="admin-detail-section admin-dedicated-content admin-payment-period-panel">
           <h2 className="admin-card-title">Payment Period Overview</h2>
           {loading ? (
-            <div className="admin-loading-small">â³ Loading payment periods...</div>
+            <div className="admin-loading-small">Loading payment periods...</div>
           ) : items.length === 0 ? (
             <div className="admin-empty-text">No payment period data found.</div>
           ) : (
             <div className="admin-grid">
               {items.map((payment) => (
                 <div key={payment._id} className="admin-card">
-                  <h4 className="admin-card-title">ðŸ’³ {payment.paymentPeriod}</h4>
-                  <p className="admin-card-detail">ðŸ‘¤ Tenant: {payment.tenant?.name || 'Unknown'}</p>
-                  <p className="admin-card-detail">ðŸ  Property: {payment.property?.title || 'Unknown property'}</p>
-                  <p className="admin-card-detail">ðŸ“ Area: {payment.property?.city || payment.property?.region || 'Unknown area'}</p>
-                  <p className="admin-card-detail">ðŸ’° Amount: ETB {Number(payment.amount || 0).toLocaleString()}</p>
-                  <p className="admin-card-detail">ðŸ“… {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString() : 'Date unavailable'}</p>
-                  <p className="admin-card-detail">âœ… Status: {payment.status || 'Unknown'}</p>
-                  <p className="admin-card-detail">ðŸ§¾ Reference: {payment.paymentReference || 'N/A'}</p>
+                  <h4 className="admin-card-title"> {payment.paymentPeriod}</h4>
+                  <p className="admin-card-detail">Tenant: {payment.tenant?.name || 'Unknown'}</p>
+                  <p className="admin-card-detail">Property: {payment.property?.title || 'Unknown property'}</p>
+                  <p className="admin-card-detail">Area: {payment.property?.city || payment.property?.region || 'Unknown area'}</p>
+                  <p className="admin-card-detail">Amount: ETB {Number(payment.amount || 0).toLocaleString()}</p>
+                  <p className="admin-card-detail"> {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString() : 'Date unavailable'}</p>
+                  <p className="admin-card-detail">Status: {payment.status || 'Unknown'}</p>
+                  <p className="admin-card-detail">Reference: {payment.paymentReference || 'N/A'}</p>
                 </div>
               ))}
             </div>
@@ -330,10 +328,10 @@ const AdminSectionPage = ({ type }) => {
       )}
 
       {isAdminManagementPage && isPlatformAdmin && (
-        <section className="admin-detail-section admin-dedicated-content">
+        <section className="admin-detail-section admin-dedicated-content admin-management-panel">
           <h2 className="admin-card-title">Area Admins</h2>
           {loading ? (
-            <div className="admin-loading-small">â³ Loading...</div>
+            <div className="admin-loading-small">Loading...</div>
           ) : loadError ? (
             <div className="admin-empty-text">{loadError}</div>
           ) : items.length === 0 ? (
@@ -342,21 +340,20 @@ const AdminSectionPage = ({ type }) => {
             <div className="admin-grid">
               {items.map((admin) => (
                 <div key={admin._id} className="admin-card">
-                  <h4 className="admin-card-title">ðŸ‘¤ {admin.name}</h4>
-                  <p className="admin-card-detail">ðŸ“§ {admin.email}</p>
-                  {admin.phone && <p className="admin-card-detail">ðŸ“± {admin.phone}</p>}
-                  <p className="admin-card-detail">ðŸ“ Area: {(admin.adminAreas?.[0]?.city || admin.adminAreas?.[0]?.region || admin.adminAreas?.[0]?.zone || admin.adminAreas?.[0]?.wereda || admin.adminAreas?.[0]?.subCity || 'Unassigned')}</p>
+                  <h4 className="admin-card-title"> {admin.name}</h4>
+                  <p className="admin-card-detail"> {admin.email}</p>
+                  {admin.phone && <p className="admin-card-detail"> {admin.phone}</p>}
+                  <p className="admin-card-detail">Area: {(admin.adminAreas?.[0]?.city || admin.adminAreas?.[0]?.region || admin.adminAreas?.[0]?.zone || admin.adminAreas?.[0]?.wereda || admin.adminAreas?.[0]?.subCity || 'Unassigned')}</p>
                   <div className="admin-card-actions">
                     <button
                       type="button"
-                      onClick={() => handleEditAdmin(admin)}
+                      onClick={() =>handleEditAdmin(admin)}
                       className="admin-btn admin-management-edit-btn"
-                    >
-                      Edit
+                    >Edit
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteAdmin(admin)}
+                      onClick={() =>handleDeleteAdmin(admin)}
                       disabled={adminActionLoading === admin._id}
                       className="admin-btn admin-management-delete-btn"
                     >
@@ -371,9 +368,9 @@ const AdminSectionPage = ({ type }) => {
       )}
 
       {type === 'rentalRequests' && (
-        <section className="admin-detail-section admin-dedicated-content">
+        <section className={`admin-detail-section admin-dedicated-content${isUserListPage ? ' admin-user-list-panel' : ''}`}>
           {loading ? (
-            <div className="admin-loading-small">â³ Loading rental requests...</div>
+            <div className="admin-loading-small">Loading rental requests...</div>
           ) : loadError ? (
             <div className="admin-empty-text">{loadError}</div>
           ) : items.length === 0 ? (
@@ -382,17 +379,16 @@ const AdminSectionPage = ({ type }) => {
             <div className="admin-grid">
               {items.map((request) => (
                 <div key={request._id} className="admin-card">
-                  <h4 className="admin-card-title">ðŸ  {request.property?.title || 'Property'}</h4>
-                  <p className="admin-card-detail">ðŸ‘¤ Tenant: {request.tenant?.name || request.tenantName || 'Unknown tenant'}</p>
-                  <p className="admin-card-detail">ðŸ“ Area: {request.property?.city || request.property?.region || 'Unknown area'}</p>
-                  <p className="admin-card-detail">ðŸ“Œ Status: {request.status || 'pending'}</p>
+                  <h4 className="admin-card-title"> {request.property?.title || 'Property'}</h4>
+                  <p className="admin-card-detail">Tenant: {request.tenant?.name || request.tenantName || 'Unknown tenant'}</p>
+                  <p className="admin-card-detail">Area: {request.property?.city || request.property?.region || 'Unknown area'}</p>
+                  <p className="admin-card-detail">Status: {request.status || 'pending'}</p>
                   {request.property?._id && (
                     <button
                       type="button"
                       className="admin-card-link"
-                      onClick={() => openRentalRequestDetails(request)}
-                    >
-                      ðŸ“„ View Details
+                      onClick={() =>openRentalRequestDetails(request)}
+                    >View Details
                     </button>
                   )}
                 </div>
@@ -403,33 +399,33 @@ const AdminSectionPage = ({ type }) => {
       )}
 
       {type === 'rentalRequests' && selectedRentalRequest && (
-        <div className="admin-request-modal-overlay" role="presentation" onClick={() => setSelectedRentalRequest(null)}>
+        <div className="admin-request-modal-overlay" role="presentation" onClick={() =>setSelectedRentalRequest(null)}>
           <section
             className="admin-request-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="rental-request-details-title"
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) =>event.stopPropagation()}
           >
             <div className="admin-request-modal-header">
-              <h2 id="rental-request-details-title" className="admin-card-title">ðŸ“„ Rental Request Details</h2>
-              <button type="button" className="admin-card-link" onClick={() => setSelectedRentalRequest(null)}>Close</button>
+              <h2 id="rental-request-details-title" className="admin-card-title">Rental Request Details</h2>
+              <button type="button" className="admin-card-link" onClick={() =>setSelectedRentalRequest(null)}>Close</button>
             </div>
             <PropertyImage
               src={getPropertyImages(selectedRentalRequest.property)}
               alt={selectedRentalRequest.property?.title || 'Property'}
               className="admin-request-modal-image"
               fallbackClassName="admin-request-modal-image admin-empty-text"
-              fallbackText="No property image available"
+              fallback="No property image available"
             />
-            <h3 className="admin-card-title">ðŸ  {selectedRentalRequest.property?.title || 'Property'}</h3>
-            <p className="admin-card-detail">ðŸ‘¤ Tenant: {selectedRentalRequest.tenant?.name || selectedRentalRequest.tenantName || 'Unknown tenant'}</p>
-            <p className="admin-card-detail">ðŸ  Landlord: {selectedRentalRequest.landlord?.name || 'Unknown landlord'}</p>
-            <p className="admin-card-detail">ðŸ“ Area: {selectedRentalRequest.property?.city || selectedRentalRequest.property?.region || 'Unknown area'}</p>
-            <p className="admin-card-detail">ðŸ“ Address: {selectedRentalRequest.property?.location || 'Location unavailable'}</p>
-            <p className="admin-card-detail">ðŸ“ Request: {selectedRentalRequest.message || 'No message provided'}</p>
-            <p className="admin-card-detail">ðŸ“… Requested: {selectedRentalRequest.createdAt ? new Date(selectedRentalRequest.createdAt).toLocaleString() : 'Date unavailable'}</p>
-            <p className="admin-card-detail">ðŸ“Œ Status: {selectedRentalRequest.status || 'pending'}</p>
+            <h3 className="admin-card-title"> {selectedRentalRequest.property?.title || 'Property'}</h3>
+            <p className="admin-card-detail">Tenant: {selectedRentalRequest.tenant?.name || selectedRentalRequest.tenantName || 'Unknown tenant'}</p>
+            <p className="admin-card-detail">Landlord: {selectedRentalRequest.landlord?.name || 'Unknown landlord'}</p>
+            <p className="admin-card-detail">Area: {selectedRentalRequest.property?.city || selectedRentalRequest.property?.region || 'Unknown area'}</p>
+            <p className="admin-card-detail">Address: {selectedRentalRequest.property?.location || 'Location unavailable'}</p>
+            <p className="admin-card-detail">Request: {selectedRentalRequest.message || 'No message provided'}</p>
+            <p className="admin-card-detail">Requested: {selectedRentalRequest.createdAt ? new Date(selectedRentalRequest.createdAt).toLocaleString() : 'Date unavailable'}</p>
+            <p className="admin-card-detail">Status: {selectedRentalRequest.status || 'pending'}</p>
             <PropertyOwnershipProof
               src={selectedRentalRequest.property?.verificationDocument}
               title={selectedRentalRequest.property?.title}
@@ -442,19 +438,19 @@ const AdminSectionPage = ({ type }) => {
               <div className="admin-card-actions">
                 <button
                   type="button"
-                  onClick={() => handleRentalRequestAction(selectedRentalRequest._id, 'approved')}
+                  onClick={() =>handleRentalRequestAction(selectedRentalRequest._id, 'approved')}
                   disabled={actionLoading === selectedRentalRequest._id}
                   className="admin-btn admin-btn-approve"
                 >
-                  {actionLoading === selectedRentalRequest._id ? 'Working...' : 'âœ… Approve'}
+                  {actionLoading === selectedRentalRequest._id ? 'Working...' : 'Approve'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleRentalRequestAction(selectedRentalRequest._id, 'rejected')}
+                  onClick={() =>handleRentalRequestAction(selectedRentalRequest._id, 'rejected')}
                   disabled={actionLoading === selectedRentalRequest._id}
                   className="admin-btn admin-btn-reject"
                 >
-                  {actionLoading === selectedRentalRequest._id ? 'Working...' : 'âŒ Reject'}
+                  {actionLoading === selectedRentalRequest._id ? 'Working...' : 'Reject'}
                 </button>
               </div>
             )}
@@ -465,22 +461,22 @@ const AdminSectionPage = ({ type }) => {
       {type !== 'paymentPeriod' && !isAdminManagementPage && type !== 'rentalRequests' && (
         <section className="admin-detail-section admin-dedicated-content">
           {loading ? (
-            <div className="admin-loading-small">â³ Loading...</div>
+            <div className="admin-loading-small">Loading...</div>
           ) : loadError ? (
             <div className="admin-empty-text">{loadError}</div>
           ) : items.length === 0 ? (
             <div className="admin-empty-text">No records found.</div>
           ) : isUserListPage ? (
-            <div className="admin-grid">
+            <div className="admin-grid admin-user-list-grid">
               {items.map(user => (
-                <div key={user._id} className="admin-card">
-                  <h4 className="admin-card-title">ðŸ‘¤ {user.name}</h4>
-                  <p className="admin-card-detail">ðŸ“§ {user.email}</p>
-                  <p className="admin-card-detail">ðŸŽ¯ Role: {user.role}</p>
-                  <p className="admin-card-detail">ðŸ“± {user.phone || 'No phone provided'}</p>
+                <div key={user._id} className="admin-card admin-user-list-card">
+                  <h4 className="admin-card-title"> {user.name}</h4>
+                  <p className="admin-card-detail"> {user.email}</p>
+                  <p className="admin-card-detail">Role: {user.role}</p>
+                  <p className="admin-card-detail"> {user.phone || 'No phone provided'}</p>
                   {user.role === 'admin' && (
                     <p className="admin-card-detail">
-                      ðŸ›¡ï¸ {user.adminType || 'platform'}{user.adminAreas?.length ? `: ${user.adminAreas.map(area => area.city || area.region || area.zone).filter(Boolean).join(', ')}` : ''}
+                       {user.adminType || 'platform'}{user.adminAreas?.length ? `: ${user.adminAreas.map(area =>area.city || area.region || area.zone).filter(Boolean).join(', ')}` : ''}
                     </p>
                   )}
                 </div>
@@ -498,14 +494,13 @@ const AdminSectionPage = ({ type }) => {
                     fallbackText="No property image available"
                   />
                   <h4 className="admin-card-title">{property.title}</h4>
-                  <p className="admin-card-detail">ðŸ“ {property.location}</p>
-                  <p className="admin-card-price">ðŸ’° ETB {Number(property.price).toLocaleString()}</p>
-                  <p className="admin-card-detail">ðŸšª Bedrooms: {property.bedrooms}</p>
-                  <p className="admin-card-detail">ðŸ‘¤ Landlord: {property.landlord?.name || 'Unknown Owner'}</p>
-                  <p className="admin-card-detail">ðŸ“ {property.description || 'No description provided'}</p>
-                  <p className="admin-card-detail">ðŸ“… Submitted: {property.createdAt ? new Date(property.createdAt).toLocaleDateString() : 'Date unavailable'}</p>
-                  <p className="admin-card-detail">
-                    ðŸ“Œ Status: {displayVerificationStatus(property)}
+                  <p className="admin-card-detail"> {property.location}</p>
+                  <p className="admin-card-price">ETB {Number(property.price).toLocaleString()}</p>
+                  <p className="admin-card-detail">Bedrooms: {property.bedrooms}</p>
+                  <p className="admin-card-detail">Landlord: {property.landlord?.name || 'Unknown Owner'}</p>
+                  <p className="admin-card-detail"> {property.description || 'No description provided'}</p>
+                  <p className="admin-card-detail">Submitted: {property.createdAt ? new Date(property.createdAt).toLocaleDateString() : 'Date unavailable'}</p>
+                  <p className="admin-card-detail">Status: {displayVerificationStatus(property)}
                   </p>
                   <PropertyOwnershipProof
                     src={property.verificationDocument}
@@ -518,24 +513,24 @@ const AdminSectionPage = ({ type }) => {
                     <div className="admin-card-actions">
                       <button
                         type="button"
-                        onClick={() => handlePropertyAction(property._id, 'verify')}
+                        onClick={() =>handlePropertyAction(property._id, 'verify')}
                         disabled={actionLoading === property._id}
                         className="admin-btn admin-btn-approve"
                       >
-                        {actionLoading === property._id ? 'Working...' : 'âœ… Approve'}
+                        {actionLoading === property._id ? 'Working...' : 'Approve'}
                       </button>
                       <button
                         type="button"
-                        onClick={() => handlePropertyAction(property._id, 'reject')}
+                        onClick={() =>handlePropertyAction(property._id, 'reject')}
                         disabled={actionLoading === property._id}
                         className="admin-btn admin-btn-reject"
                       >
-                        {actionLoading === property._id ? 'Working...' : 'âŒ Reject'}
+                        {actionLoading === property._id ? 'Working...' : 'Reject'}
                       </button>
                     </div>
                   )}
                   {type !== 'awaitingVerification' && property._id && (
-                    <Link to={`/property/${property._id}`} className="admin-card-link">ðŸ‘ï¸ View details</Link>
+                    <Link to={`/property/${property._id}`} className="admin-card-link">View details</Link>
                   )}
                 </div>
               ))}

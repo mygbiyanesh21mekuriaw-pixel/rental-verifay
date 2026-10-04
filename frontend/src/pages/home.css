@@ -93,7 +93,7 @@
 .home-feature-title { margin: 0 0 8px; color: #18332d; }
 .home-feature-desc { margin: 0; color: #60736c; }
 
-/* ===== የተረጋገጡ ቤቶች ክፍል ===== */
+/* =====    ===== */
 .home-properties-section {
   max-width: 1100px;
   width: 100%;
@@ -126,7 +126,7 @@
   text-decoration: underline;
 }
 
-/* ===== የጫኛ ===== */
+/* =====  ===== */
 .home-loading {
   display: flex;
   justify-content: center;
@@ -149,7 +149,7 @@
   to { transform: rotate(360deg); }
 }
 
-/* ===== ባዶ ሁኔታ ===== */
+/* =====   ===== */
 .home-empty {
   text-align: center;
   padding: 40px;
@@ -157,14 +157,14 @@
   font-size: 18px;
 }
 
-/* ===== የቤት ካርዶች ፍርግር ===== */
+/* =====    ===== */
 .home-properties-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 24px;
 }
 
-/* ===== የቤት ካርድ ===== */
+/* =====   ===== */
 .home-property-card {
   background: white;
   border-radius: 16px;
@@ -253,7 +253,7 @@
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
-/* ===== ለሞባይል ===== */
+/* =====  ===== */
 @media (max-width: 768px) {
   .home-features {
     grid-template-columns: 1fr;

@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { createSystemLog } = require('./systemLogController');
 const { listChapaBanks } = require('../utils/payoutProvider');
+const { encryptBankAccountNumber, decryptBankAccountNumber } = require('../utils/bankAccountCrypto');
 const sendEmail = require('../utils/email');
 const { uploadFilesToUrls } = require('../utils/uploadMedia');
 
@@ -22,6 +23,8 @@ const normalizeLoginEmail = (email) => {
   return normalizedEmail.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
 };
 
+const normalizeAccountEmail = (email) => normalizeLoginEmail(email);
+
 const serializeUser = (user) => ({
   id: user._id ? user._id.toString() : user.id,
   name: user.name,
@@ -36,7 +39,9 @@ const serializeUser = (user) => ({
   bankAccountName: user.role === 'landlord' ? user.bankAccountName || '' : undefined,
   bankCode: user.role === 'landlord' ? user.bankCode || '' : undefined,
   bankName: user.role === 'landlord' ? user.bankName || '' : undefined,
-  bankAccountMasked: user.role === 'landlord' ? maskAccountNumber(user.bankAccountNumber) : undefined,
+  bankAccountMasked: user.role === 'landlord'
+    ? maskAccountNumber(decryptBankAccountNumber(user.bankAccountNumber))
+    : undefined,
 });
 
 // አዲስ ተጠቃሚ መመዝገብ
@@ -44,7 +49,7 @@ const register = async (req, res) => {
   try {
     const { name, email, password, phone, profilePhoto, role } = req.body;
     const normalizedName = String(name || '').trim();
-    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedEmail = normalizeAccountEmail(email);
     const normalizedPhone = String(phone || '').trim();
 
     if (!normalizedName || !normalizedEmail || !password || !normalizedPhone || !role) {
@@ -124,7 +129,8 @@ const login = async (req, res) => {
     const normalizedEmail = normalizeLoginEmail(email);
 
     // ተጠቃሚውን ያግኙ
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail })
+      .select('+bankAccountNumber');
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -164,7 +170,8 @@ const login = async (req, res) => {
 // የተጠቃሚ መረጃ ማግኘት
 const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user.id)
+      .select('-password +bankAccountNumber');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -180,7 +187,8 @@ const updateProfile = async (req, res) => {
     const { name, email, phone, profilePhoto, bankAccountName, bankAccountNumber, bankCode } = req.body;
     const userId = req.user.id;
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId)
+      .select('+bankAccountNumber');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -203,8 +211,14 @@ const updateProfile = async (req, res) => {
     user.profilePhoto = profilePhoto || user.profilePhoto;
     if (user.role === 'landlord') {
       if (bankAccountName !== undefined || bankAccountNumber !== undefined || bankCode !== undefined) {
-        if (!String(bankAccountName || '').trim() || !String(bankAccountNumber || '').trim() || !String(bankCode || '').trim()) {
+        const normalizedAccountName = String(bankAccountName || '').trim();
+        const normalizedAccountNumber = String(bankAccountNumber || '').trim();
+        if (!normalizedAccountName || normalizedAccountName.length > 100 ||
+          !String(bankCode || '').trim()) {
           return res.status(400).json({ message: 'Bank, account name and account number are required' });
+        }
+        if (!/^\d{4,30}$/.test(normalizedAccountNumber)) {
+          return res.status(400).json({ message: 'Account number must contain 4 to 30 digits.' });
         }
         const bankResult = await listChapaBanks();
         if (!bankResult.ok) {
@@ -216,8 +230,8 @@ const updateProfile = async (req, res) => {
         if (!selectedBank) {
           return res.status(400).json({ message: 'Select a valid Chapa-supported bank' });
         }
-        user.bankAccountName = String(bankAccountName).trim();
-        user.bankAccountNumber = String(bankAccountNumber).trim();
+        user.bankAccountName = normalizedAccountName;
+        user.bankAccountNumber = encryptBankAccountNumber(normalizedAccountNumber);
         user.bankCode = selectedBank.code;
         user.bankName = selectedBank.name;
       }
@@ -248,7 +262,8 @@ const updateProfilePhoto = async (req, res) => {
   }
 
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id)
+      .select('+bankAccountNumber');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }

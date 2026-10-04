@@ -33,7 +33,7 @@ const UserSchema = new mongoose.Schema({
     default: '',
   },
   bankAccountName: { type: String, default: '', trim: true },
-  bankAccountNumber: { type: String, default: '', trim: true },
+  bankAccountNumber: { type: String, default: '', trim: true, select: false },
   bankCode: { type: String, default: '', trim: true },
   bankName: { type: String, default: '', trim: true },
   role: {

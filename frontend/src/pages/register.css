@@ -1,4 +1,4 @@
-/* ===== የምዝገባ ገፅ ===== */
+/* =====   ===== */
 
 .register-container {
   display: flex;
@@ -19,7 +19,7 @@
   animation: slideUp 0.5s ease;
 }
 
-/* የእንቅስቃሴ (Animation) */
+/*  (Animation) */
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -31,7 +31,7 @@
   }
 }
 
-/* ርዕስ */
+/*  */
 .register-title {
   text-align: center;
   color: #2d3748;
@@ -47,7 +47,7 @@
   margin-bottom: 30px;
 }
 
-/* የስህተት መልዕክት */
+/*   */
 .register-error {
   background-color: #fed7d7;
   color: #9b2c2c;
@@ -58,14 +58,14 @@
   border-left: 4px solid #e53e3e;
 }
 
-/* ቅጽ (Form) */
+/*  (Form) */
 .register-form {
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
 
-/* የእያንዳንዱ መስክ ክፍል */
+/*    */
 .register-field {
   display: flex;
   flex-direction: column;
@@ -86,7 +86,7 @@
   font-size: 16px;
 }
 
-/* የግቤት (Input) ቦታዎች */
+/*  (Input)  */
 .register-input {
   padding: 12px 16px;
   border: 2px solid #e2e8f0;
@@ -109,7 +109,7 @@
   font-size: 14px;
 }
 
-/* የሚመረጥ (Select) */
+/*  (Select) */
 .register-select {
   padding: 12px 16px;
   border: 2px solid #e2e8f0;
@@ -131,7 +131,7 @@
   box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
 }
 
-/* የመመዝገቢያ ቁልፍ */
+/*   */
 .register-button {
   padding: 14px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -160,7 +160,7 @@
   cursor: not-allowed;
 }
 
-/* የግርጌ ጽሁፍ */
+/*   */
 .register-footer {
   text-align: center;
   margin-top: 24px;
@@ -180,7 +180,7 @@
   text-decoration: underline;
 }
 
-/* ===== ለሞባይል (Responsive) ===== */
+/* =====  (Responsive) ===== */
 @media (max-width: 640px) {
   .register-card {
     padding: 24px;
@@ -203,7 +203,7 @@
   }
 }
 
-/* ===== የእንቅስቃሴ ማሳወቂያ (Loading Spinner) ===== */
+/* =====   (Loading Spinner) ===== */
 .register-spinner {
   display: inline-block;
   width: 20px;
@@ -222,7 +222,7 @@
   }
 }
 
-/* ===== የስኬት መልዕክት ===== */
+/* =====   ===== */
 .register-success {
   background-color: #c6f6d5;
   color: #22543d;
@@ -233,7 +233,7 @@
   border-left: 4px solid #48bb78;
 }
 
-/* ===== የመስክ አይነት ልዩነቶች ===== */
+/* =====    ===== */
 .register-input[type="tel"] {
   direction: ltr;
 }
@@ -242,7 +242,7 @@
   letter-spacing: 2px;
 }
 
-/* ===== ፎከስ ለሞባይል ===== */
+/* =====   ===== */
 @media (max-width: 480px) {
   .register-container {
     padding: 10px;

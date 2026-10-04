@@ -52,7 +52,7 @@ const uniqueProperties = (propertyList) => {
   });
 };
 
-const createMarkerIcon = (selected = false) => L.divIcon({
+const createMarkerIcon = (selected = false) =>L.divIcon({
   className: '',
   html: `<div style="width:18px;height:18px;border-radius:50%;background:${selected ? '#2563eb' : '#10b981'};border:2px solid #fff;box-shadow:0 0 0 6px ${selected ? 'rgba(37,99,235,0.18)' : 'rgba(16,185,129,0.18)'}"></div>`,
   iconSize: [18, 18],
@@ -74,17 +74,17 @@ const MapFocus = ({ center }) => {
 
 const PropertyMap = ({ properties, selectedPropertyId, onSelectProperty }) => {
   const validProperties = useMemo(
-    () => properties.filter((property) => getPropertyCoordinates(property)),
+    () =>properties.filter((property) =>getPropertyCoordinates(property)),
     [properties]
   );
 
-  const selectedProperty = validProperties.find((property) => property._id === selectedPropertyId) || validProperties[0];
+  const selectedProperty = validProperties.find((property) =>property._id === selectedPropertyId) || validProperties[0];
   const selectedCenter = getPropertyCoordinates(selectedProperty) || DEFAULT_MAP_CENTER;
 
   if (validProperties.length === 0) {
     return (
       <div className="tenant-map-empty">
-        <span>ðŸ“</span>
+        <span></span>
         <p>No properties found in this area.</p>
       </div>
     );
@@ -99,8 +99,7 @@ const PropertyMap = ({ properties, selectedPropertyId, onSelectProperty }) => {
 
       <MapContainer center={selectedCenter} zoom={11} scrollWheelZoom className="tenant-map-container">
         <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
-          url={MAP_TILES}
+          attribution='&copy; OpenStreetMap contributors'url={MAP_TILES}
         />
         {validProperties.map((property) => {
           const coords = getPropertyCoordinates(property);
@@ -111,7 +110,7 @@ const PropertyMap = ({ properties, selectedPropertyId, onSelectProperty }) => {
               key={property._id}
               position={coords}
               icon={selectedPropertyId === property._id ? createMarkerIcon(true) : createMarkerIcon(false)}
-              eventHandlers={{ click: () => onSelectProperty(property._id) }}
+              eventHandlers={{ click: () =>onSelectProperty(property._id) }}
             >
               <Popup>
                 <div className="tenant-map-popup">
@@ -132,7 +131,7 @@ const PropertyMap = ({ properties, selectedPropertyId, onSelectProperty }) => {
 };
 
 const PropertyCard = ({ property, userId, onFavoriteChange, token, selected, onSelect }) => {
-  const [isFavorite, setIsFavorite] = useState(() => getFavoriteIds(userId).has(String(property._id)));
+  const [isFavorite, setIsFavorite] = useState(() =>getFavoriteIds(userId).has(String(property._id)));
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleFavorite = async (event) => {
@@ -153,7 +152,7 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token, selected, onS
   return (
     <div
       className={`tenant-card ${selected ? 'tenant-card-selected' : ''}`}
-      onClick={() => onSelect?.(property._id)}
+      onClick={() =>onSelect?.(property._id)}
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
@@ -171,33 +170,33 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token, selected, onS
           fallbackClassName="tenant-card-no-image"
           fallbackText="No photo"
         />
-        <span className="tenant-card-badge">âœ… Verified</span>
+        <span className="tenant-card-badge">Verified</span>
       </div>
       <div className="tenant-card-content">
         <h3 className="tenant-card-title">{property.title}</h3>
-        <p className="tenant-card-location">ðŸ“ {property.location}</p>
+        <p className="tenant-card-location"> {property.location}</p>
         <p className="tenant-card-detail">
-          ðŸ“ {property.city}, {property.subCity}, Kebele {property.kebele}
+           {property.city}, {property.subCity}, Kebele {property.kebele}
         </p>
-        <p className="tenant-card-price">ðŸ’° ETB {property.price?.toLocaleString()}</p>
-        <p className="tenant-card-detail">ðŸšª {property.bedrooms} bedrooms</p>
-        <p className="tenant-card-detail">ðŸ‘¤ Landlord: {property.landlord?.name || 'Not available'}</p>
+        <p className="tenant-card-price">ETB {property.price?.toLocaleString()}</p>
+        <p className="tenant-card-detail"> {property.bedrooms} bedrooms</p>
+        <p className="tenant-card-detail">Landlord: {property.landlord?.name || 'Not available'}</p>
         {getPropertyCoordinates(property) ? (
-          <p className="tenant-card-detail">ðŸ—ºï¸ Map ready</p>
+          <p className="tenant-card-detail">Map ready</p>
         ) : (
-          <p className="tenant-card-detail">ðŸ—ºï¸ Location details pending</p>
+          <p className="tenant-card-detail">Location details pending</p>
         )}
         <p className="tenant-card-description">{property.description}</p>
-        <p className="tenant-card-detail">âœ… Verification status: Approved</p>
+        <p className="tenant-card-detail">Verification status: Approved</p>
         <button 
           type="button" 
           className={`tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`} 
           onClick={handleFavorite}
           disabled={isUpdating}
         >
-          {isUpdating ? 'â³' : isFavorite ? 'â¤ï¸ Favorited' : 'â¤ï¸ Favorite'}
+          {isUpdating ? '' : isFavorite ? 'Favorited' : 'Favorite'}
         </button>
-        <Link to={`/property/${property._id}`} className="tenant-card-btn">ðŸ  Request to Rent</Link>
+        <Link to={`/property/${property._id}`} className="tenant-card-btn">Request to Rent</Link>
       </div>
     </div>
   );
@@ -266,7 +265,7 @@ const TenantSearch = () => {
       const availableProperties = uniqueProperties(response.data);
       setProperties(availableProperties);
       setSelectedPropertyId((current) => {
-        if (current && availableProperties.some((property) => property._id === current)) {
+        if (current && availableProperties.some((property) =>property._id === current)) {
           return current;
         }
         return availableProperties[0]?._id || null;
@@ -304,14 +303,14 @@ const TenantSearch = () => {
 
   const handleFavoriteChange = () => {};
 
-  const selectedProperty = properties.find((property) => property._id === selectedPropertyId) || null;
+  const selectedProperty = properties.find((property) =>property._id === selectedPropertyId) || null;
 
   return (
     <div className="tenant-container">
       <BackToDashboard />
 
       <div className="tenant-header">
-        <h1 className="tenant-title">ðŸ”Ž Advanced Property Search</h1>
+        <h1 className="tenant-title">Advanced Property Search</h1>
         <p className="tenant-subtitle">Find verified rental properties</p>
       </div>
 
@@ -328,7 +327,7 @@ const TenantSearch = () => {
                 placeholder="Title"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by title">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by title"></button>
             </div>
           </div>
 
@@ -343,7 +342,7 @@ const TenantSearch = () => {
                 placeholder="Description"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by description">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by description"></button>
             </div>
           </div>
 
@@ -360,7 +359,7 @@ const TenantSearch = () => {
                 placeholder="Bedrooms"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by bedrooms">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by bedrooms"></button>
             </div>
           </div>
 
@@ -376,7 +375,7 @@ const TenantSearch = () => {
                 placeholder="Price"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by price">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by price"></button>
             </div>
           </div>
 
@@ -391,7 +390,7 @@ const TenantSearch = () => {
                 placeholder="Address"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by address">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by address"></button>
             </div>
           </div>
 
@@ -406,7 +405,7 @@ const TenantSearch = () => {
                 placeholder="Region"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by region">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by region"></button>
             </div>
           </div>
 
@@ -421,7 +420,7 @@ const TenantSearch = () => {
                 placeholder="Zone"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by zone">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by zone"></button>
             </div>
           </div>
 
@@ -436,7 +435,7 @@ const TenantSearch = () => {
                 placeholder="Wereda"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by wereda">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by wereda"></button>
             </div>
           </div>
 
@@ -451,7 +450,7 @@ const TenantSearch = () => {
                 placeholder="City"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by city">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by city"></button>
             </div>
           </div>
 
@@ -466,7 +465,7 @@ const TenantSearch = () => {
                 placeholder="Sub-city"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by sub-city">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by sub-city"></button>
             </div>
           </div>
 
@@ -481,7 +480,7 @@ const TenantSearch = () => {
                 placeholder="Kebele"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by kebele">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by kebele"></button>
             </div>
           </div>
 
@@ -496,7 +495,7 @@ const TenantSearch = () => {
                 placeholder="House Number"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by house number">ðŸ”Ž</button>
+              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by house number"></button>
             </div>
           </div>
 
@@ -513,8 +512,7 @@ const TenantSearch = () => {
             </select>
 
             <button type="submit" className="tenant-search-btn">Search</button>
-            <button type="button" className="tenant-search-btn tenant-search-clear" onClick={handleClearFilters}>
-              Clear Filters
+            <button type="button" className="tenant-search-btn tenant-search-clear" onClick={handleClearFilters}>Clear Filters
             </button>
           </div>
         </form>
@@ -522,7 +520,7 @@ const TenantSearch = () => {
 
       {errorMessage && (
         <div className="tenant-empty">
-          <span className="tenant-empty-icon">âš ï¸</span>
+          <span className="tenant-empty-icon"></span>
           <p>{errorMessage}</p>
         </div>
       )}
@@ -534,13 +532,13 @@ const TenantSearch = () => {
       {loading && (
         <div className="tenant-loading">
           <div className="tenant-loading-spinner"></div>
-          <span>â³ Searching properties...</span>
+          <span>Searching properties...</span>
         </div>
       )}
 
       {!loading && hasSearched && properties.length === 0 && !errorMessage && (
         <div className="tenant-empty">
-          <span className="tenant-empty-icon">ðŸ˜•</span>
+          <span className="tenant-empty-icon"></span>
           <p>No properties found matching your filters.</p>
         </div>
       )}
@@ -558,8 +556,7 @@ const TenantSearch = () => {
           <div className="tenant-search-summary-row">
             <p className="tenant-results-count">Found {properties.length} propert{properties.length === 1 ? 'y' : 'ies'}</p>
             {selectedProperty && (
-              <div className="tenant-selected-property-banner">
-                Focused on: <strong>{selectedProperty.title}</strong> Â· {selectedProperty.location}
+              <div className="tenant-selected-property-banner">Focused on: <strong>{selectedProperty.title}</strong>  {selectedProperty.location}
               </div>
             )}
           </div>

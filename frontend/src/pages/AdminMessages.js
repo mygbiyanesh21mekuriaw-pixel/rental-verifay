@@ -25,7 +25,7 @@ const AdminMessages = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const records = Array.isArray(response.data) ? response.data : [];
-      const validRecords = records.filter(conv => conv && conv._id != null);
+      const validRecords = records.filter(conv =>conv && conv._id != null);
       const users = new Map();
       validRecords.forEach((conversation) => {
         [conversation.tenant, conversation.landlord].forEach((user) => {
@@ -69,7 +69,7 @@ const AdminMessages = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSelectedConversation(response.data);
-      setRecipients(current => current.map(target => (
+      setRecipients(current =>current.map(target => (
         target.conversation._id === response.data._id
           ? { ...target, conversation: response.data }
           : target
@@ -88,23 +88,22 @@ const AdminMessages = () => {
         <div className="admin-title-wrapper">
           <div>
             <h1 className="admin-title">
-              <span className="admin-title-gradient">ðŸ’¬ Messages</span>
+              <span className="admin-title-gradient">Messages</span>
             </h1>
             <p className="admin-subtitle">Admin communication with users</p>
           </div>
           <button
             type="button"
             className="admin-close-btn admin-back-dashboard"
-            onClick={() => navigate('/admin-dashboard')}
-          >
-            â† Back to Admin Dashboard
+            onClick={() =>navigate('/admin-dashboard')}
+          >Back to Admin Dashboard
           </button>
         </div>
       </div>
 
       <section className="admin-detail-section admin-dedicated-content">
         {loading ? (
-          <div className="admin-loading-small">â³ Loading conversations...</div>
+          <div className="admin-loading-small">Loading conversations...</div>
         ) : loadError ? (
           <div className="admin-empty-text">{loadError}</div>
         ) : recipients.length === 0 ? (
@@ -114,15 +113,14 @@ const AdminMessages = () => {
             {recipients.map(({ user, conversation }) => (
               <div key={user._id} className="admin-recipient-item">
                 <div>
-                  <h4 className="admin-conversation-title">ðŸ‘¤ {user.name || 'User'}</h4>
+                  <h4 className="admin-conversation-title"> {user.name || 'User'}</h4>
                   <p className="admin-recipient-email">{user.email || 'Email unavailable'}</p>
                 </div>
                 <button
                   type="button"
                   className="admin-message-reply-button"
-                  onClick={() => selectConversation(conversation, user)}
-                >
-                  ðŸ’¬ Reply Message
+                  onClick={() =>selectConversation(conversation, user)}
+                >Reply Message
                 </button>
               </div>
             ))}
@@ -132,8 +130,7 @@ const AdminMessages = () => {
         {selectedConversation && (
           <div className="admin-message-reply-panel">
             <div className="admin-conversation-header">
-              <h2 className="admin-conversation-title">
-                ðŸ’¬ Reply to {selectedRecipient?.name || 'selected user'}
+              <h2 className="admin-conversation-title">Reply to {selectedRecipient?.name || 'selected user'}
               </h2>
               <button
                 type="button"
@@ -142,8 +139,7 @@ const AdminMessages = () => {
                   setSelectedConversation(null);
                   setSelectedRecipient(null);
                 }}
-              >
-                Close
+              >Close
               </button>
             </div>
             <div className="admin-message-history">
@@ -179,7 +175,7 @@ const AdminMessages = () => {
             <form className="admin-message-form" onSubmit={sendReply}>
               <textarea
                 value={body}
-                onChange={(event) => setBody(event.target.value)}
+                onChange={(event) =>setBody(event.target.value)}
                 rows="3"
                 placeholder="Write a reply to this conversation"
                 disabled={sending}

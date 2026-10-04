@@ -3,10 +3,15 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('./models/User');
 
+const normalizeAdminEmail = (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  return normalizedEmail.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
+};
+
 async function createAdmin() {
   try {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/rental-db';
-    const adminEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const adminEmail = normalizeAdminEmail(process.env.ADMIN_EMAIL);
     const adminPassword = String(process.env.ADMIN_PASSWORD || '').trim();
     const adminName = String(process.env.ADMIN_NAME || '').trim();
 

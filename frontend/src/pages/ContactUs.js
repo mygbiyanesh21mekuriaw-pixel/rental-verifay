@@ -54,36 +54,34 @@ const Contact = () => {
       <div className="public-content">
         <div className="contact-container">
       <div className="contact-hero">
-        <h1 className="contact-title">ðŸ“ž Contact Us</h1>
-        <p className="contact-subtitle">
-          Contact us with any questions or feedback.
+        <h1 className="contact-title">Contact Us</h1>
+        <p className="contact-subtitle">Contact us with any questions or feedback.
         </p>
       </div>
 
       <div className="contact-content">
         <div className="contact-info">
           <div className="contact-info-card">
-            <span className="contact-info-icon">ðŸ“</span>
+            <span className="contact-info-icon"></span>
             <h3>Address</h3>
             <p>Addis Ababa, Ethiopia</p>
           </div>
           {adminEmail && <div className="contact-info-card">
-            <span className="contact-info-icon">ðŸ“§</span>
+            <span className="contact-info-icon"></span>
             <h3>Email</h3>
             <p><a href={`mailto:${adminEmail}`}>{adminEmail}</a></p>
           </div>}
           <div className="contact-info-card">
-            <span className="contact-info-icon">ðŸ•</span>
+            <span className="contact-info-icon"></span>
             <h3>Business hours</h3>
             <p>Monday - Saturday: 8:00 - 18:00</p>
           </div>
         </div>
 
         <div className="contact-form-container">
-          <h2>ðŸ“ Send us a message</h2>
+          <h2>Send us a message</h2>
           {submitted ? (
-            <div className="contact-success">
-              âœ… Your message was sent to the Platform Admin.
+            <div className="contact-success">Your message was sent to the Platform Admin.
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="contact-form">
@@ -136,7 +134,7 @@ const Contact = () => {
                 />
               </div>
               <button type="submit" className="contact-form-btn" disabled={sending}>
-                {sending ? 'Sending...' : 'ðŸ“¤ Send message'}
+                {sending ? 'Sending...' : 'Send message'}
               </button>
             </form>
           )}

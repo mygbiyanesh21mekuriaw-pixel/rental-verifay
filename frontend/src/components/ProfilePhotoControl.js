@@ -57,7 +57,7 @@ const ProfilePhotoControl = ({ user, className = '', showLabel = false }) => {
       >
         <ProfileAvatar user={user} className="profile-photo-control-avatar" />
         <span className="profile-photo-control-camera" aria-hidden="true">
-          {uploading ? '…' : <FaCamera />}
+          {uploading ? '' : <FaCamera />}
         </span>
         {showLabel && <span className="profile-photo-control-label">Change photo</span>}
         <input

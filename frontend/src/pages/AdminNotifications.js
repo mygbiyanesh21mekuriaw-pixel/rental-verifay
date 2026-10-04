@@ -22,7 +22,7 @@ const AdminNotifications = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const records = Array.isArray(response.data) ? response.data : response.data?.notifications;
-      setNotifications((Array.isArray(records) ? records : []).filter((notif) => notif && notif._id != null));
+      setNotifications((Array.isArray(records) ? records : []).filter((notif) =>notif && notif._id != null));
     } catch (error) {
       console.error('Error fetching notifications:', error);
       setLoadError('Unable to load notifications right now.');
@@ -39,7 +39,7 @@ const AdminNotifications = () => {
       await axios.put(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setNotifications((current) => current.map((notification) => (
+      setNotifications((current) =>current.map((notification) => (
         notification._id === notificationId ? { ...notification, read: true } : notification
       )));
     } catch (error) {
@@ -56,7 +56,7 @@ const AdminNotifications = () => {
       await axios.put(`${process.env.REACT_APP_API_URL}/api/notifications/read-all`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+      setNotifications((current) =>current.map((notification) => ({ ...notification, read: true })));
     } catch (error) {
       console.error('Unable to mark all admin notifications as read:', error);
       setActionError('Unable to mark all notifications as read. Please try again.');
@@ -81,7 +81,7 @@ const AdminNotifications = () => {
       });
       console.log('DELETE response status:', response.status);
       console.log('DELETE response:', response.data);
-      setNotifications((current) => current.filter((notification) => notification._id !== notificationId));
+      setNotifications((current) =>current.filter((notification) =>notification._id !== notificationId));
     } catch (error) {
       console.error('Unable to delete admin notification:', error);
       console.error('DELETE error status:', error.response?.status);
@@ -105,16 +105,16 @@ const AdminNotifications = () => {
       <BackToDashboard dashboardRoute="/admin-dashboard" />
 
       <div className="tenant-header">
-        <h1 className="tenant-title">ðŸ”” Notifications</h1>
+        <h1 className="tenant-title">Notifications</h1>
       </div>
 
       {loading ? (
-        <div className="tenant-loading">â³ Loading notifications...</div>
+        <div className="tenant-loading">Loading notifications...</div>
       ) : loadError ? (
         <div className="tenant-empty">{loadError}</div>
       ) : notifications.length === 0 ? (
         <div className="tenant-empty">
-          <span className="tenant-empty-icon">ðŸ””</span>
+          <span className="tenant-empty-icon"></span>
           <p>No notifications yet.</p>
         </div>
       ) : (
@@ -142,12 +142,11 @@ const AdminNotifications = () => {
                 </div>
                 <div className="tenant-notification-actions-row">
                   {!notification.read && (
-                    <button type="button" className="tenant-notification-read-btn" onClick={() => handleMarkRead(notification._id)}>
-                      Mark as read
+                    <button type="button" className="tenant-notification-read-btn" onClick={() =>handleMarkRead(notification._id)}>Mark as read
                     </button>
                   )}
-                  <button type="button" className="notification-delete-btn" onClick={() => handleDelete(notification._id)} disabled={deletingId === notification._id} aria-label="Delete notification" title="Delete notification">
-                    {deletingId === notification._id ? '...' : 'ðŸ—‘ï¸'}
+                  <button type="button" className="notification-delete-btn" onClick={() =>handleDelete(notification._id)} disabled={deletingId === notification._id} aria-label="Delete notification" title="Delete notification">
+                    {deletingId === notification._id ? '...' : ''}
                   </button>
                 </div>
               </div>

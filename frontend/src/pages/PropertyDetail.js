@@ -19,7 +19,7 @@ const PropertyDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // ===== á‹¨áŠªáˆ«á‹­ áŒ¥á‹«á‰„ áˆáŠ”á‰³á‹Žá‰½ =====
+  // =====    =====
   const [showRentModal, setShowRentModal] = useState(false);
   const [rentMessage, setRentMessage] = useState('');
   const [rentPhone, setRentPhone] = useState(user?.phone || '');
@@ -28,17 +28,17 @@ const PropertyDetail = () => {
   const [rentalMessage, setRentalMessage] = useState('');
   const [rentalRequest, setRentalRequest] = useState(null);
 
-  // ===== á‹¨á‰°á‹ˆá‹³áŒ… áˆáŠ”á‰³ =====
+  // =====   =====
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // ===== áŒáˆáŒˆáˆ›á‹Žá‰½ =====
+  // =====  =====
   const [reviews, setReviews] = useState([]);
 
-  // ===== á‹¨áˆ˜áŒˆáŠ“áŠ› áˆáŠ”á‰³ =====
+  // =====   =====
   const [showContact, setShowContact] = useState(false);
   const [adminActionLoading, setAdminActionLoading] = useState(false);
 
-  // fetchProperty áŠ• á‰  useCallback á‹­áŠ¨á‰°á‰±
+  // fetchProperty   useCallback 
   const fetchProperty = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -89,7 +89,7 @@ const PropertyDetail = () => {
     }
   }, [id, location.state, requestId, user?.id, user?.role]);
 
-  // ===== á‹¨á‰°á‹ˆá‹³áŒ… áˆáŠ”á‰³ áˆ›áˆ¨áŒ‹áŒˆáŒ¥ =====
+  // =====    =====
   const checkIfFavorite = useCallback(async () => {
     if (user?.role !== 'tenant' || !user?.id || !id) {
       setIsFavorite(false);
@@ -124,7 +124,7 @@ const PropertyDetail = () => {
     fetchReviews();
   }, [checkIfFavorite, fetchProperty, fetchReviews]);
 
-  // ===== á‹ˆá‹° á‰°á‹ˆá‹³áŒ… áˆ˜áŒ¨áˆ˜áˆ­/áˆ›áˆµá‹ˆáŒˆá‹µ =====
+  // =====   / =====
   const toggleFavorite = async () => {
     if (user?.role !== 'tenant' || !user.id) return;
 
@@ -138,11 +138,11 @@ const PropertyDetail = () => {
     }
   };
 
-  // ===== á‹¨áŠªáˆ«á‹­ áŒ¥á‹«á‰„ áˆ˜áˆ‹áŠ­ =====
+  // =====    =====
   const handleRentRequest = async (e) => {
     e.preventDefault();
     if (!rentMessage.trim() || !rentMoveInDate || !rentPhone.trim()) {
-      setRentalMessage('âŒ Please complete the entire form.');
+      setRentalMessage('Please complete the entire form.');
       return;
     }
     setSubmittingRent(true);
@@ -161,19 +161,19 @@ const PropertyDetail = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setRentalMessage('âœ… ' + response.data.message);
+      setRentalMessage(' ' + response.data.message);
       setShowRentModal(false);
       setRentMessage('');
       setRentPhone('');
       setRentMoveInDate('');
     } catch (error) {
-      setRentalMessage('âŒ ' + (error.response?.data?.message || 'An error occurred'));
+      setRentalMessage(' ' + (error.response?.data?.message || 'An error occurred'));
     } finally {
       setSubmittingRent(false);
     }
   };
 
-  // ===== áŠ¨á‰£áˆˆá‰¤á‰µ áŒ‹áˆ­ áˆ˜áŒˆáŠ“áŠ˜á‰µ =====
+  // =====    =====
   const contactLandlord = () => {
     setShowContact(!showContact);
   };
@@ -218,7 +218,7 @@ const PropertyDetail = () => {
     return (
       <div className="property-loading">
         <div className="property-loading-spinner"></div>
-        <span>â³ Loading...</span>
+        <span>Loading...</span>
       </div>
     );
   }
@@ -226,11 +226,10 @@ const PropertyDetail = () => {
   if (error) {
     return (
       <div className="property-error">
-        <div className="property-error-icon">ðŸ˜•</div>
+        <div className="property-error-icon"></div>
         <h2 className="property-error-title">{error}</h2>
         <p className="property-error-desc">Return to the search page</p>
-        <button onClick={() => navigate('/search')} className="property-back-btn">
-          ðŸ”™ Back to search
+        <button onClick={() =>navigate('/search')} className="property-back-btn">Back to search
         </button>
       </div>
     );
@@ -238,14 +237,13 @@ const PropertyDetail = () => {
 
   return (
     <div className="property-container">
-      {/* ===== á‹¨áˆ˜áˆ˜áˆˆáˆ» á‰áˆá ===== */}
-      <button onClick={() => navigate('/search')} className="property-back-btn">
-        â† Back to search
+      {/* =====   ===== */}
+      <button onClick={() =>navigate('/search')} className="property-back-btn">Back to search
       </button>
 
-      {/* ===== á‹‹áŠ“ áŠ«áˆ­á‹µ ===== */}
+      {/* =====   ===== */}
       <div className="property-card">
-        {/* á‹¨áˆáˆµáˆ áŠ­ááˆ */}
+        {/*   */}
         <div className="property-image-section">
           {getPropertyImages(property).length > 0 ? (
             <>
@@ -268,11 +266,11 @@ const PropertyDetail = () => {
               )}
             </>
           ) : (
-            <div className="property-no-image">ðŸ“¸ No image</div>
+            <div className="property-no-image">No image</div>
           )}
         </div>
 
-        {/* á‹¨áˆ˜áˆ¨áŒƒ áŠ­ááˆ */}
+        {/*   */}
         <div className="property-info">
           {user?.role !== 'tenant' && (
             <PropertyOwnershipProof
@@ -285,12 +283,12 @@ const PropertyDetail = () => {
             <h1 className="property-title">{property?.title}</h1>
             <div className="property-header-actions">
               {property?.isVerified && property?.verificationStatus === 'approved' ? (
-                <span className="property-badge property-badge-verified">âœ… Verified</span>
+                <span className="property-badge property-badge-verified">Verified</span>
               ) : (
-                <span className="property-badge property-badge-pending">â³ Not yet verified</span>
+                <span className="property-badge property-badge-pending">Not yet verified</span>
               )}
               
-              {/* á‹¨á‰°á‹ˆá‹³áŒ… á‰áˆá (Tenant á‰¥á‰») */}
+              {/*   (Tenant ) */}
               {user?.role === 'tenant' && (
                 <button 
                   onClick={(event) => {
@@ -300,36 +298,36 @@ const PropertyDetail = () => {
                   }}
                   className={`property-fav-btn ${isFavorite ? 'active' : ''}`}
                 >
-                  {isFavorite ? 'â¤ï¸' : 'ðŸ¤'}
+                  {isFavorite ? '' : ''}
                 </button>
               )}
             </div>
           </div>
 
-          <p className="property-location">ðŸ“ {property?.location}</p>
+          <p className="property-location"> {property?.location}</p>
           {property?.region && (
             <div className="property-address-details">
-              <p>ðŸ“ Region: {property.region}</p>
-              <p>ðŸ“ Zone: {property.zone}</p>
-              <p>ðŸ“ Wereda: {property.wereda}</p>
-              <p>ðŸ™ï¸ City: {property.city}</p>
-              <p>ðŸ™ï¸ Sub-city: {property.subCity}</p>
-              <p>ðŸ“ Kebele: {property.kebele}</p>
-              <p>ðŸ  House Number: {property.houseNumber}</p>
+              <p>Region: {property.region}</p>
+              <p>Zone: {property.zone}</p>
+              <p>Wereda: {property.wereda}</p>
+              <p>City: {property.city}</p>
+              <p>Sub-city: {property.subCity}</p>
+              <p>Kebele: {property.kebele}</p>
+              <p>House Number: {property.houseNumber}</p>
             </div>
           )}
-          <p className="property-price">ðŸ’° ETB {property?.price?.toLocaleString()}</p>
-          <p className="property-bedrooms">ðŸ›ï¸ {property?.bedrooms} bedrooms</p>
+          <p className="property-price">ETB {property?.price?.toLocaleString()}</p>
+          <p className="property-bedrooms"> {property?.bedrooms} bedrooms</p>
           
           <div className="property-divider"></div>
           
-          <h3 className="property-section-title">ðŸ“ Description</h3>
+          <h3 className="property-section-title">Description</h3>
           <p className="property-description">{property?.description}</p>
 
           <div className="property-divider"></div>
 
-          {/* ===== á‹¨á‰£áˆˆá‰¤á‰µ áˆ˜áˆ¨áŒƒ ===== */}
-          <h3 className="property-section-title">ðŸ‘¤ Landlord information</h3>
+          {/* =====   ===== */}
+          <h3 className="property-section-title">Landlord information</h3>
           <div className="property-landlord-profile">
             {property?.landlord?.profilePhoto ? (
               <img
@@ -338,7 +336,7 @@ const PropertyDetail = () => {
                 className="property-landlord-photo"
               />
             ) : (
-              <div className="property-landlord-photo-fallback">ðŸ‘¤</div>
+              <div className="property-landlord-photo-fallback"></div>
             )}
             <div>
               <p className="property-landlord">
@@ -359,65 +357,62 @@ const PropertyDetail = () => {
               <button
                 type="button"
                 className="property-rent-btn"
-                onClick={() => handleAdminPropertyAction('verify')}
+                onClick={() =>handleAdminPropertyAction('verify')}
                 disabled={adminActionLoading !== false}
               >
-                {adminActionLoading === 'verify' ? 'â³ Verifying...' : 'âœ… Verify / Approve'}
+                {adminActionLoading === 'verify' ? 'Verifying...' : 'Verify / Approve'}
               </button>
               <button
                 type="button"
                 className="property-modal-btn property-modal-btn-cancel"
-                onClick={() => handleAdminPropertyAction('reject')}
+                onClick={() =>handleAdminPropertyAction('reject')}
                 disabled={adminActionLoading !== false}
               >
-                {adminActionLoading === 'reject' ? 'â³ Rejecting...' : 'âŒ Reject'}
+                {adminActionLoading === 'reject' ? 'Rejecting...' : 'Reject'}
               </button>
             </div>
           )}
 
-          {/* ===== á‹¨áˆ˜áŒˆáŠ“áŠ› á‰áˆá (Tenant á‰¥á‰») ===== */}
+          {/* =====   (Tenant ) ===== */}
           {user?.role === 'tenant' && (
             <div className="property-contact-section">
               <button 
                 onClick={contactLandlord}
                 className="property-contact-btn"
-              >
-                ðŸ“ž Contact now
+              >Contact now
               </button>
               {showContact && (
                 <div className="property-contact-info">
-                  <p><strong>ðŸ“± Phone:</strong> {property?.landlord?.phone || 'Not available'}</p>
-                  <p><strong>âœ‰ï¸ Email:</strong> {property?.landlord?.email || 'Not available'}</p>
+                  <p><strong>Phone:</strong> {property?.landlord?.phone || 'Not available'}</p>
+                  <p><strong>Email:</strong> {property?.landlord?.email || 'Not available'}</p>
                   <p><small>Contact the landlord directly for more information.</small></p>
                 </div>
               )}
             </div>
           )}
 
-          {/* ===== "á‰°áŠ¨áˆ«á‹­á‰»áˆˆáˆ" á‰áˆá (Tenant á‰¥á‰») ===== */}
+          {/* ===== ""  (Tenant ) ===== */}
           {user?.role === 'tenant' && (
             (property?.isVerified && property?.verificationStatus === 'approved' && property?.availabilityStatus === 'available') ||
             (location.state?.fromRejectedRequest && location.state.property?._id === id)
           ) && (
             <div className="property-rent-section">
               <button 
-                onClick={() => setShowRentModal(true)}
+                onClick={() =>setShowRentModal(true)}
                 className="property-rent-btn"
-              >
-                ðŸ  Request to Rent
+              >Request to Rent
               </button>
-              <p className="property-rent-info">
-                Click the button to request this property. An admin will review your request.
+              <p className="property-rent-info">Click the button to request this property. An admin will review your request.
               </p>
               {rentalMessage && (
-                <p className={`property-rental-message ${rentalMessage.includes('âœ…') ? 'success' : 'error'}`}>
+                <p className={`property-rental-message ${rentalMessage.includes('') ? 'success' : 'error'}`}>
                   {rentalMessage}
                 </p>
               )}
             </div>
           )}
           {user?.role === 'tenant' && property?.isVerified && property?.availabilityStatus === 'rented' && (
-            <p className="property-rental-message error">âŒ This property has been rented.</p>
+            <p className="property-rental-message error">This property has been rented.</p>
           )}
 
           {user?.role === 'tenant' && rentalRequest &&
@@ -425,51 +420,49 @@ const PropertyDetail = () => {
             property?.availabilityStatus === 'rented' &&
             String(property?.rentedBy) === String(user.id) && (
               <div className="property-rent-section">
-                <button type="button" onClick={() => navigate(`/tenant/rented-property?propertyId=${property._id}`)} className="property-rent-btn">
-                  ðŸ  Rented Property
+                <button type="button" onClick={() =>navigate(`/tenant/rented-property?propertyId=${property._id}`)} className="property-rent-btn">Rented Property
                 </button>
               </div>
             )}
 
-          {/* ===== á‹¨áŠªáˆ«á‹­ áŒ¥á‹«á‰„ áˆžá‹³áˆ ===== */}
+          {/* =====    ===== */}
           {showRentModal && (
-            <div className="property-modal-overlay" onClick={() => setShowRentModal(false)}>
-              <div className="property-modal" onClick={(e) => e.stopPropagation()}>
-                <h3 className="property-modal-title">ðŸ  Submit a rental request</h3>
-                <p className="property-modal-subtitle">
-                  You are requesting <strong>{property?.title}</strong>
+            <div className="property-modal-overlay" onClick={() =>setShowRentModal(false)}>
+              <div className="property-modal" onClick={(e) =>e.stopPropagation()}>
+                <h3 className="property-modal-title">Submit a rental request</h3>
+                <p className="property-modal-subtitle">You are requesting <strong>{property?.title}</strong>
                 </p>
                 
                 <form onSubmit={handleRentRequest} className="property-modal-form">
                   <div className="property-modal-field">
-                    <label className="property-modal-label">ðŸ“ž Phone *</label>
+                    <label className="property-modal-label">Phone *</label>
                     <input
                       type="tel"
                       className="property-modal-input"
                       value={rentPhone}
                       required
-                      onChange={(e) => setRentPhone(e.target.value)}
+                      onChange={(e) =>setRentPhone(e.target.value)}
                     />
                   </div>
                   <div className="property-modal-field">
-                    <label className="property-modal-label">ðŸ“ Message *</label>
+                    <label className="property-modal-label">Message *</label>
                     <textarea
                       className="property-modal-input property-modal-textarea"
                       placeholder="What would you like to tell the landlord?"
                       value={rentMessage}
                       required
-                      onChange={(e) => setRentMessage(e.target.value)}
+                      onChange={(e) =>setRentMessage(e.target.value)}
                     />
                   </div>
                   
                   <div className="property-modal-field">
-                    <label className="property-modal-label">ðŸ“… Move-in date *</label>
+                    <label className="property-modal-label">Move-in date *</label>
                     <input
                       type="date"
                       className="property-modal-input"
                       value={rentMoveInDate}
                       required
-                      onChange={(e) => setRentMoveInDate(e.target.value)}
+                      onChange={(e) =>setRentMoveInDate(e.target.value)}
                     />
                   </div>
 
@@ -477,16 +470,15 @@ const PropertyDetail = () => {
                     <button
                       type="button"
                       className="property-modal-btn property-modal-btn-cancel"
-                      onClick={() => setShowRentModal(false)}
-                    >
-                      âœ– Cancel
+                      onClick={() =>setShowRentModal(false)}
+                    >Cancel
                     </button>
                     <button
                       type="submit"
                       className="property-modal-btn property-modal-btn-submit"
                       disabled={submittingRent}
                     >
-                      {submittingRent ? 'â³ Sending...' : 'ðŸ“¤ Submit request'}
+                      {submittingRent ? 'Sending...' : 'Submit request'}
                     </button>
                   </div>
                 </form>
@@ -499,7 +491,7 @@ const PropertyDetail = () => {
               <div className="property-divider"></div>
               <div className="property-reviews-section">
                 <div className="property-reviews-header">
-                  <h3 className="property-section-title">â­ Reviews</h3>
+                  <h3 className="property-section-title">Reviews</h3>
                 </div>
                 <div className="property-reviews-list">
                   {reviews.map((review) => (
@@ -507,7 +499,7 @@ const PropertyDetail = () => {
                       <div className="property-review-header">
                         <strong>{review.tenant?.name || 'Tenant'}</strong>
                         <span className="property-review-rating">
-                          {'â­'.repeat(review.rating)}
+                          {''.repeat(review.rating)}
                         </span>
                         <small className="property-review-date">{new Date(review.createdAt).toLocaleDateString()}</small>
                       </div>

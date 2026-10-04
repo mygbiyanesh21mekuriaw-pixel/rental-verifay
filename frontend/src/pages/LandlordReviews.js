@@ -48,7 +48,7 @@ const LandlordReviews = () => {
                 </div>
                 <div className="landlord-review-meta">
                   <span className="landlord-review-stars" aria-label={`${review.rating} out of 5 stars`}>
-                    {'â­'.repeat(review.rating)}
+                    {''.repeat(review.rating)}
                   </span>
                   <time dateTime={review.createdAt}>
                     {new Date(review.createdAt).toLocaleDateString(undefined, {
@@ -57,7 +57,7 @@ const LandlordReviews = () => {
                   </time>
                 </div>
               </div>
-              <p className="landlord-review-comment">â€œ{review.comment}â€</p>
+              <p className="landlord-review-comment">{review.comment}</p>
             </article>
           ))}
         </div>

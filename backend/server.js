@@ -8,6 +8,7 @@ const morgan = require('morgan');
 const multer = require('multer');
 const connectDB = require('./config/db');
 const createAdmin = require('./create-admin');
+const { migrateLegacyBankAccountNumbers } = require('./utils/bankAccountCrypto');
 
 // የአካባቢ ተለዋዋጮችን ጫን
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -50,6 +51,10 @@ if (!process.env.JWT_SECRET?.trim()) {
 }
 
 const app = express();
+console.log('==============================');
+console.log('RUNNING SERVER FILE:', __filename);
+console.log('RUNNING PORT:', process.env.PORT || 5000);
+console.log('==============================');
 
 app.set('trust proxy', 1);
 app.use(cors());
@@ -60,6 +65,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/contact', require('./routes/contactRoutes'));
 app.use('/api/properties', require('./routes/propertyRoutes'));
+app.use('/api/chapa', require('./routes/chapaRoutes'));
 app.use('/api/rent-requests', require('./routes/rentRequestRoutes'));
 app.use('/api/rental-requests', require('./routes/rentRequestRoutes'));
 app.use('/api/view-history', require('./routes/viewHistoryRoutes'));
@@ -73,6 +79,12 @@ app.use('/api/admin', require('./routes/systemLogRoutes'));
 
 app.get('/', (req, res) => {
   res.json({ message: 'Rental Property Verification API is running' });
+});
+app.get('/api/chapa/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Chapa route is connected'
+  });
 });
 
 app.use(morgan('dev'));
@@ -108,6 +120,7 @@ app.use((err, req, res, next) => {
 
 const startServer = async () => {
   await connectDB();
+  await migrateLegacyBankAccountNumbers();
   await createAdmin();
 
   const PORT = process.env.PORT || 5000;

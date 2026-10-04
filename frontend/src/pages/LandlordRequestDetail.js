@@ -36,7 +36,7 @@ const LandlordRequestDetail = () => {
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
         <h1 className="tenant-title">Rental Request Details</h1>
-        <Link to="/landlord/rental-requests" className="tenant-back-btn">â† Back to Requests</Link>
+        <Link to="/landlord/rental-requests" className="tenant-back-btn">Back to Requests</Link>
       </div>
 
       {loading ? (

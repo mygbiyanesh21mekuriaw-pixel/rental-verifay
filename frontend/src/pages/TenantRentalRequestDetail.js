@@ -85,7 +85,7 @@ const TenantRentalRequestDetail = () => {
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
         <h1 className="tenant-title">Rental Request Details</h1>
-        <Link to="/tenant/rental-requests" className="tenant-back-btn">â† Back to Rental Requests</Link>
+        <Link to="/tenant/rental-requests" className="tenant-back-btn">Back to Rental Requests</Link>
       </div>
 
       <div className="tenant-request-detail-card">

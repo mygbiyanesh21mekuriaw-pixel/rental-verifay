@@ -56,7 +56,7 @@ const TenantMessages = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setConversation(response.data);
-      setConversations((current) => current.map((item) => (
+      setConversations((current) =>current.map((item) => (
         item._id === response.data._id ? response.data : item
       )));
       setBody('');
@@ -67,14 +67,14 @@ const TenantMessages = () => {
     }
   };
 
-  if (loading) return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>â³ Loading...</span></div>;
+  if (loading) return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>Loading...</span></div>;
   if (error) return (
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
-        <h1 className="tenant-title">âœ‰ï¸ Messages</h1>
+        <h1 className="tenant-title">Messages</h1>
         <BackToDashboard
           dashboardRoute={location.state?.from || '/tenant-dashboard'}
-          label="â† Back to Previous Page"
+          label=" Back to Previous Page"
         />
       </div>
       <div className="tenant-empty"><p>{error}</p></div>
@@ -84,21 +84,21 @@ const TenantMessages = () => {
   return (
     <div className="tenant-container tenant-section-page">
       <div className="tenant-header">
-        <h1 className="tenant-title">âœ‰ï¸ Messages</h1>
+        <h1 className="tenant-title">Messages</h1>
         {conversation && <>
-          <p className="tenant-subtitle">{conversation.property?.title} Â· {conversation.property?.location}</p>
+          <p className="tenant-subtitle">{conversation.property?.title}  {conversation.property?.location}</p>
           <p className="tenant-subtitle">Landlord: {conversation.landlord?.name}</p>
         </>}
         <BackToDashboard
           dashboardRoute={location.state?.from || '/tenant-dashboard'}
-          label="â† Back to Previous Page"
+          label=" Back to Previous Page"
         />
       </div>
       <section className="tenant-section tenant-message-panel">
         {!conversationId && !conversation && conversations.length === 0 && <p className="tenant-empty">No conversations yet.</p>}
         {!conversationId && !conversation && conversations.map(item => (
-          <button type="button" className="tenant-message-conversation" key={item._id} onClick={() => navigate(`/tenant/messages?conversationId=${item._id}`)}>
-            {item.property?.title || 'Property'} Â· Landlord: {item.landlord?.name || 'Landlord'}
+          <button type="button" className="tenant-message-conversation" key={item._id} onClick={() =>navigate(`/tenant/messages?conversationId=${item._id}`)}>
+            {item.property?.title || 'Property'}  Landlord: {item.landlord?.name || 'Landlord'}
           </button>
         ))}
         {conversation && <>
@@ -114,7 +114,7 @@ const TenantMessages = () => {
             ))}
           </div>
           <form className="tenant-message-form" onSubmit={sendMessage}>
-            <textarea value={body} onChange={event => setBody(event.target.value)} placeholder="Write a message to your landlord" rows="3" />
+            <textarea value={body} onChange={event =>setBody(event.target.value)} placeholder="Write a message to your landlord" rows="3" />
             <button type="submit" className="tenant-request-message-btn" disabled={sending || !body.trim()}>{sending ? 'Sending...' : 'Send message'}</button>
           </form>
         </>}

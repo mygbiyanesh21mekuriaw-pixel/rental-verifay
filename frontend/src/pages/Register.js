@@ -186,7 +186,7 @@ const Register = () => {
 
           {formData.role === 'landlord' && (
             <div className="auth-field">
-              <label>📷 Landlord photo URL (optional)</label>
+              <label>Landlord photo URL (optional)</label>
               <input
                 type="url"
                 name="profilePhoto"
@@ -209,12 +209,12 @@ const Register = () => {
                 minLength={8}
                 aria-invalid={Boolean(fieldErrors.password)}
                 className={`auth-password-input pr-11 ${fieldErrors.password ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}`}
-                placeholder="••••••••"
+                placeholder=""
               />
               <button
                 type="button"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                onClick={() => setShowPassword((current) => !current)}
+                onClick={() =>setShowPassword((current) => !current)}
                 className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-500 transition hover:text-slate-700"
               >
                 {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -235,12 +235,12 @@ const Register = () => {
                 minLength={8}
                 aria-invalid={Boolean(fieldErrors.confirmPassword)}
                 className={`auth-password-input pr-11 ${fieldErrors.confirmPassword ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}`}
-                placeholder="••••••••"
+                placeholder=""
               />
               <button
                 type="button"
                 aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                onClick={() => setShowConfirmPassword((current) => !current)}
+                onClick={() =>setShowConfirmPassword((current) => !current)}
                 className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-500 transition hover:text-slate-700"
               >
                 {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -275,8 +275,7 @@ const Register = () => {
           </button>
         </form>
         
-        <p className="auth-footer">
-          Already have an account? <Link to="/login">Login</Link>
+        <p className="auth-footer">Already have an account? <Link to="/login">Login</Link>
         </p>
       </div>
     </div>

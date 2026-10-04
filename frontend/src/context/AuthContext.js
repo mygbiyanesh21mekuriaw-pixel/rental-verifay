@@ -5,9 +5,14 @@ const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
+const normalizeLoginEmail = (email) => {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  return normalizedEmail.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
+};
+
 const setAuthHeader = (jwtToken) => {
   if (jwtToken) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${jwtToken}`;
+    axios.defaults.headers.common['Authorization'] = 'Bearer ' + jwtToken;
   } else {
     delete axios.defaults.headers.common['Authorization'];
   }
@@ -47,7 +52,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/auth/me`);
+      const res = await axios.get(process.env.REACT_APP_API_URL + '/api/auth/me');
       const authUser = res.data.user || res.data;
       setUser(authUser);
       persistUser(authUser);
@@ -74,8 +79,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const res = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
-        email,
+      const normalizedEmail = normalizeLoginEmail(email);
+      const res = await axios.post(process.env.REACT_APP_API_URL + '/api/auth/login', {
+        email: normalizedEmail,
         password,
       });
 
@@ -95,15 +101,15 @@ export const AuthProvider = ({ children }) => {
       return {
         success: false,
         error: process.env.NODE_ENV === 'development' && developmentDetail
-          ? `${responseMessage || 'Login failed'}: ${developmentDetail}`
-          : responseMessage || 'Login failed',
+          ? (responseMessage || 'Login failed') + ': ' + developmentDetail
+          : (responseMessage || 'Login failed'),
       };
     }
   };
 
   const register = async (userData) => {
     try {
-      const res = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/register`, userData);
+      const res = await axios.post(process.env.REACT_APP_API_URL + '/api/auth/register', userData);
       const jwtToken = res.data.token;
       const authUser = res.data.user;
 

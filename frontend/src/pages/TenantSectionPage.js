@@ -31,13 +31,13 @@ const uniqueProperties = (propertyList) => {
   });
 };
 
-const isApprovedRequest = (request) => request.status === 'approved' || request.status === 'confirmed';
+const isApprovedRequest = (request) =>request.status === 'approved' || request.status === 'confirmed';
 
 const isConfirmedRental = (request, userId) => ['approved', 'confirmed'].includes(request.status)
   && request.property?.availabilityStatus === 'rented'
   && String(request.property?.rentedBy) === String(userId);
 
-const isActiveRental = (request, userId) => isConfirmedRental(request, userId);
+const isActiveRental = (request, userId) =>isConfirmedRental(request, userId);
 
 const displayRequestStatus = (status, isRented = false) => {
   const normalizedStatus = typeof status === 'string' && status.trim()
@@ -104,7 +104,7 @@ const RentalReview = ({ propertyId }) => {
     return (
       <div className="tenant-review-saved">
         <strong>Your review</strong>
-        <span className="tenant-review-stars">{'â­'.repeat(review.rating)}</span>
+        <span className="tenant-review-stars">{''.repeat(review.rating)}</span>
         <p>{review.comment}</p>
       </div>
     );
@@ -113,8 +113,7 @@ const RentalReview = ({ propertyId }) => {
   return (
     <div className="tenant-rental-review">
       {!isOpen && (
-        <button type="button" className="tenant-review-open-btn" onClick={() => setIsOpen(true)}>
-          â­ Write a review
+        <button type="button" className="tenant-review-open-btn" onClick={() =>setIsOpen(true)}>Write a review
         </button>
       )}
       {isOpen && (
@@ -126,11 +125,11 @@ const RentalReview = ({ propertyId }) => {
                 key={star}
                 type="button"
                 className={`tenant-review-star-btn ${rating >= star ? 'selected' : ''}`}
-                onClick={() => setRating(star)}
+                onClick={() =>setRating(star)}
                 aria-label={`${star} star${star === 1 ? '' : 's'}`}
                 aria-pressed={rating === star}
               >
-                {rating >= star ? 'â˜…' : 'â˜†'}
+                {rating >= star ? '' : ''}
               </button>
             ))}
           </div>
@@ -138,7 +137,7 @@ const RentalReview = ({ propertyId }) => {
           <textarea
             id={`review-${propertyId}`}
             value={comment}
-            onChange={(event) => setComment(event.target.value)}
+            onChange={(event) =>setComment(event.target.value)}
             maxLength={2000}
             rows={3}
             required
@@ -146,7 +145,7 @@ const RentalReview = ({ propertyId }) => {
           />
           {error && <p className="tenant-review-error" role="alert">{error}</p>}
           <div className="tenant-review-form-actions">
-            <button type="button" className="tenant-review-cancel-btn" onClick={() => setIsOpen(false)}>Cancel</button>
+            <button type="button" className="tenant-review-cancel-btn" onClick={() =>setIsOpen(false)}>Cancel</button>
             <button type="submit" className="tenant-review-submit-btn" disabled={submitting || !comment.trim()}>
               {submitting ? 'Submitting...' : 'Submit Review'}
             </button>
@@ -159,15 +158,15 @@ const RentalReview = ({ propertyId }) => {
 };
 
 const sectionConfig = {
-  verified: { title: 'âœ… Verified properties', empty: 'No verified properties are available yet.' },
-  favorites: { title: 'â¤ï¸ Favorite properties', empty: 'You have no favorite properties yet' },
-  recentlyViewed: { title: 'ðŸ‘ï¸ Recently viewed', empty: 'You have not viewed any properties yet' },
-  rentalRequests: { title: 'ðŸ“ Rental Requests', empty: 'You have not submitted any rental requests yet.' },
-  rented: { title: 'ðŸ  Rented Property', empty: 'You do not have an approved rented property yet.' },
+  verified: { title: 'Verified properties', empty: 'No verified properties are available yet.' },
+  favorites: { title: 'Favorite properties', empty: 'You have no favorite properties yet' },
+  recentlyViewed: { title: 'Recently viewed', empty: 'You have not viewed any properties yet' },
+  rentalRequests: { title: 'Rental Requests', empty: 'You have not submitted any rental requests yet.' },
+  rented: { title: 'Rented Property', empty: 'You do not have an approved rented property yet.' },
 };
 
 const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
-  const [isFavorite, setIsFavorite] = useState(() => getFavoriteIds(userId).has(String(property._id)));
+  const [isFavorite, setIsFavorite] = useState(() =>getFavoriteIds(userId).has(String(property._id)));
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleFavorite = async (event) => {
@@ -195,25 +194,25 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
       fallbackClassName="tenant-card-no-image"
       fallbackText="No photo"
     />
-    <span className="tenant-card-badge">âœ… Verified</span>
+    <span className="tenant-card-badge">Verified</span>
     </div>
     <div className="tenant-card-content">
       <h3 className="tenant-card-title">{property.title}</h3>
-      <p className="tenant-card-location">ðŸ“ {property.location}</p>
-      <p className="tenant-card-price">ðŸ’° ETB {property.price?.toLocaleString()}</p>
-      <p className="tenant-card-detail">ðŸ›ï¸ {property.bedrooms} rooms</p>
-      <p className="tenant-card-detail">ðŸ‘¤ Landlord: {property.landlord?.name || 'Not available'}</p>
+      <p className="tenant-card-location"> {property.location}</p>
+      <p className="tenant-card-price">ETB {property.price?.toLocaleString()}</p>
+      <p className="tenant-card-detail"> {property.bedrooms} rooms</p>
+      <p className="tenant-card-detail">Landlord: {property.landlord?.name || 'Not available'}</p>
       <p className="tenant-card-description">{property.description}</p>
-      <p className="tenant-card-detail">âœ… Verification status: Approved</p>
+      <p className="tenant-card-detail">Verification status: Approved</p>
       <button 
         type="button" 
         className={`tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`} 
         onClick={handleFavorite}
         disabled={isUpdating}
       >
-        {isUpdating ? 'â³' : isFavorite ? 'â¤ï¸ Favorited' : 'â¤ï¸ Favorite'}
+        {isUpdating ? '' : isFavorite ? 'Favorited' : 'Favorite'}
       </button>
-      <Link to={`/property/${property._id}`} className="tenant-card-btn">ðŸ  Request to Rent</Link>
+      <Link to={`/property/${property._id}`} className="tenant-card-btn">Request to Rent</Link>
     </div>
   </div>
   );
@@ -253,19 +252,19 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
               fallbackText="No property photo"
             />
           )}
-          <h3 className="tenant-request-title">ðŸ  {request.property?.title}</h3>
-          <p className="tenant-request-detail">ðŸ“ {request.property?.location}</p>
-          <p className="tenant-request-detail">ðŸ’° Rent: ETB {Number(request.property?.price || 0).toLocaleString()}</p>
-          <p className="tenant-request-detail">ðŸ‘¤ Landlord: {request.landlord?.name || 'Not available'}</p>
-          <p className="tenant-request-detail">ðŸ“… Move-in date: {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString() : 'Not provided'}</p>
-          {showActiveRentalActions && request.property?.rentedAt && <p className="tenant-request-detail">ðŸ“… Rental started: {new Date(request.property.rentedAt).toLocaleDateString()}</p>}
-          {isActiveRental(request, userId) && <div className="tenant-rented-notice">ðŸ  This property has been rented in your name.</div>}
+          <h3 className="tenant-request-title"> {request.property?.title}</h3>
+          <p className="tenant-request-detail"> {request.property?.location}</p>
+          <p className="tenant-request-detail">Rent: ETB {Number(request.property?.price || 0).toLocaleString()}</p>
+          <p className="tenant-request-detail">Landlord: {request.landlord?.name || 'Not available'}</p>
+          <p className="tenant-request-detail">Move-in date: {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString() : 'Not provided'}</p>
+          {showActiveRentalActions && request.property?.rentedAt && <p className="tenant-request-detail">Rental started: {new Date(request.property.rentedAt).toLocaleDateString()}</p>}
+          {isActiveRental(request, userId) && <div className="tenant-rented-notice">This property has been rented in your name.</div>}
           {showActiveRentalActions && isConfirmedRental(request, userId) && (
             <RentalReview propertyId={request.property?._id} />
           )}
-          {!showActiveRentalActions && notifications.find(notification => String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id))?.message && (
+          {!showActiveRentalActions && notifications.find(notification =>String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id))?.message && (
             <div className={`tenant-rental-notification tenant-rental-notification-${request.status}`}>
-              {notifications.find(notification => String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id)).message}
+              {notifications.find(notification =>String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id)).message}
             </div>
           )}
         </div>
@@ -275,7 +274,7 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
               role="status"
               className={`tenant-request-status tenant-request-status-${isApprovedRequest(request) ? 'approved' : request.status}`}
             >
-              {isApprovedRequest(request) ? 'âœ… Approved' : request.status === 'rejected' ? 'âŒ Rejected' : `â³ ${displayRequestStatus(request.status)}`}
+              {isApprovedRequest(request) ? 'Approved' : request.status === 'rejected' ? 'Rejected' : ` ${displayRequestStatus(request.status)}`}
             </span>
           )}
           {!showActiveRentalActions && request._id && (() => {
@@ -286,24 +285,22 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
                 to={`/property/${propertyId}`}
                 state={request.status === 'rejected' ? { fromRejectedRequest: true, property: request.property } : undefined}
                 className="tenant-request-details-btn"
-              >
-                ðŸ‘ï¸ View Details
+              >View Details
               </Link>
             );
           })()}
           {showActiveRentalActions && isConfirmedRental(request, userId) && (
             <>
-              <button type="button" className="tenant-request-message-btn" onClick={() => openMessage(request)} disabled={openingRequestId === request._id}>
-                {openingRequestId === request._id ? 'Opening...' : 'âœ‰ï¸ Message Landlord'}
+              <button type="button" className="tenant-request-message-btn" onClick={() =>openMessage(request)} disabled={openingRequestId === request._id}>
+                {openingRequestId === request._id ? 'Opening...' : 'Message Landlord'}
               </button>
               <button
                 type="button"
                 className="tenant-request-pay-btn"
-                onClick={() => navigate(`/tenant/rent-payment/${request.property?._id}`, {
+                onClick={() =>navigate(`/tenant/rent-payment/${request.property?._id}`, {
                   state: { from: '/tenant/rented-property' },
                 })}
-              >
-                ðŸ’³ Pay Rent
+              >Pay Rent
               </button>
             </>
           )}
@@ -339,13 +336,13 @@ const TenantSectionPage = ({ type }) => {
           : notificationResponse.data?.notifications;
         setNotifications(Array.isArray(notificationRecords) ? notificationRecords : []);
         setItems(type === 'rented'
-          ? response.data.filter(request => isActiveRental(request, user.id)
+          ? response.data.filter(request =>isActiveRental(request, user.id)
             && (!rentedPropertyId || String(request.property?._id) === rentedPropertyId))
           : response.data);
       } else if (type === 'recentlyViewed') {
         const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/view-history/my-history`, { headers });
         const seenIds = new Set();
-        setItems(response.data.map(entry => entry.property).filter(property => {
+        setItems(response.data.map(entry =>entry.property).filter(property => {
           const propertyId = property?._id?.toString();
           if (!isValidProperty(property) || seenIds.has(propertyId)) return false;
           seenIds.add(propertyId);
@@ -372,7 +369,7 @@ const TenantSectionPage = ({ type }) => {
 
   const handleFavoriteChange = (propertyId, isFavorite) => {
     if (type === 'favorites' && !isFavorite) {
-      setItems(currentItems => currentItems.filter(property => property._id !== propertyId));
+      setItems(currentItems =>currentItems.filter(property =>property._id !== propertyId));
     }
   };
 
@@ -382,7 +379,7 @@ const TenantSectionPage = ({ type }) => {
   }, [fetchSection]);
 
   if (loading) {
-    return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>â³ Loading...</span></div>;
+    return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>Loading...</span></div>;
   }
 
   return (
@@ -394,7 +391,7 @@ const TenantSectionPage = ({ type }) => {
       </div>
       <section className="tenant-section">
         {items.length === 0 ? (
-          <div className="tenant-empty"><span className="tenant-empty-icon">ðŸ˜•</span><p>{config.empty}</p></div>
+          <div className="tenant-empty"><span className="tenant-empty-icon"></span><p>{config.empty}</p></div>
         ) : type === 'rentalRequests' || type === 'rented' ? (
           <RequestList
             requests={items}

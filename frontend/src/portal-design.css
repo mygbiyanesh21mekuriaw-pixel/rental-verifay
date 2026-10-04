@@ -124,7 +124,7 @@ main {
 }
 
 .navbar-authenticated .navbar-link {
-  color: var(--rv-muted);
+  color: #ffffff;
   padding: 9px 12px;
   border-radius: 8px;
   font-size: 14px;
@@ -132,9 +132,13 @@ main {
 
 .navbar-authenticated .navbar-link:hover,
 .navbar-authenticated .navbar-link.active {
-  color: var(--rv-brand);
-  background: var(--rv-brand-soft);
+  color: #ffffff;
+  background: #6675e8;
   transform: none;
+}
+
+.navbar-authenticated .navbar-link.active {
+  background: #493ed6;
 }
 
 .navbar-authenticated .navbar-notification-link {
@@ -145,13 +149,17 @@ main {
   padding: 11px 14px;
   border-radius: 8px;
   background: transparent;
-  color: var(--rv-muted);
+  color: #ffffff;
 }
 
 .navbar-authenticated .navbar-notification-link:hover,
 .navbar-authenticated .navbar-notification-link.active {
-  color: var(--rv-brand);
-  background: var(--rv-brand-soft);
+  color: #ffffff;
+  background: #6675e8;
+}
+
+.navbar-authenticated .navbar-notification-link.active {
+  background: #493ed6;
 }
 
 .navbar-authenticated .navbar-user-info {
@@ -532,7 +540,39 @@ body,
 /* Remove browser page vertical overflow */
 body {
   overflow-x: clip !important;
-}/* =========================================
+}
+
+/* Keep dashboard content flush against the sidebar on desktop. */
+@media (min-width: 1024px) {
+  .app:has(.navbar-authenticated) .app-main {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .app:has(.navbar-authenticated) .app-main > .tenant-container,
+  .app:has(.navbar-authenticated) .app-main > .admin-container,
+  .app:has(.navbar-authenticated) .app-main > .max-w-7xl {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .landlord-layout-main {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .landlord-layout-main > div,
+  .landlord-layout-main > div > * {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* =========================================
    SIDEBAR EMPTY SPACE FIX
 ========================================= */
 
@@ -1706,4 +1746,78 @@ body {
     min-height: calc(100vh - 74px);
     padding: 28px 16px;
   }
+}
+
+@media (min-width: 1024px) {
+  .app:has(.navbar-authenticated) .app-main {
+    flex: 1 1 auto;
+    width: auto !important;
+    margin-left: var(--rv-sidebar-width) !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .app:has(.navbar-authenticated) .app-main > * {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .app:has(.navbar-authenticated) .app-main > .tenant-container,
+  .app:has(.navbar-authenticated) .app-main > .admin-container,
+  .app:has(.navbar-authenticated) .app-main > .max-w-7xl {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .app:has(.navbar-authenticated) .landlord-layout,
+  .app:has(.navbar-authenticated) .landlord-layout-main,
+  .app:has(.navbar-authenticated) .landlord-layout-main > div,
+  .app:has(.navbar-authenticated) .landlord-layout-main > div > * {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .app:has(.navbar-authenticated) .landlord-layout-main,
+  .app:has(.navbar-authenticated) .landlord-layout-main > div > * {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* Keep tenant and admin workspaces white. */
+.app:has(.navbar-authenticated) .app-main {
+  background: #fff !important;
+}
+
+.app:has(.navbar-authenticated) .tenant-container,
+.app:has(.navbar-authenticated) .admin-container,
+.app:has(.navbar-authenticated) .landlord-layout {
+  background: transparent !important;
+}
+
+.app:has(.navbar-authenticated) .admin-container::before,
+.app:has(.navbar-authenticated) .admin-container::after {
+  display: none !important;
+}
+
+/* Keep the tenant/admin workspace white, without changing the sidebar or public header. */
+.app:has(.navbar-authenticated) > .app-main {
+  background-color: #fff !important;
+  min-height: 100vh;
+}
+
+.app:has(.navbar-authenticated) .tenant-container,
+.app:has(.navbar-authenticated) .admin-container,
+.app:has(.navbar-authenticated) .landlord-layout {
+  background-color: transparent !important;
+}
+
+/* Landlord page content only: keep tenant/admin pages and the sidebar unchanged. */
+.app:has(.navbar-landlord) .landlord-layout-main {
+  background: #fff !important;
+  min-height: calc(100vh - 64px);
 }

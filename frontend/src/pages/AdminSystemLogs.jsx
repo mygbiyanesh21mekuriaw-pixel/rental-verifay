@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import './AdminSystemLogs.css';
 
 const ACTION_OPTIONS = [
   'USER_REGISTERED',
@@ -27,9 +28,9 @@ const ROLE_OPTIONS = ['All', 'admin', 'landlord', 'tenant'];
 const STATUS_OPTIONS = ['All', 'success', 'failed', 'pending'];
 
 const formatDateTime = (value) => {
-  if (!value) return 'â€”';
+  if (!value) return '';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'â€”';
+  if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('en-GB', {
     year: 'numeric',
     month: '2-digit',
@@ -105,7 +106,7 @@ const AdminSystemLogs = () => {
         navigate('/login', { replace: true });
         return;
       }
-      setError('âŒ Failed to load system logs.');
+      setError('Failed to load system logs.');
       setLogs([]);
     } finally {
       setLoading(false);
@@ -132,22 +133,20 @@ const AdminSystemLogs = () => {
   };
 
   const toggleRow = (logId) => {
-    setExpandedRows((current) =>
-      current.includes(logId)
-        ? current.filter((item) => item !== logId)
+    setExpandedRows((current) =>current.includes(logId)
+        ? current.filter((item) =>item !== logId)
         : [...current, logId]
     );
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="system-logs-page max-w-7xl mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
-          <span>ðŸ“‹</span>
+          <span></span>
           <span>System Logs</span>
         </h1>
-        <p className="mt-2 text-slate-600">
-          View important activities and changes made in the House Rental Management System.
+        <p className="mt-2 text-slate-600">View important activities and changes made in the House Rental Management System.
         </p>
       </div>
 
@@ -158,8 +157,8 @@ const AdminSystemLogs = () => {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
+              onChange={(e) =>setSearch(e.target.value)}
+              className="system-logs-search-input w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
               placeholder="Search description or action"
             />
           </div>
@@ -168,7 +167,7 @@ const AdminSystemLogs = () => {
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Role</label>
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value)}
+              onChange={(e) =>setRole(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
             >
               {ROLE_OPTIONS.map((option) => (
@@ -181,7 +180,7 @@ const AdminSystemLogs = () => {
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Action</label>
             <select
               value={action}
-              onChange={(e) => setAction(e.target.value)}
+              onChange={(e) =>setAction(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
             >
               <option value="All">All</option>
@@ -195,7 +194,7 @@ const AdminSystemLogs = () => {
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Status</label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) =>setStatus(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
             >
               {STATUS_OPTIONS.map((option) => (
@@ -209,7 +208,7 @@ const AdminSystemLogs = () => {
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={(e) =>setDateFrom(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
             />
           </div>
@@ -219,26 +218,24 @@ const AdminSystemLogs = () => {
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={(e) =>setDateTo(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
             />
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="system-logs-filter-actions mt-4 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={handleSearch}
-            className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition"
-          >
-            ðŸ”Ž Search
+            className="system-logs-filter-button system-logs-search-button inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+          >Search
           </button>
           <button
             type="button"
             onClick={handleClearFilters}
-            className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
-          >
-            ðŸ§¹ Clear Filters
+            className="system-logs-filter-button system-logs-clear-button inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+          >Clear Filters
           </button>
         </div>
       </div>
@@ -251,9 +248,9 @@ const AdminSystemLogs = () => {
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-slate-600">â³ Loading system logs...</div>
+          <div className="p-8 text-center text-slate-600">Loading system logs...</div>
         ) : logs.length === 0 ? (
-          <div className="p-8 text-center text-slate-600">ðŸ“‹ No system logs found.</div>
+          <div className="p-8 text-center text-slate-600">No system logs found.</div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -276,7 +273,7 @@ const AdminSystemLogs = () => {
                       <React.Fragment key={log._id}>
                         <tr
                           className="hover:bg-slate-50 cursor-pointer"
-                          onClick={() => toggleRow(log._id)}
+                          onClick={() =>toggleRow(log._id)}
                         >
                           <td className="px-4 py-3 text-sm text-slate-700">{formatDateTime(log.createdAt)}</td>
                           <td className="px-4 py-3 text-sm text-slate-700">{userName}</td>
@@ -303,9 +300,9 @@ const AdminSystemLogs = () => {
                                 <div><strong>Role:</strong> {getRoleLabel(log.role)}</div>
                                 <div><strong>Action:</strong> {log.action}</div>
                                 <div className="md:col-span-2"><strong>Description:</strong> {log.description}</div>
-                                <div><strong>Property ID:</strong> {log.property || 'â€”'}</div>
-                                <div><strong>Rental Request ID:</strong> {log.rentalRequest || 'â€”'}</div>
-                                <div><strong>Payment ID:</strong> {log.payment || 'â€”'}</div>
+                                <div><strong>Property ID:</strong> {log.property || ''}</div>
+                                <div><strong>Rental Request ID:</strong> {log.rentalRequest || ''}</div>
+                                <div><strong>Payment ID:</strong> {log.payment || ''}</div>
                                 <div><strong>Status:</strong> {log.status}</div>
                                 <div><strong>Date/Time:</strong> {formatDateTime(log.createdAt)}</div>
                               </div>
@@ -320,28 +317,24 @@ const AdminSystemLogs = () => {
             </div>
 
             <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-4 py-3 bg-slate-50 border-t border-slate-200 text-sm text-slate-600">
-              <div>
-                Showing {logs.length ? (pagination.page - 1) * pagination.limit + 1 : 0}â€“{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} logs
+              <div>Showing {logs.length ? (pagination.page - 1) * pagination.limit + 1 : 0}{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} logs
               </div>
-              <div className="flex items-center gap-2">
+              <div className="system-logs-pagination flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  onClick={() =>setPage((current) =>Math.max(1, current - 1))}
                   disabled={!pagination.hasPrevPage}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Previous
+                  className="system-logs-page-button rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >Previous
                 </button>
-                <span className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700">
-                  Page {pagination.page}
+                <span className="system-logs-page-indicator rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700">Page {pagination.page}
                 </span>
                 <button
                   type="button"
-                  onClick={() => setPage((current) => current + 1)}
+                  onClick={() =>setPage((current) =>current + 1)}
                   disabled={!pagination.hasNextPage}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Next
+                  className="system-logs-page-button rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >Next
                 </button>
               </div>
             </div>
@@ -353,4 +346,3 @@ const AdminSystemLogs = () => {
 };
 
 export default AdminSystemLogs;
-

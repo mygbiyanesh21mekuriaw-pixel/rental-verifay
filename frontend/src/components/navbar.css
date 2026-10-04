@@ -1,4 +1,4 @@
-/* ===== የላይኛው ሜኑ ባር (Navbar) ===== */
+/* =====    (Navbar) ===== */
 
 .navbar {
   background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
@@ -21,7 +21,7 @@
   gap: 12px;
 }
 
-/* ===== ሎጎ ===== */
+/* =====  ===== */
 .navbar-logo {
   color: #ffffff;
   font-size: 24px;
@@ -56,7 +56,7 @@
   background-clip: text;
 }
 
-/* ===== የሊንኮች ዝርዝር ===== */
+/* =====   ===== */
 .navbar-links {
   display: flex;
   align-items: center;
@@ -84,7 +84,7 @@
 }
 
 .navbar-top-logout-btn {
-  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  background: #493ed6;
   color: #ffffff;
   border: none;
   padding: 10px 20px;
@@ -97,6 +97,7 @@
 }
 
 .navbar-top-logout-btn:hover {
+  background: #6675e8;
   transform: translateY(-1px);
   box-shadow: 0 12px 20px rgba(79, 70, 229, 0.25);
 }
@@ -199,7 +200,7 @@
   color: #15803d;
 }
 
-/* ===== የተለመደ ሊንክ ===== */
+/* =====   ===== */
 .navbar-link {
   color: #cbd5e0;
   text-decoration: none;
@@ -225,7 +226,7 @@
   color: #ffffff;
 }
 
-/* ===== የተመዝገብ ቁልፍ ===== */
+/* =====   ===== */
 .navbar-register-btn {
   background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
   color: #ffffff !important;
@@ -242,7 +243,7 @@
   background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
 }
 
-/* ===== የተጠቃሚ መረጃ ===== */
+/* =====   ===== */
 .navbar-user-info {
   color: #e2e8f0;
   padding: 8px 16px;
@@ -317,7 +318,7 @@
   margin-left: auto;
 }
 
-/* ===== የመውጫ ቁልፍ ===== */
+/* =====   ===== */
 .navbar-notification-link {
   position: relative;
   display: inline-flex;
@@ -381,7 +382,7 @@
   box-shadow: 0 6px 25px rgba(229, 62, 62, 0.4);
 }
 
-/* ===== የሞባይል ሜኑ ቁልፍ (Hamburger) ===== */
+/* =====    (Hamburger) ===== */
 .navbar-hamburger {
   display: none;
   background: none;
@@ -397,7 +398,7 @@
   transform: rotate(90deg);
 }
 
-/* ===== ለሞባይል (Responsive) ===== */
+/* =====  (Responsive) ===== */
 @media (max-width: 820px) {
   .navbar .navbar-hamburger {
     display: inline-flex;
@@ -450,7 +451,7 @@
   }
 }
 
-/* ===== ለትናንሽ ስክሪኖች ===== */
+/* =====   ===== */
 @media (max-width: 480px) {
   .navbar {
     padding: 10px 0;
@@ -480,7 +481,7 @@
   }
 }
 
-/* ===== ለመግቢያ ቁልፍ (Login) ===== */
+/* =====   (Login) ===== */
 .navbar-login-btn {
   color: #cbd5e0;
   text-decoration: none;
@@ -496,7 +497,7 @@
   color: #ffffff;
 }
 
-/* ===== የማሳወቂያ (Badge) ===== */
+/* =====  (Badge) ===== */
 .navbar-badge {
   background-color: #e53e3e;
   color: white;
@@ -517,7 +518,7 @@
   }
 }
 
-/* ===== የመገለጫ ምስል (Avatar) ===== */
+/* =====   (Avatar) ===== */
 .navbar-avatar-img {
   width: 32px;
   height: 32px;

@@ -1,6 +1,6 @@
-/* ===== የአጠቃላይ መተግበሪያ ስታይል ===== */
+/* =====    ===== */
 
-/* ===== የገፅ መሠረታዊ ውቅር ===== */
+/* =====    ===== */
 * {
   margin: 0;
   padding: 0;
@@ -15,14 +15,14 @@ body {
   min-height: 100vh;
 }
 
-/* ===== የመተግበሪያ ዋና መያዣ ===== */
+/* =====    ===== */
 .app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* ===== ዋና ይዘት (Main Content) ===== */
+/* =====   (Main Content) ===== */
 .app-main {
   flex: 1;
   margin-left: 260px;
@@ -131,7 +131,7 @@ body {
   }
 }
 
-/* ===== የጫኛ (Loading) ስፒነር ===== */
+/* =====  (Loading)  ===== */
 .app-loading {
   display: flex;
   justify-content: center;
@@ -156,7 +156,7 @@ body {
   100% { transform: rotate(360deg); }
 }
 
-/* ===== የገፅ ርዕሶች ===== */
+/* =====   ===== */
 .app-page-title {
   font-size: 28px;
   font-weight: 700;
@@ -170,7 +170,7 @@ body {
   margin-bottom: 24px;
 }
 
-/* ===== የመልዕክት ሳጥኖች ===== */
+/* =====   ===== */
 .app-alert {
   padding: 16px 20px;
   border-radius: 10px;
@@ -222,7 +222,7 @@ body {
   flex-shrink: 0;
 }
 
-/* ===== የቁልፍ ዘይቤዎች ===== */
+/* =====   ===== */
 .app-btn {
   display: inline-block;
   padding: 10px 24px;
@@ -289,7 +289,7 @@ body {
   font-size: 18px;
 }
 
-/* ===== የካርድ ዘይቤ ===== */
+/* =====   ===== */
 .app-card {
   background: white;
   border-radius: 16px;
@@ -315,7 +315,7 @@ body {
   margin-bottom: 16px;
 }
 
-/* ===== የፍርግር (Grid) ዘይቤ ===== */
+/* =====  (Grid)  ===== */
 .app-grid {
   display: grid;
   gap: 24px;
@@ -333,7 +333,7 @@ body {
   grid-template-columns: repeat(4, 1fr);
 }
 
-/* ===== የቅጽ (Form) ዘይቤ ===== */
+/* =====  (Form)  ===== */
 .app-form-group {
   margin-bottom: 20px;
 }
@@ -387,7 +387,7 @@ body {
   cursor: pointer;
 }
 
-/* ===== ለሞባይል (Responsive) ===== */
+/* =====  (Responsive) ===== */
 @media (max-width: 1024px) {
   .app-grid-4 {
     grid-template-columns: repeat(2, 1fr);
@@ -439,7 +439,7 @@ body {
   }
 }
 
-/* ===== የተጠቃሚ ሚና ባጅ (Role Badge) ===== */
+/* =====    (Role Badge) ===== */
 .app-role-badge {
   display: inline-block;
   padding: 4px 14px;
@@ -463,7 +463,7 @@ body {
   color: #48bb78;
 }
 
-/* ===== የማረጋገጫ ባጅ (Verification Badge) ===== */
+/* =====   (Verification Badge) ===== */
 .app-verified-badge {
   display: inline-flex;
   align-items: center;
@@ -484,7 +484,7 @@ body {
   color: #ed8936;
 }
 
-/* ===== የስክሮል ባር ዘይቤ ===== */
+/* =====    ===== */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

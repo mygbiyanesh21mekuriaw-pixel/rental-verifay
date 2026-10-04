@@ -19,7 +19,7 @@ const LandlordBankInformation = () => {
     setLoadingBanks(true);
     setBankLoadError('');
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/payments/banks`, { timeout: 20000 });
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/chapa/banks`, { timeout: 20000 });
       const records = Array.isArray(response.data)
         ? response.data
         : response.data?.banks || response.data?.data?.banks || [];
@@ -28,7 +28,7 @@ const LandlordBankInformation = () => {
           name: bank.name || bank.bank_name || bank.bankName,
           code: String(bank.code ?? bank.bank_code ?? bank.bank_slug ?? bank.slug ?? bank.id ?? '').trim(),
         }))
-        .filter((bank) => bank.name && bank.code);
+        .filter((bank) =>bank.name && bank.code);
       setBanks(available);
       if (!available.length) {
         setBankLoadError('Chapa returned no supported banks. Check the backend Chapa configuration and try again.');
@@ -46,7 +46,7 @@ const LandlordBankInformation = () => {
     loadBanks();
   }, [loadBanks]);
 
-  const selectedBankIsAvailable = banks.some((bank) => bank.code === bankDetails.bankCode);
+  const selectedBankIsAvailable = banks.some((bank) =>bank.code === bankDetails.bankCode);
 
   const saveBankDetails = async (event) => {
     event.preventDefault();
@@ -71,7 +71,7 @@ const LandlordBankInformation = () => {
 
   return (
     <section className="landlord-account-page">
-      <header className="landlord-account-heading">
+      <header className="landlord-account-heading landlord-bank-information-heading">
         <div>
           <p>LANDLORD</p>
           <h1>Bank Information</h1>
@@ -81,18 +81,16 @@ const LandlordBankInformation = () => {
 
       <section className="landlord-account-card">
         <h2>Chapa payout bank details</h2>
-        <p className="landlord-account-help">Bank details are sent securely to the backend for landlord payouts.</p>
+        <p className="landlord-account-help">Your account number is encrypted before storage. Payouts are sent only after a rent payment is confirmed.</p>
         {user?.bankAccountMasked && (
-          <p className="landlord-account-help">
-            Current account: {user.bankName || 'Configured'} · {user.bankAccountMasked}
+          <p className="landlord-account-help">Current account: {user.bankName || 'Configured'}  {user.bankAccountMasked}
           </p>
         )}
         <form className="landlord-account-form" onSubmit={saveBankDetails}>
-          <label>
-            Bank
+          <label>Bank
             <select
               value={bankDetails.bankCode}
-              onChange={(event) => setBankDetails((current) => ({ ...current, bankCode: event.target.value }))}
+              onChange={(event) =>setBankDetails((current) => ({ ...current, bankCode: event.target.value }))}
               required
               disabled={loadingBanks || banks.length === 0}
             >
@@ -100,22 +98,20 @@ const LandlordBankInformation = () => {
               {banks.map((bank) => <option key={bank.code} value={bank.code}>{bank.name}</option>)}
             </select>
           </label>
-          <label>
-            Account name
+          <label>Account name
             <input
               value={bankDetails.bankAccountName}
-              onChange={(event) => setBankDetails((current) => ({ ...current, bankAccountName: event.target.value }))}
+              onChange={(event) =>setBankDetails((current) => ({ ...current, bankAccountName: event.target.value }))}
               placeholder="Name registered on your bank account"
               required
             />
           </label>
-          <label>
-            Account number
+          <label>Account number
             <input
               type="password"
               autoComplete="off"
               value={bankDetails.bankAccountNumber}
-              onChange={(event) => setBankDetails((current) => ({ ...current, bankAccountNumber: event.target.value }))}
+              onChange={(event) =>setBankDetails((current) => ({ ...current, bankAccountNumber: event.target.value }))}
               placeholder="Enter your real bank account number"
               required
             />

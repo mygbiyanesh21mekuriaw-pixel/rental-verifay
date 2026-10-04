@@ -65,8 +65,7 @@ const LandlordProfile = () => {
           <span>Manage your name, phone number, and profile photo.</span>
         </div>
         {!editing && (
-          <button type="button" className="landlord-account-button" onClick={() => setEditing(true)}>
-            Edit Profile
+          <button type="button" className="landlord-account-button" onClick={() =>setEditing(true)}>Edit Profile
           </button>
         )}
       </header>
@@ -75,20 +74,18 @@ const LandlordProfile = () => {
         <ProfilePhotoControl user={user || profile} showLabel />
         {editing ? (
           <form className="landlord-account-form" onSubmit={saveProfile}>
-            <label>
-              Name
+            <label>Name
               <input
                 value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                onChange={(event) =>setForm((current) => ({ ...current, name: event.target.value }))}
                 required
               />
             </label>
-            <label>
-              Phone
+            <label>Phone
               <input
                 type="tel"
                 value={form.phone}
-                onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                onChange={(event) =>setForm((current) => ({ ...current, phone: event.target.value }))}
               />
             </label>
             <div className="landlord-account-actions">
@@ -96,8 +93,7 @@ const LandlordProfile = () => {
                 setForm({ name: profile?.name || '', phone: profile?.phone || '' });
                 setEditing(false);
                 setMessage('');
-              }}>
-                Cancel
+              }}>Cancel
               </button>
               <button type="submit" className="landlord-account-button" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Profile'}

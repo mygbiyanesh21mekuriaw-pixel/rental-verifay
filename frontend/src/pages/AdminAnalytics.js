@@ -4,10 +4,10 @@ import './adminDashboard.css';
 
 const chartPalette = ['#7c3aed', '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#14b8a6'];
 
-const formatNumber = (value) => Number(value || 0).toLocaleString();
+const formatNumber = (value) =>Number(value || 0).toLocaleString();
 
 const buildBarChart = (items, keyLabel = 'label', keyValue = 'value') => {
-  const max = items.reduce((largest, item) => Math.max(largest, Number(item[keyValue] || 0)), 0) || 1;
+  const max = items.reduce((largest, item) =>Math.max(largest, Number(item[keyValue] || 0)), 0) || 1;
 
   return (
     <div className="admin-chart-bars">
@@ -31,7 +31,7 @@ const buildBarChart = (items, keyLabel = 'label', keyValue = 'value') => {
 };
 
 const buildDonutChart = (items) => {
-  const total = items.reduce((sum, item) => sum + Number(item.value || 0), 0) || 1;
+  const total = items.reduce((sum, item) =>sum + Number(item.value || 0), 0) || 1;
 
   let startAngle = 0;
   const segments = items.map((item, index) => {
@@ -171,11 +171,11 @@ const AdminAnalytics = () => {
   }, [analytics]);
 
   if (loading) {
-    return <div className="admin-container"><div className="admin-empty-text">â³ Loading analytics...</div></div>;
+    return <div className="admin-container"><div className="admin-empty-text">Loading analytics...</div></div>;
   }
 
   if (error) {
-    return <div className="admin-container"><div className="admin-empty-text">âš ï¸ {error}</div></div>;
+    return <div className="admin-container"><div className="admin-empty-text"> {error}</div></div>;
   }
 
   if (!analytics) {
@@ -187,12 +187,11 @@ const AdminAnalytics = () => {
       <div className="admin-header">
         <div className="admin-title-wrapper">
           <div>
-            <h1 className="admin-title"><span className="admin-title-icon">ðŸ“Š</span><span className="admin-title-gradient">Admin Analytics</span></h1>
+            <h1 className="admin-title"><span className="admin-title-icon"></span><span className="admin-title-gradient">Admin Analytics</span></h1>
             <p className="admin-subtitle">Platform insights from the live database</p>
           </div>
-          <button type="button" className="admin-logout-btn" onClick={() => window.location.href = '/admin-dashboard'}>
-            <span className="admin-logout-icon">â†</span>
-            Back to dashboard
+          <button type="button" className="admin-logout-btn" onClick={() =>window.location.href = '/admin-dashboard'}>
+            <span className="admin-logout-icon"></span>Back to dashboard
           </button>
         </div>
       </div>
@@ -209,23 +208,23 @@ const AdminAnalytics = () => {
       <section className="admin-analytics-grid">
         <div className="admin-chart-panel">
           <h3>Property Status</h3>
-          {propertyChart.some(item => Number(item.value) > 0) ? buildBarChart(propertyChart) : <div className="admin-empty-text">No property status data available.</div>}
+          {propertyChart.some(item =>Number(item.value) > 0) ? buildBarChart(propertyChart) : <div className="admin-empty-text">No property status data available.</div>}
         </div>
 
         <div className="admin-chart-panel">
           <h3>User Roles</h3>
-          {userChart.some(item => Number(item.value) > 0) ? buildDonutChart(userChart) : <div className="admin-empty-text">No user role data available.</div>}
+          {userChart.some(item =>Number(item.value) > 0) ? buildDonutChart(userChart) : <div className="admin-empty-text">No user role data available.</div>}
         </div>
 
         <div className="admin-chart-panel">
           <h3>Rental Requests</h3>
-          {rentalChart.some(item => Number(item.value) > 0) ? buildBarChart(rentalChart) : <div className="admin-empty-text">No rental request data available.</div>}
+          {rentalChart.some(item =>Number(item.value) > 0) ? buildBarChart(rentalChart) : <div className="admin-empty-text">No rental request data available.</div>}
         </div>
       </section>
 
       <section className="admin-chart-panel admin-trend-panel">
         <h3>Growth Over Time</h3>
-        {trendSeries.some((series) => series.points.length > 0) ? (
+        {trendSeries.some((series) =>series.points.length > 0) ? (
           <div className="admin-trend-grid">
             {trendSeries.map((series) => (
               <div key={series.label} className="admin-trend-series">

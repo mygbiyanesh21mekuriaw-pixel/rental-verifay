@@ -13,15 +13,15 @@
   gap: 18px;
   margin-bottom: 20px;
   padding: 22px 24px;
-  border: 1px solid #bbf7d0;
-  border-left: 4px solid #16a34a;
+  border: 1px solid #6675e8;
+  border-left: 4px solid #493ed6;
   border-radius: 12px;
-  background: linear-gradient(110deg, #f0fdf4 0%, #fff 100%);
+  background: linear-gradient(110deg, #493ed6 0%, #6675e8 100%);
 }
 
 .landlord-account-heading p {
   margin: 0 0 6px;
-  color: #15803d;
+  color: #fff;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -29,11 +29,26 @@
 
 .landlord-account-heading h1 {
   margin: 0;
-  color: #14532d;
+  color: #fff;
   font-size: 28px;
 }
 
-.landlord-account-heading span,
+.landlord-bank-information-heading p,
+.landlord-bank-information-heading h1,
+.landlord-account-settings-heading p,
+.landlord-account-settings-heading h1 {
+  color: #fff;
+}
+
+.landlord-bank-information-heading span,
+.landlord-account-settings-heading span {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.landlord-account-heading span {
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .landlord-account-help {
   display: block;
   margin: 7px 0 0;
@@ -91,17 +106,17 @@
 .landlord-account-button {
   min-height: 42px;
   padding: 10px 16px;
-  border: 1px solid #15803d;
+  border: 1px solid #493ed6;
   border-radius: 9px;
-  background: #16a34a;
+  background: #493ed6;
   color: #fff;
   cursor: pointer;
   font: inherit;
   font-weight: 700;
 }
 
-.landlord-account-button:hover:not(:disabled) {
-  background: #15803d;
+.landlord-account-button:not(.secondary):hover:not(:disabled) {
+  background: #6675e8;
 }
 
 .landlord-account-button:disabled {
@@ -200,15 +215,15 @@
   gap: 8px;
   margin-bottom: 24px;
   padding: 22px 24px;
-  border: 1px solid #bbf7d0;
-  border-left: 4px solid #16a34a;
+  border: 1px solid #6675e8;
+  border-left: 4px solid #493ed6;
   border-radius: 10px;
-  background: linear-gradient(110deg, #f0fdf4 0%, #ffffff 100%);
+  background: linear-gradient(110deg, #493ed6 0%, #6675e8 100%);
 }
 
 .landlord-dashboard-title {
   margin: 0;
-  color: #14532d;
+  color: #fff;
   font-size: 32px;
   font-weight: 800;
 }
@@ -220,11 +235,41 @@
   margin: 0;
   padding: 10px 16px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  background: #493ed6;
   color: #fff;
   font-size: 16px;
   font-weight: 700;
-  box-shadow: 0 8px 16px rgba(22, 163, 74, 0.2);
+  box-shadow: 0 8px 16px rgba(73, 62, 214, 0.2);
+}
+
+.landlord-dashboard-welcome:hover {
+  background: #6675e8;
+}
+
+.landlord-section-page-header,
+.landlord-property-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 22px 24px;
+  border: 1px solid #6675e8;
+  border-left: 4px solid #493ed6;
+  border-radius: 10px;
+  background: linear-gradient(110deg, #493ed6 0%, #6675e8 100%);
+}
+
+.landlord-section-page-title,
+.landlord-property-form-title {
+  margin: 0;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.landlord-property-form-title {
+  font-size: 24px;
 }
 
 .landlord-main-header {
@@ -274,7 +319,7 @@
 
 .landlord-nav-button:hover {
   transform: translateY(-4px) !important;
-  border-color: var(--button-color) !important;
+  border-color: #6675e8 !important;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14) !important;
 }
 
@@ -284,14 +329,14 @@
 }
 
 .landlord-nav-button:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--button-color) 35%, white);
+  outline: 3px solid rgba(102, 117, 232, 0.35);
   outline-offset: 3px;
 }
 
 .landlord-nav-button--verified {
   --button-color: #15803d;
-  --button-soft: #f0fdf4;
-  --button-border: #bbf7d0;
+  --button-soft: #eff6ff;
+  --button-border: #bfdbfe;
 }
 
 .landlord-nav-button--rented {
@@ -350,23 +395,28 @@
 }
 
 .landlord-reviews-header {
+  padding: 22px 24px;
+  border: 1px solid #6675e8;
+  border-left: 4px solid #493ed6;
+  border-radius: 10px;
+  background: linear-gradient(110deg, #493ed6 0%, #6675e8 100%);
   margin-bottom: 24px;
 }
 
 .landlord-reviews-header h1 {
   margin: 0;
-  color: #172033;
+  color: #fff;
   font-size: 28px;
 }
 
 .landlord-reviews-header > p:last-child {
   margin: 8px 0 0;
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .landlord-reviews-eyebrow {
   margin: 0 0 8px;
-  color: #a16207;
+  color: #fff;
   font-size: 12px;
   font-weight: 800;
 }
@@ -578,11 +628,15 @@
     padding: 0 10px;
     border: 0;
     border-radius: 9px;
-    background: #465fff;
+    background: #493ed6;
     color: #fff;
     font: inherit;
     font-size: 13px;
     font-weight: 700;
+  }
+
+  .landlord-mobile-logout:hover {
+    background: #6675e8;
   }
 
   .landlord-layout .landlord-sidebar {

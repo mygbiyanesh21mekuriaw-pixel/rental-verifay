@@ -37,7 +37,7 @@ const TenantNotifications = () => {
       await axios.put(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setNotifications((current) => current.map((notification) => (
+      setNotifications((current) =>current.map((notification) => (
         notification._id === notificationId ? { ...notification, read: true } : notification
       )));
     } catch (error) {
@@ -54,7 +54,7 @@ const TenantNotifications = () => {
       await axios.put(`${process.env.REACT_APP_API_URL}/api/notifications/read-all`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+      setNotifications((current) =>current.map((notification) => ({ ...notification, read: true })));
     } catch (error) {
       console.error('Unable to mark all notifications as read:', error);
       setActionError('Unable to mark all notifications as read. Please try again.');
@@ -79,7 +79,7 @@ const TenantNotifications = () => {
       });
       console.log('DELETE response status:', response.status);
       console.log('DELETE response:', response.data);
-      setNotifications((current) => current.filter((notification) => notification._id !== notificationId));
+      setNotifications((current) =>current.filter((notification) =>notification._id !== notificationId));
     } catch (error) {
       console.error('Unable to delete tenant notification:', error);
       console.error('DELETE error status:', error.response?.status);
@@ -104,14 +104,14 @@ const TenantNotifications = () => {
       <BackToDashboard />
       
       <div className="tenant-header">
-        <h1 className="tenant-title">ðŸ”” Notifications</h1>
+        <h1 className="tenant-title">Notifications</h1>
         <p className="tenant-subtitle">Welcome, {user?.name}!</p>
       </div>
 
       {loading && (
         <div className="tenant-loading">
           <div className="tenant-loading-spinner"></div>
-          <span>â³ Loading notifications...</span>
+          <span>Loading notifications...</span>
         </div>
       )}
 
@@ -145,12 +145,11 @@ const TenantNotifications = () => {
                   </div>
                   <div className="tenant-notification-actions-row">
                     {!notification.read && (
-                      <button type="button" className="tenant-notification-read-btn" onClick={() => handleMarkRead(notification._id)}>
-                        Mark as read
+                      <button type="button" className="tenant-notification-read-btn" onClick={() =>handleMarkRead(notification._id)}>Mark as read
                       </button>
                     )}
-                    <button type="button" className="notification-delete-btn" onClick={() => handleDelete(notification._id)} disabled={deletingId === notification._id} aria-label="Delete notification" title="Delete notification">
-                      {deletingId === notification._id ? '...' : 'ðŸ—‘ï¸'}
+                    <button type="button" className="notification-delete-btn" onClick={() =>handleDelete(notification._id)} disabled={deletingId === notification._id} aria-label="Delete notification" title="Delete notification">
+                      {deletingId === notification._id ? '...' : ''}
                     </button>
                   </div>
                 </div>

@@ -11,25 +11,20 @@ const Home = () => {
       <div className="home-container">
         <section className="home-hero" aria-labelledby="home-title">
           <span className="home-eyebrow">A better way to find your next home</span>
-          <h1 className="home-title" id="home-title">
-            House Rental
+          <h1 className="home-title" id="home-title">House Rental
           </h1>
-          <p className="home-subtitle">
-            Find and rent verified properties with confidence.
+          <p className="home-subtitle">Find and rent verified properties with confidence.
           </p>
 
           <div className="home-buttons">
             {user?.role === 'tenant' ? (
-              <Link to="/search" className="home-btn home-btn-primary">
-                Browse properties
+              <Link to="/search" className="home-btn home-btn-primary">Browse properties
               </Link>
             ) : !user ? (
               <>
-                <Link to="/login" className="home-btn home-btn-primary">
-                  Log in and find a home
+                <Link to="/login" className="home-btn home-btn-primary">Log in and find a home
                 </Link>
-                <Link to="/register" className="home-btn home-btn-secondary">
-                  Register
+                <Link to="/register" className="home-btn home-btn-secondary">Register
                 </Link>
               </>
             ) : null}
@@ -38,31 +33,27 @@ const Home = () => {
 
         <section className="home-features" aria-label="Why choose RentalVerify">
           <article className="home-feature-card">
-            <div className="home-feature-icon" aria-hidden="true">✓</div>
+            <div className="home-feature-icon" aria-hidden="true"></div>
             <h2 className="home-feature-title">Verified properties</h2>
-            <p className="home-feature-desc">
-              Every property is reviewed by an administrator.
+            <p className="home-feature-desc">Every property is reviewed by an administrator.
             </p>
           </article>
 
           <article className="home-feature-card">
-            <div className="home-feature-icon" aria-hidden="true">⌑</div>
+            <div className="home-feature-icon" aria-hidden="true"></div>
             <h2 className="home-feature-title">Secure and trusted</h2>
-            <p className="home-feature-desc">
-              Your personal information is handled with care.
+            <p className="home-feature-desc">Your personal information is handled with care.
             </p>
           </article>
 
           <article className="home-feature-card">
-            <div className="home-feature-icon" aria-hidden="true">↗</div>
+            <div className="home-feature-icon" aria-hidden="true"></div>
             <h2 className="home-feature-title">Fast and easy</h2>
-            <p className="home-feature-desc">
-              Find your next home in just a few simple steps.
+            <p className="home-feature-desc">Find your next home in just a few simple steps.
             </p>
           </article>
         </section>
-        <div className="home-image-credit" aria-hidden="true">
-          Find a place to call home
+        <div className="home-image-credit" aria-hidden="true">Find a place to call home
         </div>
       </div>
     </div>

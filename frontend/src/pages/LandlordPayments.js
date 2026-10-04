@@ -39,7 +39,7 @@ const LandlordPayments = () => {
         });
         const landlordPayments = Array.isArray(response.data) ? response.data : [];
         setPayments(propertyId
-          ? landlordPayments.filter((payment) => String(payment.property?._id || payment.property) === propertyId)
+          ? landlordPayments.filter((payment) =>String(payment.property?._id || payment.property) === propertyId)
           : landlordPayments);
       } catch (error) {
         setPayments([]);

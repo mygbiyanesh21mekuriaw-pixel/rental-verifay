@@ -127,17 +127,16 @@ const AdminProfile = () => {
         <div className="admin-profile-section-header">
           <h2 id="admin-profile-details-title">Account information</h2>
           {!editingProfile && (
-            <button type="button" className="admin-profile-edit-button" onClick={() => setEditingProfile(true)}>
-              Edit Account
+            <button type="button" className="admin-profile-edit-button" onClick={() =>setEditingProfile(true)}>Edit Account
             </button>
           )}
         </div>
 
         {editingProfile ? (
           <form className="admin-profile-form" onSubmit={saveProfile}>
-            <label>Name<input value={profileForm.name} onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })} required /></label>
-            <label>Email<input type="email" value={profileForm.email} onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })} required /></label>
-            <label>Phone<input type="tel" value={profileForm.phone} onChange={(event) => setProfileForm({ ...profileForm, phone: event.target.value })} /></label>
+            <label>Name<input value={profileForm.name} onChange={(event) =>setProfileForm({ ...profileForm, name: event.target.value })} required /></label>
+            <label>Email<input type="email" value={profileForm.email} onChange={(event) =>setProfileForm({ ...profileForm, email: event.target.value })} required /></label>
+            <label>Phone<input type="tel" value={profileForm.phone} onChange={(event) =>setProfileForm({ ...profileForm, phone: event.target.value })} /></label>
             {profileMessage && <p className="admin-profile-message" role="status">{profileMessage}</p>}
             <div className="admin-profile-actions">
               <button type="button" className="admin-profile-cancel-button" onClick={() => {
@@ -168,16 +167,15 @@ const AdminProfile = () => {
             <button type="button" className="admin-profile-edit-button" onClick={() => {
               setPasswordMessage('');
               setEditingPassword(true);
-            }}>
-              ðŸ” Change Password
+            }}>Change Password
             </button>
           )}
         </div>
         {editingPassword && (
           <form className="admin-profile-form" onSubmit={changePassword}>
-            <label>Current password<input type="password" autoComplete="current-password" value={passwordForm.currentPassword} onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} required /></label>
-            <label>New password<input type="password" autoComplete="new-password" minLength={8} value={passwordForm.newPassword} onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })} required /></label>
-            <label>Confirm new password<input type="password" autoComplete="new-password" minLength={8} value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm({ ...passwordForm, confirmPassword: event.target.value })} required /></label>
+            <label>Current password<input type="password" autoComplete="current-password" value={passwordForm.currentPassword} onChange={(event) =>setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} required /></label>
+            <label>New password<input type="password" autoComplete="new-password" minLength={8} value={passwordForm.newPassword} onChange={(event) =>setPasswordForm({ ...passwordForm, newPassword: event.target.value })} required /></label>
+            <label>Confirm new password<input type="password" autoComplete="new-password" minLength={8} value={passwordForm.confirmPassword} onChange={(event) =>setPasswordForm({ ...passwordForm, confirmPassword: event.target.value })} required /></label>
             {passwordMessage && <p className="admin-profile-message" role="status">{passwordMessage}</p>}
             <div className="admin-profile-actions">
               <button type="button" className="admin-profile-cancel-button" onClick={() => {

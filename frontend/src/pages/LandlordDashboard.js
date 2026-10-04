@@ -9,6 +9,8 @@ import LandlordPayments from './LandlordPayments';
 import LandlordProfile from './LandlordProfile';
 import LandlordNotifications from './LandlordNotifications';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
+import PropertyImage from '../components/PropertyImage';
+import { getPropertyImages } from '../utils/propertyMedia';
 import ProfileAvatar from '../components/ProfileAvatar';
 import './landlordDashboard.css';
 
@@ -30,7 +32,7 @@ const getFileErrorMessage = (file, label) => {
     return `${label} must be a JPG, JPEG, PNG, or WEBP image.`;
   }
 
-  if (file.size > MAX_FILE_SIZE) {
+  if (file.size >MAX_FILE_SIZE) {
     return 'File too large. Maximum allowed size is 10 MB per file.';
   }
 
@@ -38,18 +40,18 @@ const getFileErrorMessage = (file, label) => {
 };
 
 export const landlordSidebarItems = [
-  { key: 'myProperties', label: 'My Properties', icon: 'ðŸ ', path: '/landlord/my-properties' },
-  { key: 'verified', label: 'Verified Properties', icon: 'âœ…', path: '/landlord/verified-properties' },
-  { key: 'addProperty', label: 'Add Property', icon: 'âž•', path: '/landlord/add-property' },
-  { key: 'rentalRequests', label: 'Rental Requests', icon: 'ðŸ“', path: '/landlord/rental-requests' },
-  { key: 'rented', label: 'Rented Properties', icon: 'ðŸ ', path: '/landlord/rented-properties' },
-  { key: 'reviews', label: 'Tenant Reviews', icon: 'â­', path: '/landlord/reviews' },
-  { key: 'underReview', label: 'Under Review', icon: 'â³', path: '/landlord/under-review' },
-  { key: 'rejected', label: 'Rejected', icon: 'âŒ', path: '/landlord/rejected' },
-  { key: 'rentPayments', label: 'Rent Payments', icon: 'ðŸ’°', path: '/landlord/rent-payments' },
-  { key: 'notifications', label: 'Notifications', icon: 'ðŸ””', path: '/landlord/notifications' },
-  { key: 'accountSettings', label: 'Account Settings', icon: 'âš™ï¸', path: '/landlord/account-settings' },
-  { key: 'bankInformation', label: 'Bank Information', icon: 'ðŸ¦', path: '/landlord/bank-information' },
+  { key: 'myProperties', label: 'My Properties', icon: '', path: '/landlord/my-properties' },
+  { key: 'verified', label: 'Verified Properties', icon: '', path: '/landlord/verified-properties' },
+  { key: 'addProperty', label: 'Add Property', icon: '', path: '/landlord/add-property' },
+  { key: 'rentalRequests', label: 'Rental Requests', icon: '', path: '/landlord/rental-requests' },
+  { key: 'rented', label: 'Rented Properties', icon: '', path: '/landlord/rented-properties' },
+  { key: 'reviews', label: 'Tenant Reviews', icon: '', path: '/landlord/reviews' },
+  { key: 'underReview', label: 'Under Review', icon: '', path: '/landlord/under-review' },
+  { key: 'rejected', label: 'Rejected', icon: '', path: '/landlord/rejected' },
+  { key: 'rentPayments', label: 'Rent Payments', icon: '', path: '/landlord/rent-payments' },
+  { key: 'notifications', label: 'Notifications', icon: '', path: '/landlord/notifications' },
+  { key: 'accountSettings', label: 'Account Settings', icon: '', path: '/landlord/account-settings' },
+  { key: 'bankInformation', label: 'Bank Information', icon: '', path: '/landlord/bank-information' },
 ];
 
 export const LandlordSidebar = ({
@@ -82,7 +84,7 @@ export const LandlordSidebar = ({
       className={`landlord-sidebar fixed inset-y-0 left-0 z-40 flex w-[260px] translate-x-0 flex-col border-r border-slate-700 bg-slate-900 text-slate-200 shadow-lg ${isOpen ? 'is-open' : ''}`}
     >
         <div className="flex items-center gap-3 border-b border-slate-700 px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm">ðŸ </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm"></div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Workspace</p>
             <h1 className="text-xl font-bold text-white">House Rental Management System</h1>
@@ -101,8 +103,8 @@ export const LandlordSidebar = ({
                 onClick={onNavigate}
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-slate-800 text-white shadow-sm ring-1 ring-white/10'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-[#493ed6] text-white shadow-sm ring-1 ring-white/10'
+                    : 'text-white hover:bg-[#6675e8] hover:text-white'
                 }`}
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-base shadow-sm ring-1 ring-slate-700">
@@ -124,7 +126,7 @@ export const LandlordSidebar = ({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{user?.name || 'User'}</p>
               <p className="truncate text-xs text-slate-400">{user?.email || 'user@example.com'}</p>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">ðŸ‘¤ Landlord</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Landlord</p>
             </div>
           </div>
         </div>
@@ -157,7 +159,7 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
           aria-label={menuOpen ? 'Close landlord navigation' : 'Open landlord navigation'}
           aria-expanded={menuOpen}
           aria-controls="landlord-navigation"
-          onClick={() => setMenuOpen((open) => !open)}
+          onClick={() =>setMenuOpen((open) => !open)}
         >
           {menuOpen ? <FaTimes aria-hidden="true" /> : <FaBars aria-hidden="true" />}
         </button>
@@ -174,7 +176,7 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
       <button
         type="button"
         className={`landlord-sidebar-backdrop ${menuOpen ? 'is-open' : ''}`}
-        onClick={() => setMenuOpen(false)}
+        onClick={() =>setMenuOpen(false)}
         aria-label="Close landlord navigation"
         tabIndex={menuOpen ? 0 : -1}
       />
@@ -182,10 +184,10 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
         user={user}
         notificationCount={notificationCount}
         isOpen={menuOpen}
-        onNavigate={() => setMenuOpen(false)}
+        onNavigate={() =>setMenuOpen(false)}
       />
-      <main className="landlord-layout-main min-h-screen px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-        <div className="mx-auto max-w-[1440px]">{children}</div>
+      <main className="landlord-layout-main min-h-screen py-5 lg:py-8">
+        <div>{children}</div>
       </main>
     </div>
   );
@@ -225,6 +227,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [imageFiles, setImageFiles] = useState([]);
+  const [existingPropertyImages, setExistingPropertyImages] = useState([]);
   const [documentFile, setDocumentFile] = useState(null);
   const [existingProofOfOwnership, setExistingProofOfOwnership] = useState('');
 
@@ -243,6 +246,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         });
 
         const property = response.data;
+        setExistingPropertyImages(getPropertyImages(property));
         setFormData({
           title: property.title || '',
           description: property.description || '',
@@ -279,7 +283,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/notifications/unread-count`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setNotificationCount(Number(response.data?.count || 0));
+        setNotificationCount(Number(response.data?.unreadCount ?? response.data?.count ?? 0));
       } catch (error) {
         setNotificationCount(0);
       }
@@ -311,14 +315,14 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         ]);
 
         const properties = Array.isArray(propertiesRes.data) ? propertiesRes.data : [];
-        const landlordProperties = properties.filter((property) => String(property.landlord?._id || property.landlord) === String(user.id));
+        const landlordProperties = properties.filter((property) =>String(property.landlord?._id || property.landlord) === String(user.id));
         const requests = Array.isArray(requestsRes.data) ? requestsRes.data : [];
         const payments = Array.isArray(paymentsRes.data) ? paymentsRes.data : [];
 
         setOverviewStats({
           properties: landlordProperties.length,
-          verified: landlordProperties.filter((property) => property.isVerified && property.verificationStatus === 'approved').length,
-          rented: landlordProperties.filter((property) => property.availabilityStatus === 'rented').length,
+          verified: landlordProperties.filter((property) =>property.isVerified && property.verificationStatus === 'approved').length,
+          rented: landlordProperties.filter((property) =>property.availabilityStatus === 'rented').length,
           requests: requests.length,
           payments: payments.length,
           notifications: notificationCount,
@@ -395,7 +399,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   const handleFileChange = (e) => {
     if (e.target.name === 'images') {
       const chosenFiles = Array.from(e.target.files || []);
-      const invalidFile = chosenFiles.find((file) => getFileErrorMessage(file, 'Property image'));
+      const invalidFile = chosenFiles.find((file) =>getFileErrorMessage(file, 'Property image'));
 
       if (chosenFiles.length > 5) {
         setFormError('You can upload up to 5 property images.');
@@ -434,7 +438,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
     setFormError('');
     setFormSuccess('');
 
-    const imageValidationError = imageFiles.find((file) => getFileErrorMessage(file, 'Property image'));
+    const imageValidationError = imageFiles.find((file) =>getFileErrorMessage(file, 'Property image'));
     if (imageValidationError) {
       setFormError(getFileErrorMessage(imageValidationError, 'Property image'));
       return;
@@ -492,11 +496,16 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
           formDataToSend.append('document', documentFile);
         }
 
-        await axios.put(`${process.env.REACT_APP_API_URL}/api/properties/${propertyId}`, formDataToSend, {
+        const response = await axios.put(`${process.env.REACT_APP_API_URL}/api/properties/${propertyId}`, formDataToSend, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
           },
+        });
+        const successMessage = response.data?.message || 'Property updated successfully.';
+        navigate('/landlord/my-properties', {
+          replace: true,
+          state: { successMessage },
         });
       } else {
         const formDataToSend = new FormData();
@@ -516,11 +525,9 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         });
       }
 
-      setFormSuccess(
-        isEditMode
-          ? 'âœ… Property updated successfully.'
-          : 'âœ… Property submitted successfully! Verification is pending'
-      );
+      if (!isEditMode) {
+        setFormSuccess('Property submitted successfully! Verification is pending');
+      }
       setFormData({
         title: '',
         description: '',
@@ -535,11 +542,11 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         bedrooms: '',
       });
       setImageFiles([]);
+      setExistingPropertyImages([]);
       setDocumentFile(null);
       setShowForm(false);
       if (isEditMode) {
         setActiveSection('myProperties');
-        navigate('/landlord/my-properties');
       } else {
         setActiveSection('underReview');
         navigate('/landlord/under-review');
@@ -555,12 +562,12 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
 
   const renderOverview = () => {
     const cards = [
-      { key: 'myProperties', label: 'My Properties', value: overviewStats.properties, icon: 'ðŸ ', path: '/landlord/my-properties', accent: 'bg-blue-50 text-blue-700' },
-      { key: 'verified', label: 'Verified Properties', value: overviewStats.verified, icon: 'âœ…', path: '/landlord/verified-properties', accent: 'bg-emerald-50 text-emerald-700' },
-      { key: 'rentalRequests', label: 'Rental Requests', value: overviewStats.requests, icon: 'ðŸ“„', path: '/landlord/rental-requests', accent: 'bg-violet-50 text-violet-700' },
-      { key: 'rented', label: 'Rented Properties', value: overviewStats.rented, icon: 'ðŸ˜ï¸', path: '/landlord/rented-properties', accent: 'bg-amber-50 text-amber-700' },
-      { key: 'rentPayments', label: 'Rent Payments', value: overviewStats.payments, icon: 'ðŸ’°', path: '/landlord/rent-payments', accent: 'bg-cyan-50 text-cyan-700' },
-      { key: 'notifications', label: 'Notifications', value: overviewStats.notifications, icon: 'ðŸ””', path: '/landlord/notifications', accent: 'bg-rose-50 text-rose-700' },
+      { key: 'myProperties', label: 'My Properties', value: overviewStats.properties, icon: '', path: '/landlord/my-properties', accent: 'bg-blue-50 text-blue-700' },
+      { key: 'verified', label: 'Verified Properties', value: overviewStats.verified, icon: '', path: '/landlord/verified-properties', accent: 'bg-[#1d4ed8] text-emerald-700' },
+      { key: 'rentalRequests', label: 'Rental Requests', value: overviewStats.requests, icon: '', path: '/landlord/rental-requests', accent: 'bg-violet-50 text-violet-700' },
+      { key: 'rented', label: 'Rented Properties', value: overviewStats.rented, icon: '', path: '/landlord/rented-properties', accent: 'bg-amber-50 text-amber-700' },
+      { key: 'rentPayments', label: 'Rent Payments', value: overviewStats.payments, icon: '', path: '/landlord/rent-payments', accent: 'bg-cyan-50 text-cyan-700' },
+      { key: 'notifications', label: 'Notifications', value: overviewStats.notifications, icon: '', path: '/landlord/notifications', accent: 'bg-rose-50 text-rose-700' },
     ];
 
     return (
@@ -635,10 +642,10 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
       {!showForm && renderMainSection()}
 
       {showForm && (
-        <div className="mx-auto max-w-5xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h3 className="m-0 text-2xl font-bold text-slate-800">
-              {isEditMode ? 'âœï¸ Update property' : 'ðŸ  Add a new property'}
+        <div className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="landlord-property-form-header">
+            <h3 className="landlord-property-form-title">
+              {isEditMode ? 'Update property' : 'Add a new property'}
             </h3>
           </div>
 
@@ -649,65 +656,82 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
             ) : (
               <form onSubmit={handleSubmit} style={styles.form} className="space-y-5">
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">ðŸ  Property title *</label>
+                  <label className="block text-sm font-semibold text-slate-700">Property title *</label>
                   <input type="text" name="title" placeholder="Example: House in Bole" value={formData.title} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">ðŸ“ Description *</label>
+                  <label className="block text-sm font-semibold text-slate-700">Description *</label>
                   <textarea name="description" placeholder="Enter a property description" value={formData.description} onChange={handleFormChange} required className="min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">ðŸ’° Price in ETB *</label>
+                  <label className="block text-sm font-semibold text-slate-700">Price in ETB *</label>
                   <input type="number" name="price" placeholder="Price" min="1" value={formData.price} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                 </div>
 
                 <fieldset className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <legend className="px-2 text-base font-bold text-slate-800">ðŸ“ Address *</legend>
+                  <legend className="px-2 text-base font-bold text-slate-800">Address *</legend>
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">ðŸ“ Region *</label>
+                    <label className="block text-sm font-semibold text-slate-700">Region *</label>
                     <input type="text" name="region" placeholder="Region" value={formData.region} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">ðŸ“ Zone *</label>
+                    <label className="block text-sm font-semibold text-slate-700">Zone *</label>
                     <input type="text" name="zone" placeholder="Zone" value={formData.zone} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">ðŸ“ Wereda *</label>
+                    <label className="block text-sm font-semibold text-slate-700">Wereda *</label>
                     <input type="text" name="wereda" placeholder="Wereda" value={formData.wereda} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">ðŸ™ï¸ City *</label>
+                    <label className="block text-sm font-semibold text-slate-700">City *</label>
                     <input type="text" name="city" placeholder="City" value={formData.city} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">ðŸ™ï¸ Sub-city *</label>
+                    <label className="block text-sm font-semibold text-slate-700">Sub-city *</label>
                     <input type="text" name="subCity" placeholder="Sub-city" value={formData.subCity} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">ðŸ“ Kebele *</label>
+                    <label className="block text-sm font-semibold text-slate-700">Kebele *</label>
                     <input type="text" name="kebele" placeholder="Kebele" value={formData.kebele} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">ðŸ  House Number *</label>
+                    <label className="block text-sm font-semibold text-slate-700">House Number *</label>
                     <input type="text" name="houseNumber" placeholder="House number" value={formData.houseNumber} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
                 </fieldset>
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">ðŸšª Number of bedrooms *</label>
+                  <label className="block text-sm font-semibold text-slate-700">Number of bedrooms *</label>
                   <input type="number" name="bedrooms" placeholder="Number of bedrooms" min="1" value={formData.bedrooms} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                 </div>
 
                 <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="block text-sm font-semibold text-slate-700">ðŸ–¼ï¸ Property images (up to 5)</label>
+                  <label className="block text-sm font-semibold text-slate-700">Property images (up to 5)</label>
+                  {isEditMode && existingPropertyImages.length > 0 && (
+                    <div className="mb-3">
+                      <p className="mb-2 text-sm font-medium text-slate-600">
+                        Current house photos (kept unless you add photos below)
+                      </p>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {existingPropertyImages.map((image, index) => (
+                          <PropertyImage
+                            key={`${image}-${index}`}
+                            src={image}
+                            alt={`${formData.title || 'Property'} photo ${index + 1}`}
+                            className="h-32 w-full rounded-lg border border-slate-200 bg-white object-cover"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <input
                     type="file"
                     name="images"
@@ -717,14 +741,14 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                     onChange={handleFileChange}
                     className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
                   />
-                  {imageFiles.length > 0 && <span className="block text-sm font-medium text-emerald-700">âœ… {imageFiles.map((file) => file.name).join(', ')}</span>}
+                  {imageFiles.length > 0 && <span className="block text-sm font-medium text-emerald-700"> {imageFiles.map((file) =>file.name).join(', ')}</span>}
                 </div>
 
                 <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="block text-sm font-semibold text-slate-700">ðŸ“· Proof of ownership</label>
+                  <label className="block text-sm font-semibold text-slate-700">Proof of ownership</label>
                   {existingProofOfOwnership && (
                     <>
-                      <span className="block text-sm font-medium text-emerald-700">âœ… {existingProofOfOwnership.split('/').pop()}</span>
+                      <span className="block text-sm font-medium text-emerald-700"> {existingProofOfOwnership.split('/').pop()}</span>
                       <PropertyOwnershipProof
                         src={existingProofOfOwnership}
                         title={formData.title}
@@ -741,11 +765,11 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                     onChange={handleFileChange}
                     className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
                   />
-                  {documentFile && <span className="block text-sm font-medium text-emerald-700">âœ… {documentFile.name}</span>}
+                  {documentFile && <span className="block text-sm font-medium text-emerald-700"> {documentFile.name}</span>}
                 </div>
 
                 <button type="submit" className="w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
-                  {isEditMode ? 'ðŸ’¾ Save changes' : 'ðŸ“¤ Submit property'}
+                  {isEditMode ? 'Save changes' : 'Submit property'}
                 </button>
               </form>
             )}

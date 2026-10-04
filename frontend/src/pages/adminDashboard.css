@@ -1,6 +1,6 @@
-/* ===== የአስተዳዳሪ ፓነል - ዘመናዊ ባለ ቀለም ስሪት ===== */
+/* =====   -     ===== */
 
-/* ===== ዋና መያዣ ===== */
+/* =====   ===== */
 .admin-container {
   width: 100%;
   margin: 0;
@@ -13,7 +13,7 @@
   overflow: hidden;
 }
 
-/* ===== የመከለያ ሞገዶች ===== */
+/* =====   ===== */
 .admin-container::before {
   content: '';
   position: absolute;
@@ -49,7 +49,7 @@
   }
 }
 
-/* ===== ርእስ ===== */
+/* =====  ===== */
 .admin-header {
   margin-bottom: 30px;
   position: relative;
@@ -58,10 +58,10 @@
 
 .admin-dashboard-header {
   padding: 22px 24px;
-  border: 1px solid #bbf7d0;
-  border-left: 4px solid #16a34a;
+  border: 1px solid #6675e8;
+  border-left: 4px solid #493ed6;
   border-radius: 10px;
-  background: linear-gradient(110deg, #f0fdf4 0%, #ffffff 100%);
+  background: linear-gradient(110deg, #493ed6 0%, #6675e8 100%);
 }
 
 .admin-dashboard-header .admin-title-gradient {
@@ -77,11 +77,15 @@
   margin: 8px 0 0 48px;
   padding: 10px 16px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  background: #493ed6;
   color: #fff;
   font-size: 16px;
   font-weight: 700;
-  box-shadow: 0 8px 16px rgba(22, 163, 74, 0.2);
+  box-shadow: 0 8px 16px rgba(73, 62, 214, 0.2);
+}
+
+.admin-dashboard-header .admin-dashboard-welcome:hover {
+  background: #6675e8;
 }
 
 .admin-profile-page {
@@ -157,14 +161,14 @@
 
 .admin-profile-edit-button,
 .admin-profile-submit-button {
-  border: 1px solid #15803d;
-  background: #16a34a;
+  border: 1px solid #493ed6;
+  background: #493ed6;
   color: #fff;
 }
 
 .admin-profile-edit-button:hover,
 .admin-profile-submit-button:hover:not(:disabled) {
-  background: #15803d;
+  background: #6675e8;
 }
 
 .admin-profile-cancel-button {
@@ -460,7 +464,7 @@
   color: #172554;
 }
 
-/* ===== Logout ቁልፍ ===== */
+/* ===== Logout  ===== */
 .admin-logout-btn {
   display: flex;
   align-items: center;
@@ -549,6 +553,30 @@
   margin: 24px 0 28px;
   position: relative;
   z-index: 1;
+}
+
+.admin-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 24px 0 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.admin-dashboard-home .admin-analytics-stat-card {
+  background: #fff;
+  border-color: #e2e8f0;
+}
+
+.admin-dashboard-home .admin-analytics-stat-value {
+  color: #493ed6;
+}
+
+.admin-dashboard-stats-message {
+  position: relative;
+  z-index: 1;
+  color: #475569;
 }
 
 .admin-analytics-stat-card {
@@ -765,7 +793,7 @@
   color: #4f46e5;
 }
 
-/* ===== የስታቲስቲክስ ካርዶች ===== */
+/* =====   ===== */
 .admin-stats {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -850,7 +878,7 @@
   box-shadow: 0 4px 25px rgba(59, 130, 246, 0.35);
 }
 
-/* ===== የዝርዝር ፓነል ===== */
+/* =====   ===== */
 .admin-detail-section {
   background: linear-gradient(135deg, #fbcfe8 0%, #bfdbfe 100%);
   backdrop-filter: blur(20px);
@@ -862,6 +890,14 @@
   position: relative;
   z-index: 1;
   scroll-margin-top: 24px;
+}
+
+.admin-management-panel {
+  background: #fff;
+}
+
+.admin-payment-period-panel {
+  background: #fff;
 }
 
 .admin-detail-header {
@@ -901,7 +937,7 @@
   transition-duration: 0.08s;
 }
 
-/* ===== የጫኛ ===== */
+/* =====  ===== */
 .admin-loading {
   display: flex;
   flex-direction: column;
@@ -940,7 +976,7 @@
   }
 }
 
-/* ===== ባዶ ሁኔታ ===== */
+/* =====   ===== */
 .admin-empty-state {
   text-align: center;
   padding: 40px 20px;
@@ -981,7 +1017,7 @@
   font-size: 16px;
 }
 
-/* ===== ያልተረጋገጡ ቤቶች ክፍል ===== */
+/* =====    ===== */
 .admin-pending-section {
   background: linear-gradient(135deg, rgba(255, 240, 247, 0.94), rgba(239, 246, 255, 0.92));
   backdrop-filter: blur(20px);
@@ -1044,14 +1080,14 @@
   border-radius: 20px;
 }
 
-/* ===== የካርድ ፍርግር ===== */
+/* =====   ===== */
 .admin-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
 }
 
-/* ===== ካርድ ===== */
+/* =====  ===== */
 .admin-card {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
@@ -1065,6 +1101,16 @@
 .admin-detail-section .admin-card {
   background: linear-gradient(135deg, rgba(255, 240, 247, 0.96), rgba(239, 246, 255, 0.96));
   border-color: rgba(59, 130, 246, 0.2);
+}
+
+.admin-user-list-panel,
+.admin-user-list-panel .admin-user-list-card {
+  background: #fff;
+}
+
+.admin-user-list-panel .admin-user-list-card {
+  backdrop-filter: none;
+  border-color: #e2e8f0;
 }
 
 .admin-detail-empty-state {
@@ -1224,7 +1270,7 @@
   font-weight: 600;
 }
 
-/* ===== ቁልፎች ===== */
+/* =====  ===== */
 .admin-btn {
   flex: 1 1 140px;
   min-width: 120px;
@@ -1259,6 +1305,15 @@
   opacity: 0.6;
   cursor: not-allowed;
   transform: none !important;
+}
+
+.admin-btn:not(.admin-btn-approve):not(.admin-btn-reject) {
+  background: #493ed6;
+  color: #fff;
+}
+
+.admin-btn:not(.admin-btn-approve):not(.admin-btn-reject):hover:not(:disabled) {
+  background: #6675e8;
 }
 
 .admin-btn-approve {
@@ -1855,16 +1910,16 @@
   min-width: 100px;
   min-height: 42px;
   padding: 10px 16px;
-  border: 1px solid #2563eb;
+  border: 1px solid #493ed6;
   border-radius: 10px;
-  background: #2563eb;
+  background: #493ed6;
   color: #fff;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
 .admin-management-edit-btn:hover:not(:disabled),
 .admin-management-delete-btn:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: #6675e8;
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28);
 }
 
@@ -1917,7 +1972,7 @@
   }
 }
 
-/* ===== ለሞባይል ===== */
+/* =====  ===== */
 @media (max-width: 1024px) {
   .admin-stats {
     grid-template-columns: repeat(3, 1fr);

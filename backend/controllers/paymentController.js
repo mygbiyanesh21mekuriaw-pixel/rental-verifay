@@ -21,6 +21,7 @@ const {
   listChapaBanks,
   createPayoutReference,
 } = require('../utils/payoutProvider');
+const { decryptBankAccountNumber } = require('../utils/bankAccountCrypto');
 
 
 const getChapaBanks = async (req, res) => {
@@ -128,7 +129,7 @@ const createOrProcessPayout = async (payment) => {
   }
 
   const landlord = await User.findById(payment.landlord).select(
-    'bankAccountName bankAccountNumber bankCode'
+    'bankAccountName bankCode +bankAccountNumber'
   );
 
   if (
@@ -159,7 +160,7 @@ const createOrProcessPayout = async (payment) => {
 
   const transfer = await initiateChapaTransfer({
     accountName: landlord.bankAccountName,
-    accountNumber: landlord.bankAccountNumber,
+    accountNumber: decryptBankAccountNumber(landlord.bankAccountNumber),
     amount: payment.amount,
     bankCode: landlord.bankCode,
     reference: payout.payoutReference,
@@ -261,7 +262,7 @@ const createPayment = async (req, res) => {
       return res.status(409).json({ message: 'Rented property payment details are incomplete' });
     }
     const landlordPayoutDetails = await User.findById(property.landlord)
-      .select('bankAccountName bankAccountNumber bankCode');
+      .select('bankAccountName bankCode +bankAccountNumber');
     if (!hasCompletePayoutBankDetails(landlordPayoutDetails)) {
       return res.status(409).json({
         message: 'The landlord has not completed bank information. Please contact the landlord before paying rent.',
@@ -438,7 +439,7 @@ const getTenantPaymentContext = async (req, res) => {
     const rental = await getConfirmedRental(property._id, req.user.id);
     if (!rental) return res.status(403).json({ message: 'Payment is only available for your approved or confirmed rented property.' });
     const landlordPayoutDetails = await User.findById(property.landlord._id)
-      .select('bankAccountName bankAccountNumber bankCode');
+      .select('bankAccountName bankCode +bankAccountNumber');
     const paymentRecords = await Payment.find({ tenant: req.user.id, property: property._id }).sort({ createdAt: -1 });
     for (const payment of paymentRecords) await reconcilePayment(payment, req);
     const payments = await paymentView(Payment.find({ tenant: req.user.id, property: property._id }).sort({ createdAt: -1 }));

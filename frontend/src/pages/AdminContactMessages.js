@@ -34,7 +34,7 @@ const AdminContactMessages = () => {
       await axios.put(`${process.env.REACT_APP_API_URL}/api/contact/platform-admin/inbox/${messageId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setMessages((current) => current.map((message) => (
+      setMessages((current) =>current.map((message) => (
         message._id === messageId ? { ...message, read: true } : message
       )));
     } catch (requestError) {
@@ -65,11 +65,11 @@ const AdminContactMessages = () => {
               <div className="admin-contact-card-header">
                 <div>
                   <h2>{message.subject}</h2>
-                  <p>{message.name} Â· <a href={`mailto:${message.email}`}>{message.email}</a></p>
+                  <p>{message.name}  <a href={`mailto:${message.email}`}>{message.email}</a></p>
                 </div>
                 <div className="admin-contact-card-meta">
                   <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time>
-                  {!message.read && <button type="button" onClick={() => markRead(message._id)}>Mark read</button>}
+                  {!message.read && <button type="button" onClick={() =>markRead(message._id)}>Mark read</button>}
                   {message.read && <span>Read</span>}
                 </div>
               </div>

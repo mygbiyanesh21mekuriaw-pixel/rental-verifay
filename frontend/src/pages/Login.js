@@ -9,6 +9,10 @@ const dashboardPaths = {
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeEmailAddress = (email) => {
+  const normalized = String(email || '').trim().toLowerCase();
+  return normalized.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
+};
 
 const platformAdminEmail = 'platform.admin@rentalverify.com';
 
@@ -72,7 +76,7 @@ const EyeOffIcon = () => (
 const validateLoginForm = ({ email, password }) => {
   const nextErrors = {};
 
-  const trimmedEmail = String(email || '').trim();
+  const trimmedEmail = normalizeEmailAddress(email);
 
   if (!trimmedEmail) {
     nextErrors.email = 'Email is required';
@@ -150,7 +154,7 @@ const Login = () => {
       // CALL AUTH LOGIN
       // ========================================
       const result = await login(
-        email.trim(),
+        normalizeEmailAddress(email),
         password
       );
 
@@ -204,7 +208,7 @@ const Login = () => {
   // CHECK PLATFORM ADMIN
   // ==========================================
   const isPlatformAdmin =
-    email.trim().toLowerCase() ===
+    normalizeEmailAddress(email) ===
     platformAdminEmail;
 
   // ==========================================
@@ -219,16 +223,13 @@ const Login = () => {
       <div className="auth-card">
 
         {/* TITLE */}
-        <span className="rv-kicker">
-          House Rental
+        <span className="rv-kicker">House Rental
         </span>
 
-        <h2>
-          Welcome back
+        <h2>Welcome back
         </h2>
 
-        <p className="auth-subtitle">
-          Sign in to manage your verified rental journey.
+        <p className="auth-subtitle">Sign in to manage your verified rental journey.
         </p>
 
         {/* ======================================
@@ -257,8 +258,7 @@ const Login = () => {
           ==================================== */}
           <div className="auth-field">
 
-            <label htmlFor="login-email">
-              Email
+            <label htmlFor="login-email">Email
             </label>
 
             <input
@@ -304,8 +304,7 @@ const Login = () => {
           ==================================== */}
           <div className="auth-field">
 
-            <label htmlFor="login-password">
-              Password
+            <label htmlFor="login-password">Password
             </label>
 
             <div className="relative">
@@ -343,7 +342,7 @@ const Login = () => {
                     ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
                     : ''
                 }`}
-                placeholder="••••••••"
+                placeholder=""
               />
 
               {/* SHOW / HIDE PASSWORD */}
@@ -354,8 +353,7 @@ const Login = () => {
                     ? 'Hide password'
                     : 'Show password'
                 }
-                onClick={() =>
-                  setShowPassword(
+                onClick={() =>setShowPassword(
                     (current) => !current
                   )
                 }
@@ -383,8 +381,7 @@ const Login = () => {
           ==================================== */}
           {!isPlatformAdmin && (
             <p className="auth-forgot-password">
-              <Link to="/forgot-password">
-                Forgot Password?
+              <Link to="/forgot-password">Forgot Password?
               </Link>
             </p>
           )}
@@ -408,11 +405,9 @@ const Login = () => {
             REGISTER
         ====================================== */}
         {!isPlatformAdmin && (
-          <p className="auth-footer">
-            Don&apos;t have an account?{' '}
+          <p className="auth-footer">Don&apos;t have an account?{' '}
 
-            <Link to="/register">
-              Register
+            <Link to="/register">Register
             </Link>
           </p>
         )}
