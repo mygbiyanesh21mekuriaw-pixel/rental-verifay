@@ -15,12 +15,9 @@ const transferConfig = () => ({
   // If it is not in .env, use Chapa's default API URL.
 
   baseUrl: (
-
-    process.env.CHAPA_BASE_URL ||
-
-    'https://api.chapa.co'
-
-  ).replace(/\/$/, ''),
+  process.env.CHAPA_BASE_URL ||
+  'https://api.chapa.co'
+).replace(/\/+$/, ''),
 
   secretKey: (
 
@@ -353,10 +350,7 @@ const initiateChapaTransfer = async ({
       ),
 
     status: normalizeTransferStatus(
-
-      data.status ||
-
-      payload?.status
+      data.status
 
     ),
 
@@ -439,28 +433,29 @@ const verifyChapaTransfer = async (
   );
 
   const data =
-
     payload?.data || {};
 
+  const returnedReference = String(
+    data.reference ||
+    data.tx_ref ||
+    ''
+  ).trim();
+  const requestedReference = String(reference).trim();
+  const apiConfirmed = response.ok &&
+    ['success', 'successful'].includes(String(payload?.status || '').toLowerCase());
+  const referenceConfirmed = Boolean(
+    returnedReference &&
+    returnedReference === requestedReference
+  );
+  const transactionStatus = normalizeTransferStatus(data.status);
+  const confirmed = apiConfirmed && referenceConfirmed;
+
   return {
-
-    ok: response.ok,
-
-    status: normalizeTransferStatus(
-
-      data.status ||
-
-      payload?.status
-
-    ),
-
-    providerReference:
-
-      data.reference ||
-
-      data.tx_ref ||
-
-      reference,
+    ok: confirmed,
+    status: confirmed ? transactionStatus : 'PROCESSING',
+    providerReference: referenceConfirmed
+      ? returnedReference
+      : requestedReference,
 
     message:
 
@@ -531,7 +526,7 @@ const listChapaBanks = async () => {
       }
 
     );
-
+console.log('CHAPA BANK RESPONSE:', JSON.stringify(payload, null, 2));
     const records =
 
       Array.isArray(payload?.data)

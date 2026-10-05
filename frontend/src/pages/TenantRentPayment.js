@@ -40,6 +40,80 @@ const readablePaymentMessage = (value, fallback) => {
   return fallback;
 };
 
+const isVerifiedPayment = (payment) => Boolean(
+  payment?.isVerified === true &&
+  payment.status === 'paid' &&
+  payment.verifiedAt &&
+  payment.provider === 'chapa' &&
+  payment.providerTransactionReference
+);
+
+const formatPaymentPeriod = (period) => {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(period || ''))) return period || 'N/A';
+  return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' })
+    .format(new Date(`${period}-01T00:00:00`));
+};
+
+const getReceiptDetails = (payment) => ([
+  ['Tenant', payment.tenant?.name || 'N/A'],
+  ['Landlord', payment.landlord?.name || 'N/A'],
+  ['Property', payment.property?.title || 'N/A'],
+  ['Payment period', formatPaymentPeriod(payment.paymentPeriod)],
+  ['Amount paid', `${payment.currency || 'ETB'} ${Number(payment.amount).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`],
+  ['Payment status', 'PAID'],
+  ['Payment method', 'Chapa'],
+  ['Transaction reference', payment.providerTransactionReference],
+  ['Payment date', new Date(payment.verifiedAt).toLocaleString()],
+  ['Verification', 'Payment verified'],
+]);
+
+const escapePdfText = (value) => String(value)
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^\x20-\x7e]/g, '?')
+  .replace(/[\\()]/g, '\\$&');
+
+const createReceiptPdf = (payment) => {
+  if (!isVerifiedPayment(payment)) return null;
+  const details = getReceiptDetails(payment);
+  const textLines = [
+    'BT',
+    '/F1 18 Tf',
+    '1 0 0 1 54 760 Tm',
+    '(HOUSE RENTAL MANAGEMENT SYSTEM) Tj',
+    '/F1 14 Tf',
+    '1 0 0 1 54 724 Tm',
+    '(RENT PAYMENT RECEIPT) Tj',
+    '/F1 10 Tf',
+    ...details.flatMap(([label, value], index) => [
+      `1 0 0 1 54 ${680 - index * 34} Tm`,
+      `(${escapePdfText(label)}: ${escapePdfText(value)}) Tj`,
+    ]),
+    'ET',
+  ].join('\n');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${textLines.length} >>\nstream\n${textLines}\nendstream`,
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const crossReferenceOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  pdf += `${offsets.slice(1).map(offset =>`${String(offset).padStart(10, '0')} 00000 n \n`).join('')}`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${crossReferenceOffset}\n%%EOF`;
+  return new Blob([pdf], { type: 'application/pdf' });
+};
+
 const TenantRentPayment = () => {
   const { propertyId } = useParams();
   const location = useLocation();
@@ -52,6 +126,30 @@ const TenantRentPayment = () => {
   const [success, setSuccess] = useState('');
   const [paymentReturnState, setPaymentReturnState] = useState(null);
   const [returnCountdown, setReturnCountdown] = useState(PAYMENT_SUCCESS_DELAY_SECONDS);
+  const [printingReceiptId, setPrintingReceiptId] = useState(null);
+
+  useEffect(() => {
+    const handleAfterPrint = () =>setPrintingReceiptId(null);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () =>window.removeEventListener('afterprint', handleAfterPrint);
+  }, []);
+
+  const printReceipt = (paymentId) => {
+    setPrintingReceiptId(paymentId);
+    window.setTimeout(() =>window.print(), 100);
+  };
+
+  const downloadReceipt = (payment) => {
+    if (!isVerifiedPayment(payment)) return;
+    const url = URL.createObjectURL(createReceiptPdf(payment));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `rent-receipt-${payment.paymentReference}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() =>URL.revokeObjectURL(url), 1000);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +232,7 @@ const TenantRentPayment = () => {
       if (!isCurrentPaymentReturn || cancelled) return;
       const refreshedContext = await loadContext();
       const returnedPayment = findReturnedPayment(refreshedContext);
-      if (returnedPayment?.status === 'paid') {
+      if (isVerifiedPayment(returnedPayment)) {
         finishPaymentReturn('success');
         return;
       }
@@ -226,6 +324,10 @@ const TenantRentPayment = () => {
   if (!context) return <div className="payment-page-state">Loading rent payment details...</div>;
 
   const latestPayment = context.currentPayment || context.latestPayment || context.payments[0] || null;
+  const verifiedPayments = context.payments.filter(isVerifiedPayment);
+  const visibleStatus = latestPayment?.status === 'paid' && !isVerifiedPayment(latestPayment)
+    ? 'pending'
+    : latestPayment?.status || 'pending';
   return (
     <div className="payment-page">
       {paymentReturnState === 'success' && (
@@ -250,7 +352,7 @@ const TenantRentPayment = () => {
           <p className="payment-property-location"> {context.property.location}</p>
           <div className="payment-detail-row"><span>Landlord</span><strong>{context.landlord.name}</strong></div>
           <div className="payment-detail-row"><span>Monthly rent</span><strong>ETB {Number(context.property.price).toLocaleString()}</strong></div>
-          <div className="payment-detail-row"><span>Payment status</span><strong className={`payment-status payment-status-${latestPayment?.status || 'pending'}`}>{formatStatus(latestPayment?.status || 'pending')}</strong></div>
+          <div className="payment-detail-row"><span>Payment status</span><strong className={`payment-status payment-status-${visibleStatus}`}>{formatStatus(visibleStatus)}</strong></div>
         </section>
 
         <section className="payment-card">
@@ -273,14 +375,62 @@ const TenantRentPayment = () => {
         </section>
       </div>
 
+      {verifiedPayments.map(payment => (
+        <section
+          className="payment-card payment-receipt"
+          data-printing={printingReceiptId === payment._id ? 'true' : undefined}
+          key={`receipt-${payment._id}`}
+          aria-label={`Verified rent receipt for ${formatPaymentPeriod(payment.paymentPeriod)}`}
+        >
+          <div className="payment-receipt-heading">
+            <div>
+              <p className="payment-eyebrow">Verified payment</p>
+              <h2>Rent Payment Receipt</h2>
+              <p className="payment-muted">House Rental Management System</p>
+            </div>
+            <span className="payment-status payment-status-paid">Verified</span>
+          </div>
+          <dl className="payment-receipt-details">
+            {getReceiptDetails(payment).map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="payment-receipt-actions">
+            <button type="button" onClick={() =>printReceipt(payment._id)}>Print Receipt</button>
+            <button type="button" onClick={() =>downloadReceipt(payment)}>Download PDF</button>
+          </div>
+        </section>
+      ))}
+
       {context.payments.length > 0 && (
         <section className="payment-card payment-history">
           <h2>Payment history</h2>
-          {context.payments.map(payment => (
-            <div className="payment-history-row" key={payment._id}>
-              <span>{payment.paymentPeriod}</span><strong>ETB {Number(payment.amount).toLocaleString()}</strong><span className={`payment-status payment-status-${payment.status}`}>{formatStatus(payment.status)}</span><small>{payment.paymentReference}</small>
-            </div>
-          ))}
+          {context.payments.map(payment => {
+            const visiblePaymentStatus = payment.status === 'paid' && !isVerifiedPayment(payment)
+              ? 'pending'
+              : payment.status;
+            return (
+              <React.Fragment key={payment._id}>
+                {payment.attempts?.map(attempt => (
+                  <div className="payment-history-row payment-history-attempt" key={attempt.paymentReference}>
+                    <span>{formatPaymentPeriod(attempt.paymentPeriod || payment.paymentPeriod)} · Previous attempt</span>
+                    <strong>{attempt.currency || payment.currency || 'ETB'} {Number(attempt.amount ?? payment.amount).toLocaleString()}</strong>
+                    <span className={`payment-status payment-status-${attempt.status || 'pending'}`}>{formatStatus(attempt.status)}</span>
+                    <small>{attempt.paymentReference}</small>
+                  </div>
+                ))}
+                <div className="payment-history-row">
+                  <span>{formatPaymentPeriod(payment.paymentPeriod)}</span>
+                  <strong>{payment.currency || 'ETB'} {Number(payment.amount).toLocaleString()}</strong>
+                  <span className={`payment-status payment-status-${visiblePaymentStatus}`}>{formatStatus(visiblePaymentStatus)}</span>
+                  <small>{payment.paymentReference}</small>
+                </div>
+              </React.Fragment>
+            );
+          })}
         </section>
       )}
     </div>
@@ -288,4 +438,4 @@ const TenantRentPayment = () => {
 };
 
 export default TenantRentPayment;
-
+export { createReceiptPdf, isVerifiedPayment };

@@ -59,22 +59,31 @@ const LandlordPayments = () => {
         {loading ? <p className="payment-muted">Loading payments...</p> : payments.length === 0 ? <p className="payment-muted">No rent payments have been submitted yet.</p> : (
           <div className="payment-table-wrap">
             <table className="payment-table">
-              <thead><tr><th>Tenant</th><th>Property</th><th>Amount</th><th>Period</th><th>Date</th><th>Payment Status</th><th>Payout Status</th><th>Transfer Status</th><th>Reference</th></tr></thead>
+              <thead><tr><th>Tenant</th><th>Property</th><th>Amount</th><th>Period</th><th>Date</th><th>Payment Status</th><th>Provider</th><th>Chapa Transaction Reference</th><th>Verified</th><th>Payout Status</th></tr></thead>
               <tbody>{payments.map(payment => {
-              const payoutStatus = getRealStatusValue(payment, 'payout', 'payoutStatus');
-              const transferStatus = getRealStatusValue(payment, 'transfer', 'transferStatus');
+              const payoutStatus = getRealStatusValue(payment, 'payout', 'payoutStatus') ||
+                (payment.isVerified ? 'PENDING' : '');
+              const verified = payment.isVerified === true && Boolean(payment.verifiedAt);
+              const paymentStatus = payment.status === 'paid' && !verified
+                ? 'Unverified'
+                : formatStatus(payment.status);
 
               return (
                 <tr key={payment._id}>
                   <td>{payment.tenant?.name}</td>
                   <td>{payment.property?.title}</td>
-                  <td>ETB {Number(payment.amount).toLocaleString()}</td>
+                  <td>{payment.currency || 'ETB'} {Number(payment.amount).toLocaleString()}</td>
                   <td>{payment.paymentPeriod}</td>
                   <td>{new Date(payment.createdAt).toLocaleDateString()}</td>
-                  <td><span className={`payment-status payment-status-${payment.status}`}>{formatStatus(payment.status)}</span></td>
-                  <td><span className={`payment-status payment-status-${String(payoutStatus || 'na').toLowerCase()}`}>{formatPayoutStatus(payoutStatus)}</span></td>
-                  <td><span className={`payment-status payment-status-${String(transferStatus || 'na').toLowerCase()}`}>{formatPayoutStatus(transferStatus)}</span></td>
-                  <td>{payment.paymentReference}</td>
+                  <td><span className={`payment-status payment-status-${paymentStatus.toLowerCase()}`}>{paymentStatus}</span></td>
+                  <td>{payment.provider || 'N/A'}</td>
+                  <td>{payment.chapaTransactionReference || 'Not verified'}</td>
+                  <td>
+                    <span className={`payment-status ${verified ? 'payment-status-verified' : 'payment-status-unverified'}`}>
+                      {verified ? `Yes · ${new Date(payment.verifiedAt).toLocaleDateString()}` : 'No'}
+                    </span>
+                  </td>
+                  <td><span className={`payment-status payment-status-payout-${String(payoutStatus || 'na').toLowerCase()}`}>{formatPayoutStatus(payoutStatus)}</span></td>
                 </tr>
               );
             })}</tbody>
@@ -87,5 +96,4 @@ const LandlordPayments = () => {
 };
 
 export default LandlordPayments;
-
 

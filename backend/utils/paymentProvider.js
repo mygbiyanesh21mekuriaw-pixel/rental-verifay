@@ -153,15 +153,24 @@ const initializeChapaPayment = async ({
       }),
     }
   );
+  console.log(
+  'CHAPA VERIFY RESPONSE:',
+  JSON.stringify(payload, null, 2)
+);
 
-  if (!response.ok || !payload?.data?.checkout_url) {
+  if (
+    !response.ok ||
+    !['success', 'successful'].includes(String(payload?.status || '').toLowerCase()) ||
+    !payload?.data?.checkout_url ||
+    payload?.data?.tx_ref !== paymentReference
+  ) {
     return {
       ok: false,
       provider: 'chapa',
       providerStatus: 'failed',
       providerMessage:
         payload?.message ||
-        'Payment provider initialization failed',
+        'Payment provider did not confirm the requested transaction reference',
       payload,
     };
   }
@@ -171,18 +180,17 @@ const initializeChapaPayment = async ({
     provider: 'chapa',
     providerStatus: 'initialized',
 
-    providerReference:
-      payload.data.reference ||
-      payload.data.tx_ref ||
-      paymentReference,
+    providerReference: payload.data.tx_ref,
 
     providerCheckoutUrl:
       payload.data.checkout_url,
 
-    providerPaymentId:
-      payload.data.tx_ref ||
-      payload.data.reference ||
-      paymentReference,
+    providerPaymentId: payload.data.id || undefined,
+
+    providerTransactionReference:
+      typeof payload.data.reference === 'string' && payload.data.reference.trim()
+        ? payload.data.reference.trim()
+        : undefined,
 
     payload,
   };
@@ -206,9 +214,13 @@ const verifyChapaPayment = async (providerReference) => {
     }
   );
 
-  if (!response.ok) {
+  if (
+    !response.ok ||
+    !['success', 'successful'].includes(String(payload?.status || '').toLowerCase())
+  ) {
     return {
       ok: false,
+      apiStatus: String(payload?.status || '').trim().toLowerCase(),
       providerStatus: 'failed',
       providerMessage:
         payload?.message ||
@@ -219,28 +231,81 @@ const verifyChapaPayment = async (providerReference) => {
 
   return {
     ok: true,
+    apiStatus: String(payload?.status || '').trim().toLowerCase(),
 
-    providerStatus: normalizeProviderStatus(
-      payload?.data?.status ||
-      payload?.status
-    ),
+    providerStatus: normalizeProviderStatus(payload?.data?.status),
 
     amount: payload?.data?.amount,
 
     currency: payload?.data?.currency,
 
     providerReference:
-      payload?.data?.reference ||
-      payload?.data?.tx_ref ||
-      providerReference,
+      typeof payload?.data?.tx_ref === 'string'
+        ? payload.data.tx_ref.trim()
+        : '',
+
+    providerTransactionReference:
+      typeof payload?.data?.reference === 'string'
+        ? payload.data.reference.trim()
+        : '',
 
     providerPaymentId:
-      payload?.data?.tx_ref ||
-      payload?.data?.reference ||
-      providerReference,
+      typeof payload?.data?.id === 'string' ||
+      typeof payload?.data?.id === 'number'
+        ? String(payload.data.id)
+        : '',
 
     payload,
   };
+};
+
+const validateChapaPaymentVerification = (verification, expectedPayment) => {
+  if (
+    !verification?.ok ||
+    !['success', 'successful'].includes(verification.apiStatus)
+  ) {
+    return { ok: false, reason: 'Chapa did not confirm the verification response' };
+  }
+
+  if (!['paid', 'failed', 'cancelled'].includes(verification.providerStatus)) {
+    return { ok: false, reason: 'Chapa transaction is not in a final status' };
+  }
+
+  const receivedAmount = Number(verification.amount);
+  const expectedAmount = Number(expectedPayment?.amount);
+  if (
+    !Number.isFinite(receivedAmount) ||
+    !Number.isFinite(expectedAmount) ||
+    receivedAmount.toFixed(2) !== expectedAmount.toFixed(2)
+  ) {
+    return { ok: false, reason: 'Chapa transaction amount does not match the expected rent' };
+  }
+
+  if (
+    String(verification.currency || '').trim().toUpperCase() !==
+    String(expectedPayment?.currency || '').trim().toUpperCase()
+  ) {
+    return { ok: false, reason: 'Chapa transaction currency does not match the expected currency' };
+  }
+
+  if (
+    !String(expectedPayment?.paymentReference || '').trim() ||
+    verification.providerReference !== expectedPayment.paymentReference
+  ) {
+    return { ok: false, reason: 'Chapa transaction reference does not match the payment reference' };
+  }
+
+  if (!String(verification.providerTransactionReference || '').trim()) {
+    return { ok: false, reason: 'Chapa did not return its transaction reference' };
+  }
+  if (
+    expectedPayment?.providerTransactionReference &&
+    verification.providerTransactionReference !== expectedPayment.providerTransactionReference
+  ) {
+    return { ok: false, reason: 'Chapa transaction reference does not match the initialized transaction' };
+  }
+
+  return { ok: true, status: verification.providerStatus };
 };
 
 const verifyChapaWebhook = ({
@@ -350,6 +415,7 @@ module.exports = {
   hasChapaConfig,
   initializeChapaPayment,
   verifyChapaPayment,
+  validateChapaPaymentVerification,
   verifyChapaWebhook,
   normalizeProviderStatus,
 };

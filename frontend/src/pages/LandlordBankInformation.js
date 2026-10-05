@@ -19,7 +19,7 @@ const LandlordBankInformation = () => {
     setLoadingBanks(true);
     setBankLoadError('');
     try {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/chapa/banks`, { timeout: 20000 });
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/payments/banks`, { timeout: 20000 });
       const records = Array.isArray(response.data)
         ? response.data
         : response.data?.banks || response.data?.data?.banks || [];
