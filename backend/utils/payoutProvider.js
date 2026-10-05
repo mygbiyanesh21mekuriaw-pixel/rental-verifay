@@ -492,7 +492,7 @@ const listChapaBanks = async () => {
 
       message:
 
-        'Chapa bank list is unavailable because CHAPA_SECRET_KEY is not configured. Set a valid Chapa secret key in backend/.env and restart the backend.',
+        'Chapa bank list is unavailable because CHAPA_SECRET_KEY is not configured. For local development, set it in backend/.env and restart the backend. For deployment, add CHAPA_SECRET_KEY to the backend service environment variables and restart or redeploy that service. Never add the Chapa secret key to the frontend.',
 
     };
 

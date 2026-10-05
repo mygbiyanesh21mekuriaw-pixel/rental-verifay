@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
+import { FaTrash } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import BackToDashboard from '../components/BackToDashboard';
 import './TenantDashboard.css';
@@ -149,7 +150,7 @@ const TenantNotifications = () => {
                       </button>
                     )}
                     <button type="button" className="notification-delete-btn" onClick={() =>handleDelete(notification._id)} disabled={deletingId === notification._id} aria-label="Delete notification" title="Delete notification">
-                      {deletingId === notification._id ? '...' : ''}
+                      {deletingId === notification._id ? '...' : <FaTrash aria-hidden="true" />}
                     </button>
                   </div>
                 </div>
@@ -166,5 +167,4 @@ const TenantNotifications = () => {
 };
 
 export default TenantNotifications;
-
 

@@ -387,6 +387,13 @@ const Navbar = () => {
     sidebarLinks = defaultAdminLinks;
   }
 
+  sidebarLinks = sidebarLinks.filter(([, label]) => label !== 'Notifications');
+  const notificationsPath = user?.role === 'admin'
+    ? '/admin-dashboard/notifications'
+    : user?.role === 'landlord'
+      ? '/landlord/notifications'
+      : '/tenant/notifications';
+
   return (
     <>
       {/* ==========================================
@@ -394,6 +401,34 @@ const Navbar = () => {
       ========================================== */}
       {user && (
         <div className="navbar-topbar">
+          <Link to="/" className="navbar-topbar-brand">
+            <img
+              src="/mekdela-amba-logo.jpeg"
+              alt="Mekdela Amba University logo"
+              className="navbar-topbar-logo"
+            />
+            <span className="navbar-topbar-brand-copy">
+              <strong>House Rental</strong>
+              <span>Management Portal</span>
+            </span>
+          </Link>
+          <div className="navbar-topbar-context">
+            <span>{getRoleName(user.role)} workspace</span>
+            <strong>Overview / Dashboard</strong>
+          </div>
+          <Link
+            to={notificationsPath}
+            className={`navbar-topbar-notifications${location.pathname === notificationsPath ? ' active' : ''}`}
+            aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+            title="Notifications"
+          >
+            <FaBell aria-hidden="true" />
+            {unreadCount > 0 && (
+              <span className="navbar-topbar-notification-badge">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

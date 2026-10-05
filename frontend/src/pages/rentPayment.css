@@ -3,10 +3,10 @@
 .payment-page-header h1 { margin: 4px 0 8px; font-size: 32px; }
 .payment-page-header p { margin: 0; color: #64748b; }
 .payment-eyebrow { color: #0369a1 !important; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.landlord-layout .payment-page-header { padding: 22px 24px; border: 1px solid #6675e8; border-left: 4px solid #493ed6; border-radius: 10px; background: linear-gradient(110deg, #493ed6 0%, #6675e8 100%); }
-.landlord-layout .payment-page-header h1 { color: #fff; }
-.landlord-layout .payment-page-header p { color: rgba(255, 255, 255, 0.85); }
-.landlord-layout .payment-eyebrow { color: #fff !important; }
+.landlord-layout .payment-page-header { padding: 22px 24px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; box-shadow: 0 2px 10px rgba(21, 55, 85, 0.05); }
+.landlord-layout .payment-page-header h1 { color: #20364b; }
+.landlord-layout .payment-page-header p { color: #66788b; }
+.landlord-layout .payment-eyebrow { color: #66788b !important; }
 .payment-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .payment-card { padding: 26px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px rgba(15, 23, 42, .07); }
 .payment-card h2 { margin: 0 0 18px; font-size: 20px; }

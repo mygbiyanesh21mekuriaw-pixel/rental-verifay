@@ -15,6 +15,8 @@ The frontend uses environment-specific API URLs:
 
 For a different deployment backend, set `REACT_APP_API_URL` in the Render frontend service's environment variables and redeploy. This value is public frontend configuration; never put API secrets in frontend environment variables.
 
+Chapa bank lookup and payments require `CHAPA_SECRET_KEY` on the backend service. For Render, add it under the backend web service's Environment settings, then restart or redeploy the backend. Do not add this secret to the frontend service.
+
 In the project directory, you can run:
 
 ### `npm start`
