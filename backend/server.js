@@ -72,6 +72,7 @@ app.use('/api/view-history', require('./routes/viewHistoryRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/bank-accounts', require('./routes/bankAccountRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/favorites', require('./routes/favoriteRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));

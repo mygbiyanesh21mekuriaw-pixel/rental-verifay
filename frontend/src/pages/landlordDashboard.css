@@ -184,8 +184,35 @@
   font-weight: 600;
 }
 
+.landlord-account-message[role="note"] {
+  margin-bottom: 18px;
+  padding: 13px 15px;
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  line-height: 1.55;
+}
+
 .landlord-account-message[role="alert"] {
   color: #b91c1c;
+}
+
+.landlord-account-summary {
+  margin: 18px 0 24px;
+  padding: 18px;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.landlord-account-summary h3 {
+  margin: 0 0 12px;
+}
+
+.landlord-account-summary p {
+  margin: 7px 0;
 }
 
 @media (max-width: 640px) {

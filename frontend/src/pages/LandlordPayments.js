@@ -59,7 +59,7 @@ const LandlordPayments = () => {
         {loading ? <p className="payment-muted">Loading payments...</p> : payments.length === 0 ? <p className="payment-muted">No rent payments have been submitted yet.</p> : (
           <div className="payment-table-wrap">
             <table className="payment-table">
-              <thead><tr><th>Tenant</th><th>Property</th><th>Amount</th><th>Period</th><th>Date</th><th>Payment Status</th><th>Provider</th><th>Chapa Transaction Reference</th><th>Verified</th><th>Payout Status</th></tr></thead>
+              <thead><tr><th>Tenant</th><th>Property</th><th>Amount</th><th>Period</th><th>Date</th><th>Payment Status</th><th>Provider</th><th>Chapa Transaction Reference</th><th>Verified</th><th>Demo Account Credit</th><th>Payout Status</th></tr></thead>
               <tbody>{payments.map(payment => {
               const payoutStatus = getRealStatusValue(payment, 'payout', 'payoutStatus') ||
                 (payment.isVerified ? 'PENDING' : '');
@@ -83,6 +83,11 @@ const LandlordPayments = () => {
                       {verified ? `Yes · ${new Date(payment.verifiedAt).toLocaleDateString()}` : 'No'}
                     </span>
                   </td>
+                  <td>
+                    {payment.demoBankCredit?.status === 'credited'
+                      ? `${payment.demoBankCredit.accountNumber} · ${Number(payment.demoBankCredit.amount).toLocaleString()} ETB`
+                      : 'Not credited'}
+                  </td>
                   <td><span className={`payment-status payment-status-payout-${String(payoutStatus || 'na').toLowerCase()}`}>{formatPayoutStatus(payoutStatus)}</span></td>
                 </tr>
               );
@@ -96,4 +101,3 @@ const LandlordPayments = () => {
 };
 
 export default LandlordPayments;
-

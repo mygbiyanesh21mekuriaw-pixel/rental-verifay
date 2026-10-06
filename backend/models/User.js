@@ -36,6 +36,9 @@ const UserSchema = new mongoose.Schema({
   bankAccountNumber: { type: String, default: '', trim: true, select: false },
   bankCode: { type: String, default: '', trim: true },
   bankName: { type: String, default: '', trim: true },
+  bankAccountSource: { type: String, enum: ['', 'bank_api', 'existing_account', 'demo'], default: '' },
+  bankAccountConfigured: { type: Boolean, default: undefined },
+  bankAccountVerified: { type: Boolean, default: false },
   role: {
     type: String,
     enum: ['user', 'tenant', 'landlord', 'admin'],

@@ -3,20 +3,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { createSystemLog } = require('./systemLogController');
-const { listChapaBanks } = require('../utils/payoutProvider');
-const { encryptBankAccountNumber, decryptBankAccountNumber } = require('../utils/bankAccountCrypto');
+const { decryptBankAccountNumber } = require('../utils/bankAccountCrypto');
+const maskBankAccountNumber = require('../utils/maskBankAccountNumber');
 const sendEmail = require('../utils/email');
 const { uploadFilesToUrls } = require('../utils/uploadMedia');
 
 const registrationNamePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
 const registrationEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const registrationPhonePattern = /^(?:0[79]\d{8}|\+251[79]\d{8})$/;
-
-const maskAccountNumber = (value) => {
-  const accountNumber = String(value || '');
-  if (!accountNumber) return '';
-  return `${'*'.repeat(Math.max(0, accountNumber.length - 4))}${accountNumber.slice(-4)}`;
-};
 
 const normalizeLoginEmail = (email) => {
   const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -39,9 +33,22 @@ const serializeUser = (user) => ({
   bankAccountName: user.role === 'landlord' ? user.bankAccountName || '' : undefined,
   bankCode: user.role === 'landlord' ? user.bankCode || '' : undefined,
   bankName: user.role === 'landlord' ? user.bankName || '' : undefined,
-  bankAccountMasked: user.role === 'landlord'
-    ? maskAccountNumber(decryptBankAccountNumber(user.bankAccountNumber))
+  bankAccountMasked: user.role === 'landlord' && user.bankAccountSource !== 'demo'
+    ? maskBankAccountNumber(decryptBankAccountNumber(user.bankAccountNumber))
+    : '',
+  bankAccountDisplay: user.role === 'landlord' && user.bankAccountSource === 'demo'
+    ? decryptBankAccountNumber(user.bankAccountNumber)
     : undefined,
+  bankAccountSource: user.role === 'landlord' ? user.bankAccountSource || '' : undefined,
+  bankAccountConfigured: user.role === 'landlord'
+    ? Boolean(user.bankAccountConfigured ?? (
+      ['existing_account', 'demo'].includes(user.bankAccountSource) &&
+      user.bankAccountName &&
+      user.bankAccountNumber &&
+      user.bankCode
+    ))
+    : undefined,
+  bankAccountVerified: user.role === 'landlord' ? user.bankAccountVerified === true : undefined,
 });
 
 // አዲስ ተጠቃሚ መመዝገብ
@@ -185,12 +192,22 @@ const getMe = async (req, res) => {
 const updateProfile = async (req, res) => {
   try {
     const { name, email, phone, profilePhoto, bankAccountName, bankAccountNumber, bankCode } = req.body;
+    const bankInformationSubmitted = bankAccountName !== undefined ||
+      bankAccountNumber !== undefined ||
+      bankCode !== undefined;
     const userId = req.user.id;
 
     const user = await User.findById(userId)
       .select('+bankAccountNumber');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (bankInformationSubmitted) {
+      return res.status(400).json({
+        message: 'Real bank account registration is disabled in this demo portal. Create an internal demo account from Bank Information instead.',
+        code: 'REAL_BANK_ACCOUNT_REGISTRATION_DISABLED',
+      });
     }
 
     if (name !== undefined) {
@@ -209,33 +226,6 @@ const updateProfile = async (req, res) => {
     }
     if (phone !== undefined) user.phone = String(phone).trim();
     user.profilePhoto = profilePhoto || user.profilePhoto;
-    if (user.role === 'landlord') {
-      if (bankAccountName !== undefined || bankAccountNumber !== undefined || bankCode !== undefined) {
-        const normalizedAccountName = String(bankAccountName || '').trim();
-        const normalizedAccountNumber = String(bankAccountNumber || '').trim();
-        if (!normalizedAccountName || normalizedAccountName.length > 100 ||
-          !String(bankCode || '').trim()) {
-          return res.status(400).json({ message: 'Bank, account name and account number are required' });
-        }
-        if (!/^\d{4,30}$/.test(normalizedAccountNumber)) {
-          return res.status(400).json({ message: 'Account number must contain 4 to 30 digits.' });
-        }
-        const bankResult = await listChapaBanks();
-        if (!bankResult.ok) {
-          return res.status(503).json({
-            message: bankResult.message || 'Unable to verify supported banks right now. Please try again.',
-          });
-        }
-        const selectedBank = bankResult.banks.find((bank) => bank.code === String(bankCode).trim());
-        if (!selectedBank) {
-          return res.status(400).json({ message: 'Select a valid Chapa-supported bank' });
-        }
-        user.bankAccountName = normalizedAccountName;
-        user.bankAccountNumber = encryptBankAccountNumber(normalizedAccountNumber);
-        user.bankCode = selectedBank.code;
-        user.bankName = selectedBank.name;
-      }
-    }
     await user.save();
 
     await createSystemLog({

@@ -17,6 +17,20 @@ For a different deployment backend, set `REACT_APP_API_URL` in the Render fronte
 
 Chapa bank lookup and payments require `CHAPA_SECRET_KEY` on the backend service. For Render, add it under the backend web service's Environment settings, then restart or redeploy the backend. Do not add this secret to the frontend service.
 
+Landlord banking is simulated entirely inside this university demo. The backend issues a unique numeric account number whose exact length, numeric format, and optional prefix come from the central `backend/config/demoBanks.js` configuration, stores it in a dedicated virtual-account collection, and maintains an ETB balance and payment-credit history. New CBE demo numbers use the configured `100` prefix and total 13 digits. Existing accounts and payment-history references are not renumbered. The account number is always labeled **DEMO ACCOUNT** in the interface. Each bank has an independent sequence; MongoDB's unique account-number index rejects collisions across banks, and the generator retries with the next sequence. These are internal simulation formats only, not claims about any real institution's account-number format; no real bank account number is requested or created, and the virtual account does not connect to CBE or any other financial institution. CBE is configured as 13 digits and Awash as 14; other entries are internal demo lengths that can be changed in that configuration file.
+
+Chapa remains the tenant rent checkout and payment-verification provider. Once Chapa confirms a payment and the application records it as paid, the backend atomically increments the landlord's demo balance and appends the credit-history record in one account-document update, preventing duplicate credits without requiring MongoDB replica-set transactions. The platform admin can view demo accounts at **Admin Dashboard → Demo Bank Accounts**. Chapa credentials remain backend-only and are used for tenant payments, not for bank-account creation or transfers.
+
+Demo bank API (all landlord endpoints require authentication):
+
+- `GET /api/bank-accounts/demo/banks` — internal demo bank options.
+- `POST /api/bank-accounts/demo` with `{ "bankCode": "CBE" }` — create or return the landlord's one active demo account; the server uses the authenticated landlord's profile name.
+- `GET /api/bank-accounts/my-account` and `GET /api/bank-accounts/my-account/balance` — account and balance.
+- `GET /api/bank-accounts/my-account/transactions` — confirmed rent credits.
+- `GET /api/admin/demo-bank-accounts` — platform-admin demo account list.
+
+No seed or new environment variable is required. Account counters and accounts are created automatically in MongoDB. Configure the existing backend Chapa settings to use checkout and payment verification; the internal demo balance is credited only after verification succeeds.
+
 In the project directory, you can run:
 
 ### `npm start`

@@ -79,6 +79,30 @@ test('prints the selected verified receipt', async () => {
   expect(window.print).toHaveBeenCalledTimes(1);
 });
 
+test('tenant rent payment screen never asks for landlord bank information', async () => {
+  axios.get.mockResolvedValue({ data: tenantPaymentContext });
+  renderTenantPayment();
+
+  expect(await screen.findByRole('heading', { name: 'Pay Rent' })).toBeInTheDocument();
+  expect(screen.queryByLabelText(/bank/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/account name/i)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/account number/i)).not.toBeInTheDocument();
+});
+
+test('tenant receives a clear message when landlord has not created a demo account', async () => {
+  axios.get.mockResolvedValue({
+    data: {
+      ...tenantPaymentContext,
+      landlordBankInformationComplete: false,
+      landlordBankInformationMessage: 'The landlord has not created an active demo bank account. Please contact the landlord before paying rent.',
+    },
+  });
+  renderTenantPayment();
+
+  expect(await screen.findByText(/has not created an active demo bank account/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Pay Rent' })).toBeDisabled();
+});
+
 test('downloads a PDF from the verified receipt', async () => {
   axios.get.mockResolvedValue({ data: tenantPaymentContext });
   const originalCreateObjectUrl = URL.createObjectURL;

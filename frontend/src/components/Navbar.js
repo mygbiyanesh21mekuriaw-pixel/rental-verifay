@@ -270,6 +270,12 @@ const Navbar = () => {
     ],
 
     [
+      FaCreditCard,
+      'Demo Bank Accounts',
+      '/admin-dashboard/demo-bank-accounts',
+    ],
+
+    [
       FaBell,
       'Notifications',
       '/admin-dashboard/notifications',

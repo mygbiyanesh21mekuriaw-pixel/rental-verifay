@@ -359,7 +359,8 @@ const TenantRentPayment = () => {
           <h2>Submit a payment</h2>
           <p className="payment-muted">Complete the secure provider checkout to confirm this payment.</p>
           {!context.landlordBankInformationComplete && (
-            <p className="payment-error" role="alert">The landlord has not completed bank information. Please contact the landlord before paying rent.
+            <p className="payment-error" role="alert">
+              {context.landlordBankInformationMessage || 'The landlord has not completed bank information. Please contact the landlord before paying rent.'}
             </p>
           )}
           {error && <p className="payment-error">{error}</p>}

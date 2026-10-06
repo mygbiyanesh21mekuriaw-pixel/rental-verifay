@@ -355,6 +355,7 @@ function App() {
             <Route path="/admin-dashboard/all-users" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="allUsers" /></PrivateRoute>} />
             <Route path="/admin-dashboard/admin-management" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="adminManagement" /></PrivateRoute>} />
             <Route path="/admin-dashboard/payment-period" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="paymentPeriod" /></PrivateRoute>} />
+            <Route path="/admin-dashboard/demo-bank-accounts" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="demoBankAccounts" /></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
@@ -366,7 +367,6 @@ function App() {
 }
 
 export default App;
-
 
 
 

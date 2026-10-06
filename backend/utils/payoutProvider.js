@@ -526,7 +526,6 @@ const listChapaBanks = async () => {
       }
 
     );
-console.log('CHAPA BANK RESPONSE:', JSON.stringify(payload, null, 2));
     const records =
 
       Array.isArray(payload?.data)

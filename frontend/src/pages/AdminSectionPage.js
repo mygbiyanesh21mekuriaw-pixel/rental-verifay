@@ -16,6 +16,7 @@ const sectionConfig = {
   allUsers: { title: 'All users', endpoint: 'users' },
   adminManagement: { title: 'Admin Management', endpoint: 'users' },
   paymentPeriod: { title: 'Payment Period', endpoint: 'payment-periods' },
+  demoBankAccounts: { title: 'DEMO Bank Accounts', endpoint: 'demo-bank-accounts' },
   verified: { title: 'Verified Properties', status: 'approved' },
 };
 
@@ -320,6 +321,37 @@ const AdminSectionPage = ({ type }) => {
                   <p className="admin-card-detail"> {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString() : 'Date unavailable'}</p>
                   <p className="admin-card-detail">Status: {payment.status || 'Unknown'}</p>
                   <p className="admin-card-detail">Reference: {payment.paymentReference || 'N/A'}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {type === 'demoBankAccounts' && isPlatformAdmin && (
+        <section className="admin-detail-section admin-dedicated-content">
+          <h2 className="admin-card-title">DEMO Bank Accounts</h2>
+          <p className="admin-subtitle">
+            Internal university-project accounts only. These are not real bank accounts.
+          </p>
+          {loading ? (
+            <div className="admin-loading-small">Loading demo accounts...</div>
+          ) : loadError ? (
+            <div className="admin-empty-text">{loadError}</div>
+          ) : items.length === 0 ? (
+            <div className="admin-empty-text">No demo bank accounts have been created.</div>
+          ) : (
+            <div className="admin-grid">
+              {items.map((account) => (
+                <div key={account._id} className="admin-card">
+                  <h4 className="admin-card-title">DEMO · {account.landlord}</h4>
+                  <p className="admin-card-detail">Bank: {account.bankName} ({account.bankCode})</p>
+                  <p className="admin-card-detail">Demo Account Number: {account.accountNumber}</p>
+                  <p className="admin-card-detail">Balance: {Number(account.balance || 0).toFixed(2)} ETB</p>
+                  <p className="admin-card-detail">Status: {account.status}</p>
+                  <p className="admin-card-detail">
+                    Created: {account.createdAt ? new Date(account.createdAt).toLocaleString() : 'N/A'}
+                  </p>
                 </div>
               ))}
             </div>

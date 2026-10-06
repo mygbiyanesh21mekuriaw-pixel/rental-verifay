@@ -16,6 +16,7 @@ const {
   deleteAreaAdminAccount,
 } = require('../controllers/adminController');
 const { getSystemLogs } = require('../controllers/systemLogController');
+const { getAllDemoAccounts } = require('../controllers/bankAccountController');
 const { auth, adminOnly, areaAdminOnly, platformAdminOnly } = require('../middleware/auth');
 
 // ሁሉም አስተዳዳሪ ተግባራት (Admin ብቻ)
@@ -28,6 +29,7 @@ router.get('/stats', auth, platformAdminOnly, getStats);
 router.get('/analytics', auth, platformAdminOnly, getAnalytics);
 router.get('/system-logs', auth, platformAdminOnly, getSystemLogs);
 router.get('/payment-periods', auth, platformAdminOnly, getAdminPaymentPeriods);
+router.get('/demo-bank-accounts', auth, platformAdminOnly, getAllDemoAccounts);
 router.delete('/users/:id', auth, platformAdminOnly, deleteUser);
 router.post('/users/admin', auth, platformAdminOnly, createAdminAccount);
 router.put('/users/admin/:id', auth, platformAdminOnly, updateAreaAdminAccount);
