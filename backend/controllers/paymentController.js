@@ -1,23 +1,31 @@
-﻿const crypto = require('crypto');
+const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const Payout = require('../models/Payout');
-const DemoBankAccount = require('../models/DemoBankAccount');
 const Property = require('../models/Property');
 const RentalRequest = require('../models/RentalRequest');
 const User = require('../models/User');
+const LandlordCredit = require('../models/LandlordCredit');
 const Notification = require('../models/Notification');
 const { createSystemLog } = require('./systemLogController');
+const { creditLandlordForPayment } = require('../services/landlordCreditService');
 
 const {
   getProviderConfig,
+  getPaymentMode,
   hasChapaConfig,
   initializeChapaPayment,
   verifyChapaPayment,
   validateChapaPaymentVerification,
 } = require('../utils/paymentProvider');
 
-const { listChapaBanks } = require('../utils/payoutProvider');
-const { creditDemoAccountForPayment } = require('../services/demoBankAccountService');
+const {
+  listChapaBanks,
+} = require('../utils/payoutProvider');
+const { getPayoutEligibility } = require('../services/payoutEligibility');
+const {
+  processLandlordPayout,
+  toExternalTransferStatus,
+} = require('../services/landlordPayoutService');
 
 
 const getChapaBanks = async (req, res) => {
@@ -57,6 +65,36 @@ const paymentResponse = (payment) => {
     ...record,
     isVerified: isVerifiedPayment(payment),
   };
+};
+
+const ensureLandlordCredit = async (payment) => {
+  try {
+    return await creditLandlordForPayment(payment);
+  } catch (error) {
+    console.error(
+      `[LANDLORD CREDIT] Unable to process payment ${payment?.paymentReference || payment?._id}:`,
+      error.message
+    );
+    return {
+      status: 'FAILED',
+      reason: 'Unable to record the landlord account credit. It can be retried.',
+    };
+  }
+};
+
+const ensureLandlordPayout = async (payment) => {
+  const creditResult = await ensureLandlordCredit(payment);
+  if (creditResult.status !== 'CREDITED') return null;
+
+  try {
+    return await processLandlordPayout(payment);
+  } catch (error) {
+    console.error(
+      `[PAYOUT] Unable to process payment ${payment?.paymentReference || payment?._id}:`,
+      error.message
+    );
+    return null;
+  }
 };
 
 
@@ -119,33 +157,6 @@ const verifyPaymentRelationships = async (payment) => {
   return rental;
 };
 
-const processDemoBankCreditSafely = async (payment) => {
-  try {
-    const demoCredit = await creditDemoAccountForPayment(payment);
-    if (demoCredit.handled) {
-      console.info(
-        '[DEMO BANK] rent payment ' +
-        (demoCredit.alreadyCredited ? 'was already credited' : 'credited') +
-        ' payment=' + payment.paymentReference
-      );
-      return demoCredit;
-    }
-    console.warn(
-      '[DEMO BANK] payment has no active virtual account; credit skipped payment=' +
-      (payment?.paymentReference || 'unknown')
-    );
-    return null;
-  } catch {
-    console.error(
-      '[DEMO BANK] credit processing failed payment=' +
-      (payment?.paymentReference || 'unknown')
-    );
-
-    return null;
-  }
-};
-
-
 /*
 |--------------------------------------------------------------------------
 | CREATE PAYMENT
@@ -177,19 +188,20 @@ const createPayment = async (req, res) => {
     if (!property.landlord || !Number.isFinite(Number(property.price)) || Number(property.price) <= 0) {
       return res.status(409).json({ message: 'Rented property payment details are incomplete' });
     }
-    const demoBankAccount = await DemoBankAccount.findOne({
-      landlord: property.landlord,
-      status: 'active',
-    }).select('_id');
-    if (!demoBankAccount) {
+
+    const landlord = await User.findById(property.landlord).select('+bankAccountNumber bankAccountName bankAccountNumber bankCode bankName bankAccountSource bankAccountConfigured bankAccountVerified');
+    const payoutEligibility = getPayoutEligibility(landlord);
+    if (!payoutEligibility.eligible) {
       return res.status(409).json({
-        message: 'The landlord has not created an active demo bank account. Please contact the landlord before paying rent.',
-        code: 'LANDLORD_DEMO_BANK_ACCOUNT_REQUIRED',
+        message: payoutEligibility.message || 'The landlord has not registered a bank account.',
+        code: 'LANDLORD_BANK_ACCOUNT_REQUIRED',
       });
     }
+
     const tenant = await User.findById(req.user.id).select('email phone');
     if (!tenant) return res.status(403).json({ message: 'Authenticated tenant not found' });
     const paymentReference = `RP-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const paymentMode = getPaymentMode();
     let payment = await Payment.findOne({ tenant: req.user.id, property: propertyId, paymentPeriod: period });
 
     if (payment?.status === 'paid' && !isVerifiedPayment(payment)) {
@@ -234,6 +246,7 @@ const createPayment = async (req, res) => {
         currency: payment.currency,
         paymentPeriod: payment.paymentPeriod,
         status: payment.status,
+        paymentMode: payment.paymentMode,
         verifiedAt: payment.verifiedAt,
         startedAt: payment.attemptStartedAt || payment.createdAt || new Date(),
         finishedAt: payment.updatedAt || new Date(),
@@ -252,6 +265,7 @@ const createPayment = async (req, res) => {
             status: 'pending',
             paymentReference,
             provider: 'chapa',
+            paymentMode,
             verifiedAt: null,
             attemptStartedAt: new Date(),
           },
@@ -287,6 +301,7 @@ const createPayment = async (req, res) => {
         status: 'pending',
         paymentReference,
         provider: 'chapa',
+        paymentMode,
         attemptStartedAt: new Date(),
       });
     }
@@ -371,7 +386,7 @@ const createPayment = async (req, res) => {
 const applyChapaVerification = async (payment, verification, req) => {
   if (!payment) return payment;
   if (isVerifiedPayment(payment)) {
-    await processDemoBankCreditSafely(payment);
+    await ensureLandlordPayout(payment);
     return payment;
   }
   if (payment.status === 'paid') {
@@ -388,9 +403,7 @@ const applyChapaVerification = async (payment, verification, req) => {
       { new: true }
     );
     if (!downgradedPayment) {
-      const currentPayment = await Payment.findById(payment._id);
-      if (isVerifiedPayment(currentPayment)) await processDemoBankCreditSafely(currentPayment);
-      return currentPayment || payment;
+      return await Payment.findById(payment._id) || payment;
     }
     payment = downgradedPayment;
   }
@@ -437,12 +450,11 @@ const applyChapaVerification = async (payment, verification, req) => {
     { new: true, runValidators: true }
   );
   if (!updatedPayment) {
-    const currentPayment = await Payment.findById(payment._id);
-    if (isVerifiedPayment(currentPayment)) await processDemoBankCreditSafely(currentPayment);
-    return currentPayment || payment;
+    return await Payment.findById(payment._id) || payment;
   }
 
   if (status === 'paid') {
+    await ensureLandlordPayout(updatedPayment);
     const confirmedPayment = await paymentView(Payment.findById(updatedPayment._id));
     const propertyTitle = confirmedPayment.property?.title || 'Rented property';
     await Notification.create([
@@ -451,7 +463,6 @@ const applyChapaVerification = async (payment, verification, req) => {
       { recipientRole: 'admin', property: updatedPayment.property, propertyTitle, message: 'A tenant rent payment was confirmed.', instructions: `Payment reference: ${updatedPayment.paymentReference}.`, type: 'info' },
     ]);
     await createSystemLog({ user: updatedPayment.tenant, role: 'tenant', action: 'PAYMENT_CONFIRMED', description: `Tenant rent payment for property "${propertyTitle}" was confirmed.`, property: updatedPayment.property, payment: updatedPayment._id, status: 'success', ipAddress: req?.ip || req?.socket?.remoteAddress || '' });
-    await processDemoBankCreditSafely(updatedPayment);
   } else {
     await createSystemLog({ user: updatedPayment.tenant, role: 'tenant', action: 'PAYMENT_FAILED', description: `Tenant rent payment for property "${updatedPayment.property}" ended in ${status} status.`, property: updatedPayment.property, payment: updatedPayment._id, status: 'failed', ipAddress: req?.ip || req?.socket?.remoteAddress || '' });
   }
@@ -461,7 +472,7 @@ const applyChapaVerification = async (payment, verification, req) => {
 const reconcilePayment = async (payment, req) => {
   if (!payment) return payment;
   if (isVerifiedPayment(payment)) {
-    await processDemoBankCreditSafely(payment);
+    await ensureLandlordPayout(payment);
     return payment;
   }
   if (!['pending', 'paid'].includes(payment.status)) return payment;
@@ -480,7 +491,7 @@ const finalizeChapaPayment = async (reference, req, res) => {
   });
   if (!payment) return res.status(404).json({ message: 'Payment not found' });
   if (isVerifiedPayment(payment)) {
-    await processDemoBankCreditSafely(payment);
+    await ensureLandlordPayout(payment);
     return res.json({ message: 'Payment already confirmed', payment: await paymentView(Payment.findById(payment._id)) });
   }
   const reconciledPayment = await reconcilePayment(payment, req);
@@ -505,10 +516,9 @@ const getTenantPaymentContext = async (req, res) => {
     if (!property) return res.status(403).json({ message: 'You can only view payments for your rented property' });
     const rental = await getConfirmedRental(property._id, req.user.id);
     if (!rental) return res.status(403).json({ message: 'Payment is only available for your approved or confirmed rented property.' });
-    const demoBankAccount = await DemoBankAccount.findOne({
-      landlord: property.landlord._id,
-      status: 'active',
-    }).select('_id');
+
+    const landlordProfile = await User.findById(property.landlord._id).select('+bankAccountNumber bankAccountName bankAccountNumber bankCode bankName bankAccountSource bankAccountConfigured bankAccountVerified');
+    const landlordPayoutEligibility = getPayoutEligibility(landlordProfile);
     const paymentRecords = await Payment.find({ tenant: req.user.id, property: property._id }).sort({ createdAt: -1 });
     for (const payment of paymentRecords) await reconcilePayment(payment, req);
     const populatedPayments = await paymentView(Payment.find({ tenant: req.user.id, property: property._id }).sort({ createdAt: -1 }));
@@ -517,20 +527,29 @@ const getTenantPaymentContext = async (req, res) => {
       if (!latest) return payment;
       return new Date(payment.createdAt || 0).getTime() > new Date(latest.createdAt || 0).getTime() ? payment : latest;
     }, null);
-    const canonicalPayout = canonicalPayment ? await Payout.findOne({ payment: canonicalPayment._id }).select('status payoutReference providerReference failureReason') : null;
+    const canonicalPayout = canonicalPayment
+      ? await Payout.findOne({ payment: canonicalPayment._id })
+        .select('status mode sandboxTransferStatus payoutReference providerReference failureReason')
+      : null;
+    const canonicalCredit = canonicalPayment
+      ? await LandlordCredit.findOne({ payment: canonicalPayment._id }).select('status reason creditedAt providerTransactionReference')
+      : null;
     res.json({
       property,
       landlord: property.landlord,
-      landlordBankInformationComplete: Boolean(demoBankAccount),
-      landlordBankInformationMessage: demoBankAccount
+      landlordBankInformationComplete: landlordPayoutEligibility.eligible,
+      landlordBankInformationMessage: landlordPayoutEligibility.eligible
         ? ''
-        : 'The landlord has not created an active demo bank account. Please contact the landlord before paying rent.',
+        : (landlordPayoutEligibility.message || 'Landlord payout account is not configured.'),
       payments,
       currentPayment: canonicalPayment,
       latestPayment: canonicalPayment,
       paymentStatus: canonicalPayment?.status || null,
       payoutStatus: canonicalPayout?.status || null,
       payout: canonicalPayout,
+      landlordCreditStatus: canonicalCredit?.status || null,
+      landlordCredit: canonicalCredit,
+      externalTransferStatus: toExternalTransferStatus(canonicalPayout?.status, canonicalPayout?.mode),
     });
   } catch (error) {
     console.error('Get tenant payment context error:', error);
@@ -541,41 +560,62 @@ const getTenantPaymentContext = async (req, res) => {
 const getLandlordPayments = async (req, res) => {
   try {
     const paymentRecords = await paymentView(Payment.find({ landlord: req.user.id }).sort({ createdAt: -1 }));
-    const demoAccount = await DemoBankAccount.findOne({
-      landlord: req.user.id,
-    }).select('accountNumber bankName credits');
-    const demoCreditByPayment = new Map(
-      (demoAccount?.credits || []).map((credit) => [String(credit.payment), credit])
+    for (const payment of paymentRecords) {
+      if (isVerifiedPayment(payment)) await ensureLandlordPayout(payment);
+    }
+    const payoutRecords = await Payout.find({ landlord: req.user.id }).select(
+      'payment paymentReference status mode sandboxTransferStatus payoutReference providerReference failureReason providerRequestResponse providerVerificationResponse lastVerifiedAt'
     );
-    const payoutRecords = await Payout.find({ landlord: req.user.id }).select('payment paymentReference status payoutReference providerReference failureReason');
+    const creditRecords = await LandlordCredit.find({
+      landlord: req.user.id,
+      payment: { $in: paymentRecords.map((payment) => payment._id) },
+    }).select('payment status reason amount currency paymentReference providerTransactionReference creditedAt externalTransferStatus sandboxTransferStatus');
     const payoutByPayment = new Map();
     const payoutByPaymentReference = new Map();
+    const creditByPayment = new Map();
     payoutRecords.forEach((payout) => {
       if (payout?.payment) payoutByPayment.set(String(payout.payment), payout);
       if (payout?.paymentReference) payoutByPaymentReference.set(String(payout.paymentReference), payout);
     });
+    creditRecords.forEach((credit) => creditByPayment.set(String(credit.payment), credit));
     const payments = paymentRecords.map((paymentRecord) => {
       const payment = paymentResponse(paymentRecord);
       const payout = payoutByPayment.get(String(payment._id)) || payoutByPaymentReference.get(String(payment.paymentReference)) || null;
-      const demoCredit = demoCreditByPayment.get(String(payment._id));
+      const credit = creditByPayment.get(String(payment._id)) || null;
       const payoutStatus = payout?.status || null;
+      const externalTransferStatus = toExternalTransferStatus(payoutStatus, payout?.mode);
+      payment.landlordCreditStatus = credit?.status || null;
+      payment.landlordCredit = credit ? {
+        status: credit.status,
+        sandboxTransferStatus: credit.sandboxTransferStatus || null,
+        reason: credit.reason || '',
+        amount: credit.amount,
+        currency: credit.currency,
+        paymentReference: credit.paymentReference,
+        providerTransactionReference: credit.providerTransactionReference,
+        creditedAt: credit.creditedAt,
+      } : null;
+      payment.externalTransferStatus = externalTransferStatus;
       payment.payoutStatus = payoutStatus;
       payment.transferStatus = payoutStatus;
       payment.payoutStatusValue = payoutStatus;
       payment.transferStatusValue = payoutStatus;
-      payment.payout = payout ? { status: payoutStatus, payoutReference: payout.payoutReference || null, providerReference: payout.providerReference || null, failureReason: payout.failureReason || null } : null;
-      payment.transfer = payout ? { status: payoutStatus, providerReference: payout.providerReference || payout.payoutReference || null, payoutReference: payout.payoutReference || null } : null;
+      payment.payout = payout ? {
+        status: payoutStatus,
+        mode: payout.mode || null,
+        sandboxTransferStatus: payout.sandboxTransferStatus || null,
+        payoutReference: payout.payoutReference || null,
+        providerReference: payout.providerReference || null,
+        failureReason: payout.failureReason || null,
+        providerRequestResponse: payout.providerRequestResponse || null,
+        providerVerificationResponse: payout.providerVerificationResponse || null,
+        lastVerifiedAt: payout.lastVerifiedAt || null,
+      } : null;
+      payment.transfer = payout?.providerReference ? { status: payoutStatus, providerReference: payout.providerReference, payoutReference: payout.payoutReference || null } : null;
       payment.payoutReference = payout?.payoutReference || null;
       payment.transferReference = payout?.providerReference || payout?.payoutReference || null;
       payment.paymentProvider = payment.provider || null;
       payment.chapaTransactionReference = payment.providerTransactionReference || null;
-      payment.demoBankCredit = demoCredit ? {
-        status: 'credited',
-        accountNumber: demoAccount.accountNumber,
-        bankName: demoAccount.bankName,
-        amount: Number(demoCredit.amount),
-        creditedAt: demoCredit.creditedAt,
-      } : null;
       return payment;
     });
     res.json(payments);

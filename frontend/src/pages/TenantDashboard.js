@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { FaBell, FaFileAlt, FaHeart, FaHome } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import './TenantDashboard.css';
 
@@ -29,10 +30,10 @@ const TenantDashboard = () => {
 
         if (!isActive) return;
         setStats([
-          { label: 'Available Properties', value: Array.isArray(propertiesRes.data) ? propertiesRes.data.length : 0 },
-          { label: 'My Rental Requests', value: Array.isArray(requestsRes.data) ? requestsRes.data.length : 0 },
-          { label: 'Favorite Properties', value: Array.isArray(favoritesRes.data) ? favoritesRes.data.length : 0 },
-          { label: 'Unread Notifications', value: Number(notificationsRes.data?.unreadCount || 0) },
+          { label: 'Available Properties', value: Array.isArray(propertiesRes.data) ? propertiesRes.data.length : 0, icon: <FaHome aria-hidden="true" />, iconClass: 'tenant-stat-icon-properties' },
+          { label: 'My Rental Requests', value: Array.isArray(requestsRes.data) ? requestsRes.data.length : 0, icon: <FaFileAlt aria-hidden="true" />, iconClass: 'tenant-stat-icon-requests' },
+          { label: 'Favorite Properties', value: Array.isArray(favoritesRes.data) ? favoritesRes.data.length : 0, icon: <FaHeart aria-hidden="true" />, iconClass: 'tenant-stat-icon-favorites' },
+          { label: 'Unread Notifications', value: Number(notificationsRes.data?.unreadCount || 0), icon: <FaBell aria-hidden="true" />, iconClass: 'tenant-stat-icon-notifications' },
         ]);
       } catch (error) {
         if (!isActive) return;
@@ -57,10 +58,13 @@ const TenantDashboard = () => {
         <p className="tenant-dashboard-stats-error" role="alert">{statsError}</p>
       ) : stats ? (
         <section className="tenant-stats" aria-label="Dashboard statistics">
-          {stats.map(({ label, value }) => (
+          {stats.map(({ label, value, icon, iconClass }) => (
             <article className="tenant-stat-card" key={label}>
+              <div className="tenant-stat-card-heading">
+                <span className="tenant-stat-label">{label}</span>
+                <span className={`tenant-stat-icon ${iconClass}`}>{icon}</span>
+              </div>
               <span className="tenant-stat-number">{Number(value).toLocaleString()}</span>
-              <span className="tenant-stat-label">{label}</span>
             </article>
           ))}
         </section>

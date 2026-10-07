@@ -9,6 +9,7 @@ const multer = require('multer');
 const connectDB = require('./config/db');
 const createAdmin = require('./create-admin');
 const { migrateLegacyBankAccountNumbers } = require('./utils/bankAccountCrypto');
+const { startPayoutReconciliation } = require('./services/payoutReconciliation');
 
 // የአካባቢ ተለዋዋጮችን ጫን
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -127,6 +128,7 @@ const startServer = async () => {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
+    startPayoutReconciliation();
   });
 };
 

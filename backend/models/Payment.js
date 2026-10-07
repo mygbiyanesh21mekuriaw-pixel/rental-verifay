@@ -10,6 +10,7 @@ const PaymentAttemptSchema = new mongoose.Schema({
   currency: { type: String, enum: ['ETB'] },
   paymentPeriod: { type: String, trim: true },
   status: { type: String, enum: ['pending', 'paid', 'failed', 'cancelled'] },
+  paymentMode: { type: String, enum: ['sandbox', 'live'], default: undefined },
   verifiedAt: { type: Date, default: null },
   startedAt: { type: Date, required: true },
   finishedAt: { type: Date, default: null },
@@ -65,6 +66,11 @@ const PaymentSchema = new mongoose.Schema({
   provider: {
     type: String,
     trim: true,
+  },
+  paymentMode: {
+    type: String,
+    enum: ['sandbox', 'live'],
+    default: undefined,
   },
   providerReference: {
     type: String,

@@ -2,7 +2,22 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FaBars, FaSignOutAlt, FaTimes } from 'react-icons/fa';
+import {
+  FaBars,
+  FaBell,
+  FaBuilding,
+  FaCheck,
+  FaCog,
+  FaFileAlt,
+  FaHardHat,
+  FaHome,
+  FaHourglassHalf,
+  FaMoneyBill,
+  FaPlus,
+  FaSignOutAlt,
+  FaStar,
+  FaTimes,
+} from 'react-icons/fa';
 import LandlordSectionPage from './LandlordSectionPage';
 import LandlordRequests from './LandlordRequests';
 import LandlordPayments from './LandlordPayments';
@@ -40,18 +55,18 @@ const getFileErrorMessage = (file, label) => {
 };
 
 export const landlordSidebarItems = [
-  { key: 'myProperties', label: 'My Properties', icon: '', path: '/landlord/my-properties' },
-  { key: 'verified', label: 'Verified Properties', icon: '', path: '/landlord/verified-properties' },
-  { key: 'addProperty', label: 'Add Property', icon: '', path: '/landlord/add-property' },
-  { key: 'rentalRequests', label: 'Rental Requests', icon: '', path: '/landlord/rental-requests' },
-  { key: 'rented', label: 'Rented Properties', icon: '', path: '/landlord/rented-properties' },
-  { key: 'reviews', label: 'Tenant Reviews', icon: '', path: '/landlord/reviews' },
-  { key: 'underReview', label: 'Under Review', icon: '', path: '/landlord/under-review' },
-  { key: 'rejected', label: 'Rejected', icon: '', path: '/landlord/rejected' },
-  { key: 'rentPayments', label: 'Rent Payments', icon: '', path: '/landlord/rent-payments' },
-  { key: 'notifications', label: 'Notifications', icon: '', path: '/landlord/notifications' },
-  { key: 'accountSettings', label: 'Account Settings', icon: '', path: '/landlord/account-settings' },
-  { key: 'bankInformation', label: 'Bank Information', icon: '', path: '/landlord/bank-information' },
+  { key: 'myProperties', label: 'My Properties', icon: <FaHome aria-hidden="true" />, path: '/landlord/my-properties' },
+  { key: 'verified', label: 'Verified Properties', icon: <FaCheck aria-hidden="true" />, path: '/landlord/verified-properties' },
+  { key: 'addProperty', label: 'Add Property', icon: <FaPlus aria-hidden="true" />, path: '/landlord/add-property' },
+  { key: 'rentalRequests', label: 'Rental Requests', icon: <FaFileAlt aria-hidden="true" />, path: '/landlord/rental-requests' },
+  { key: 'rented', label: 'Rented Properties', icon: <FaHardHat aria-hidden="true" />, path: '/landlord/rented-properties' },
+  { key: 'reviews', label: 'Tenant Reviews', icon: <FaStar aria-hidden="true" />, path: '/landlord/reviews' },
+  { key: 'underReview', label: 'Under Review', icon: <FaHourglassHalf aria-hidden="true" />, path: '/landlord/under-review' },
+  { key: 'rejected', label: 'Rejected', icon: <FaTimes aria-hidden="true" />, path: '/landlord/rejected' },
+  { key: 'rentPayments', label: 'Rent Payments', icon: <FaMoneyBill aria-hidden="true" />, path: '/landlord/rent-payments' },
+  { key: 'notifications', label: 'Notifications', icon: <FaBell aria-hidden="true" />, path: '/landlord/notifications' },
+  { key: 'accountSettings', label: 'Account Settings', icon: <FaCog aria-hidden="true" />, path: '/landlord/account-settings' },
+  { key: 'bankInformation', label: 'Bank Information', icon: <FaBuilding aria-hidden="true" />, path: '/landlord/bank-information' },
 ];
 
 export const LandlordSidebar = ({
@@ -84,7 +99,9 @@ export const LandlordSidebar = ({
       className={`landlord-sidebar fixed inset-y-0 left-0 z-40 flex w-[260px] translate-x-0 flex-col border-r border-slate-700 bg-slate-900 text-slate-200 shadow-lg ${isOpen ? 'is-open' : ''}`}
     >
         <div className="flex items-center gap-3 border-b border-slate-700 px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm"></div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm">
+            <FaBuilding aria-hidden="true" />
+          </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Workspace</p>
             <h1 className="text-xl font-bold text-white">House Rental Management System</h1>
@@ -562,12 +579,12 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
 
   const renderOverview = () => {
     const cards = [
-      { key: 'myProperties', label: 'My Properties', value: overviewStats.properties, icon: '', path: '/landlord/my-properties', accent: 'bg-blue-50 text-blue-700' },
-      { key: 'verified', label: 'Verified Properties', value: overviewStats.verified, icon: '', path: '/landlord/verified-properties', accent: 'bg-[#1d4ed8] text-emerald-700' },
-      { key: 'rentalRequests', label: 'Rental Requests', value: overviewStats.requests, icon: '', path: '/landlord/rental-requests', accent: 'bg-violet-50 text-violet-700' },
-      { key: 'rented', label: 'Rented Properties', value: overviewStats.rented, icon: '', path: '/landlord/rented-properties', accent: 'bg-amber-50 text-amber-700' },
-      { key: 'rentPayments', label: 'Rent Payments', value: overviewStats.payments, icon: '', path: '/landlord/rent-payments', accent: 'bg-cyan-50 text-cyan-700' },
-      { key: 'notifications', label: 'Notifications', value: overviewStats.notifications, icon: '', path: '/landlord/notifications', accent: 'bg-rose-50 text-rose-700' },
+      { key: 'myProperties', label: 'My Properties', value: overviewStats.properties, icon: <FaHome aria-hidden="true" />, path: '/landlord/my-properties', accent: 'bg-blue-50 text-blue-700' },
+      { key: 'verified', label: 'Verified Properties', value: overviewStats.verified, icon: <FaCheck aria-hidden="true" />, path: '/landlord/verified-properties', accent: 'bg-[#1d4ed8] text-white' },
+      { key: 'rentalRequests', label: 'Rental Requests', value: overviewStats.requests, icon: <FaFileAlt aria-hidden="true" />, path: '/landlord/rental-requests', accent: 'bg-violet-50 text-violet-700' },
+      { key: 'rented', label: 'Rented Properties', value: overviewStats.rented, icon: <FaHardHat aria-hidden="true" />, path: '/landlord/rented-properties', accent: 'bg-amber-50 text-amber-700' },
+      { key: 'rentPayments', label: 'Rent Payments', value: overviewStats.payments, icon: <FaMoneyBill aria-hidden="true" />, path: '/landlord/rent-payments', accent: 'bg-cyan-50 text-cyan-700' },
+      { key: 'notifications', label: 'Notifications', value: overviewStats.notifications, icon: <FaBell aria-hidden="true" />, path: '/landlord/notifications', accent: 'bg-rose-50 text-rose-700' },
     ];
 
     return (

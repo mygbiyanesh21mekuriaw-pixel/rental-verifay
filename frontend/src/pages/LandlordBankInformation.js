@@ -2,211 +2,443 @@ import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-const getBankInformationError = (requestError) => {
-  const status = requestError.response?.status;
-  if (status === 401) return 'Your session has expired. Please log in again.';
-  if (status === 403) return 'Only landlord accounts can access demo bank information.';
-  if (status === 404) {
-    return 'The demo bank API route was not found. Restart the backend server and try again.';
-  }
-  return requestError.response?.data?.message || 'Unable to load demo bank account information.';
-};
-
 const getAuthConfig = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
 });
 
+const getBankInformationError = (requestError) => {
+  const status = requestError.response?.status;
+  if (status === 401) return 'Your session has expired. Please log in again.';
+  if (status === 403) return 'Only landlord accounts can access bank information.';
+  return requestError.response?.data?.message || 'Unable to load bank account information.';
+};
+
 const LandlordBankInformation = () => {
   const { user } = useAuth();
   const [banks, setBanks] = useState([]);
-  const [selectedBankCode, setSelectedBankCode] = useState('');
   const [account, setAccount] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [form, setForm] = useState({
+    bankCode: '',
+    accountName: user?.name || '',
+    accountNumber: '',
+  });
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [error, setError] = useState('');
+  const [bankListError, setBankListError] = useState('');
   const [loadError, setLoadError] = useState('');
-  const [historyError, setHistoryError] = useState('');
   const [message, setMessage] = useState('');
 
   const loadBankInformation = useCallback(async () => {
     setLoading(true);
-    setError('');
     setLoadError('');
-    setHistoryError('');
+    setBankListError('');
     try {
-      const [banksResponse, accountResponse] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_API_URL}/api/bank-accounts/demo/banks`, getAuthConfig()),
-        axios.get(`${process.env.REACT_APP_API_URL}/api/bank-accounts/my-account`, getAuthConfig()),
-      ]);
-      setBanks(Array.isArray(banksResponse.data) ? banksResponse.data : []);
-      setAccount(accountResponse.data?.account || null);
-      try {
-        const transactionsResponse = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/bank-accounts/my-account/transactions`,
+      const loadBanks = async () => {
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/bank-accounts/banks`,
           getAuthConfig()
         );
-        setTransactions(Array.isArray(transactionsResponse.data?.transactions)
-          ? transactionsResponse.data.transactions
-          : []);
-      } catch (requestError) {
-        setTransactions([]);
-        setHistoryError(getBankInformationError(requestError));
+        const availableBanks = Array.isArray(response.data?.banks)
+          ? response.data.banks
+          : [];
+        if (availableBanks.length === 0) {
+          throw new Error('No payout banks are currently available from Chapa.');
+        }
+        return availableBanks;
+      };
+
+      const [banksResult, accountResult, transactionsResult] = await Promise.allSettled([
+        loadBanks(),
+        axios.get(`${process.env.REACT_APP_API_URL}/api/bank-accounts/my-account`, getAuthConfig()),
+        axios.get(
+          `${process.env.REACT_APP_API_URL}/api/bank-accounts/my-account/transactions`,
+          getAuthConfig()
+        ),
+      ]);
+      if (accountResult.status === 'rejected') throw accountResult.reason;
+      if (transactionsResult.status === 'rejected') throw transactionsResult.reason;
+
+      const availableBanks = banksResult.status === 'fulfilled' ? banksResult.value : [];
+      if (banksResult.status === 'rejected') {
+        setBankListError(getBankInformationError(banksResult.reason));
       }
+      const accountResponse = accountResult.value;
+      const transactionsResponse = transactionsResult.value;
+      const savedAccount = accountResponse.data?.account || null;
+      setBanks(availableBanks);
+      setAccount(savedAccount);
+      setTransactions(Array.isArray(transactionsResponse.data?.transactions)
+        ? transactionsResponse.data.transactions
+        : []);
+      setForm({
+        bankCode: savedAccount?.bankCode || '',
+        accountName: savedAccount?.accountName || user?.name || '',
+        accountNumber: '',
+      });
     } catch (requestError) {
       setLoadError(getBankInformationError(requestError));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.name]);
 
   useEffect(() => {
     loadBankInformation();
   }, [loadBankInformation]);
 
-  const createAccount = async (event) => {
-    event.preventDefault();
-    if (!selectedBankCode || creating) return;
+  useEffect(() => {
+    if (!showUpdateModal) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape' && !saving) setShowUpdateModal(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [showUpdateModal, saving]);
 
-    setCreating(true);
+  const openCreateForm = () => {
+    setForm({
+      bankCode: '',
+      accountName: user?.name || '',
+      accountNumber: '',
+    });
+    setError('');
+    setShowCreateForm(true);
+  };
+
+  const openUpdateModal = () => {
+    setForm({
+      bankCode: account?.bankCode || '',
+      accountName: account?.accountName || user?.name || '',
+      accountNumber: '',
+    });
+    setError('');
+    setShowUpdateModal(true);
+  };
+
+  const saveBankAccount = async (event, isUpdate = false) => {
+    event.preventDefault();
+    if (saving) return;
+
+    const selectedBank = banks.find((bank) => bank.code === form.bankCode);
+    const accountName = form.accountName.trim();
+    const accountNumber = form.accountNumber.trim();
+    if (!selectedBank || !accountName || (!accountNumber && !isUpdate)) {
+      setError('Select a bank and enter the account holder name and account number.');
+      return;
+    }
+
+    setSaving(true);
     setError('');
     setMessage('');
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/api/bank-accounts/demo`,
-        { bankCode: selectedBankCode },
+        `${process.env.REACT_APP_API_URL}/api/bank-accounts`,
+        {
+          bankCode: selectedBank.code,
+          bankName: selectedBank.name,
+          accountName,
+          ...(accountNumber ? { accountNumber } : {}),
+        },
         getAuthConfig()
       );
-      setAccount(response.data?.account || null);
-      setMessage(response.data?.message || 'Your demo bank account is now active.');
       await loadBankInformation();
+      setForm((previous) => ({ ...previous, accountName, accountNumber: '' }));
+      setShowCreateForm(false);
+      setShowUpdateModal(false);
+      setMessage(response.data?.message || 'Bank account saved successfully.');
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Unable to create the demo bank account.');
+      setError(requestError.response?.data?.message || 'Unable to save your bank account.');
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   };
 
+  const renderFormFields = (isUpdate) => (
+    <>
+      <label htmlFor={isUpdate ? 'update-landlord-bank' : 'create-landlord-bank'}>
+        Bank <span aria-hidden="true">*</span>
+        <select
+          id={isUpdate ? 'update-landlord-bank' : 'create-landlord-bank'}
+          value={form.bankCode}
+          onChange={(event) => setForm((current) => ({ ...current, bankCode: event.target.value }))}
+          required
+          disabled={saving || banks.length === 0}
+        >
+          <option value="">Select a bank</option>
+          {banks.map((bank) => (
+            <option key={bank.code} value={bank.code}>{bank.name}</option>
+          ))}
+        </select>
+      </label>
+
+      <label htmlFor={isUpdate ? 'update-landlord-account-name' : 'create-landlord-account-name'}>
+        Account Name <span aria-hidden="true">*</span>
+        <input
+          id={isUpdate ? 'update-landlord-account-name' : 'create-landlord-account-name'}
+          type="text"
+          value={form.accountName}
+          onChange={(event) => setForm((current) => ({ ...current, accountName: event.target.value }))}
+          placeholder="Enter account name (as on your bank account)"
+          autoComplete="name"
+          required
+          disabled={saving}
+        />
+      </label>
+
+      <label htmlFor={isUpdate ? 'update-landlord-account-number' : 'create-landlord-account-number'}>
+        Account Number {!isUpdate && <span aria-hidden="true">*</span>}
+        <input
+          id={isUpdate ? 'update-landlord-account-number' : 'create-landlord-account-number'}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          value={form.accountNumber}
+          onChange={(event) => setForm((current) => ({ ...current, accountNumber: event.target.value }))}
+          placeholder={isUpdate ? 'Enter a new number or leave blank to keep current' : 'Enter account number'}
+          required={!isUpdate}
+          disabled={saving}
+        />
+        {isUpdate && (
+          <small className="bank-account-field-help">
+            The saved number stays masked. Leave this blank to keep it unchanged.
+          </small>
+        )}
+      </label>
+    </>
+  );
+
   return (
-    <section className="landlord-account-page">
+    <section className="landlord-account-page landlord-bank-information">
       <header className="landlord-account-heading landlord-bank-information-heading">
         <div>
-          <p>LANDLORD</p>
+          <p>LANDLORD WORKSPACE</p>
           <h1>Bank Information</h1>
-          <span>Manage your internal demo account used for rent payment simulation.</span>
+          <span>Manage your saved bank details and view rent credits. Transfers are sent through Chapa and confirmed before they are marked executed.</span>
         </div>
       </header>
 
-      <section className="landlord-account-card">
-        <h2>DEMO BANK ACCOUNT</h2>
-        <p className="landlord-account-message" role="note">
-          This account is created inside the Rental Verification Portal for university project
-          simulation. It is NOT a real bank account and does not connect to CBE, Awash Bank, or
-          any real financial institution.
-        </p>
+      <section className="landlord-account-card bank-account-panel" aria-labelledby="bank-account-panel-title">
+        <h2 id="bank-account-panel-title">Bank Information</h2>
 
-        {loading ? (
-          <p className="landlord-account-help" role="status">Loading demo account...</p>
-        ) : loadError ? (
-          <p className="landlord-account-message" role="alert">{loadError}</p>
-        ) : account ? (
-          <>
-            {message && <p className="landlord-account-message" role="status">{message}</p>}
-            <div className="landlord-account-summary">
-              <h3>✓ Demo Bank Account Active</h3>
-              <p><strong>Bank:</strong> {account.bankName} ({account.bankCode})</p>
-              <p><strong>Account Name:</strong> {account.accountName}</p>
-              <p><strong>DEMO ACCOUNT NUMBER:</strong> {account.accountNumber}</p>
-              <p><strong>Balance:</strong> {Number(account.balance || 0).toFixed(2)} ETB</p>
-              <p><strong>Status:</strong> {account.status
-                ? account.status.charAt(0).toUpperCase() + account.status.slice(1)
-                : 'Unknown'}</p>
-            </div>
-            <h3>Payment History</h3>
-            {historyError ? (
-              <p className="landlord-account-message" role="alert">{historyError}</p>
-            ) : transactions.length === 0 ? (
-              <p className="landlord-account-help">No rent payments have been credited yet.</p>
-            ) : (
-              <div className="payment-table-wrap">
-                <table className="payment-table">
-                  <thead>
-                    <tr>
-                      <th>Payment Date</th>
-                      <th>Tenant</th>
-                      <th>Property</th>
-                      <th>Amount</th>
-                      <th>Payment Status</th>
-                      <th>Credited To</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((transaction) => (
-                      <tr key={transaction.id}>
-                        <td>{transaction.creditedAt ? new Date(transaction.creditedAt).toLocaleString() : 'N/A'}</td>
-                        <td>{transaction.tenant}</td>
-                        <td>{transaction.property}</td>
-                        <td>{transaction.currency} {Number(transaction.amount).toLocaleString()}</td>
-                        <td>{transaction.paymentStatus}</td>
-                        <td>{transaction.creditedTo}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        {message && <p className="landlord-account-message" role="status">{message}</p>}
+        {bankListError && <p className="landlord-account-message" role="alert">{bankListError}</p>}
+        {loadError ? (
+          <div className="bank-account-load-error">
+            <p className="landlord-account-message" role="alert">{loadError}</p>
             <button
               type="button"
               className="landlord-account-button"
               onClick={loadBankInformation}
               disabled={loading}
             >
-              Refresh Balance and History
+              {loading ? 'Loading...' : 'Retry'}
+            </button>
+          </div>
+        ) : loading ? (
+          <p className="landlord-account-help" role="status">Loading bank information...</p>
+        ) : account ? (
+          <>
+            <div className="bank-account-active-banner">
+              <span aria-hidden="true">✓</span>
+              <div>
+                <strong>Your bank account is active</strong>
+                <p>Verified live rent payments are submitted to this bank account through Chapa. Sandbox requests are simulations and do not move real bank funds. A transfer is marked executed only after Chapa confirms a live transfer.</p>
+              </div>
+              <span className="bank-account-status">Active</span>
+            </div>
+
+            <div className="bank-account-details">
+              <h3>Bank Account Details</h3>
+              <dl>
+                <div><dt>Bank</dt><dd>{account.bankName} ({account.bankCode})</dd></div>
+                <div><dt>Account Name</dt><dd>{account.accountName}</dd></div>
+                <div><dt>Account Number</dt><dd>{account.accountNumberMasked || '••••'}</dd></div>
+                <div><dt>Status</dt><dd className="bank-account-active-text">Active</dd></div>
+                <div><dt>Internal Available Balance</dt><dd>{account.currency || 'ETB'} {Number(account.balance || 0).toLocaleString()}</dd></div>
+              </dl>
+              <p className="bank-account-field-help">
+                This is your internal platform balance, not the balance in your {account.bankName} account. External transfers appear only after Chapa confirms them.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="landlord-account-button secondary"
+              onClick={openUpdateModal}
+            >
+              Update Bank Account
             </button>
           </>
+        ) : showCreateForm ? (
+          <div className="bank-account-create-layout">
+            <div className="bank-account-create-card">
+              <h3>Create Bank Account</h3>
+              <form className="landlord-account-form" onSubmit={(event) => saveBankAccount(event)}>
+                {renderFormFields(false)}
+                {error && <p className="landlord-account-message" role="alert">{error}</p>}
+                <div className="landlord-account-actions">
+                  <button type="submit" className="landlord-account-button" disabled={saving || banks.length === 0}>
+                    {saving ? 'Saving...' : 'Create Account'}
+                  </button>
+                  <button
+                    type="button"
+                    className="landlord-account-button"
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setError('');
+                    }}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {banks.length === 0 && (
+                  <p className="landlord-account-message" role="alert">No supported banks are available right now. Please retry later.</p>
+                )}
+              </form>
+            </div>
+
+            <aside className="bank-account-supported-card">
+              <h3><span aria-hidden="true">✓</span> Supported Banks</h3>
+              <p>Please select a bank from the available bank list.</p>
+              <p>Only supported banks are allowed for account registration.</p>
+              <details>
+                <summary>View supported banks</summary>
+                <ul>
+                  {banks.map((bank) => <li key={bank.code}>{bank.name}</li>)}
+                </ul>
+              </details>
+            </aside>
+          </div>
         ) : (
-          <>
-            <p className="landlord-account-help">You don't have a demo bank account configured yet.</p>
-            {error && <p className="landlord-account-message" role="alert">{error}</p>}
-            <form className="landlord-account-form" onSubmit={createAccount}>
-              <label htmlFor="demo-bank">Bank
-                <select
-                  id="demo-bank"
-                  value={selectedBankCode}
-                  onChange={(event) => setSelectedBankCode(event.target.value)}
-                  required
-                  disabled={banks.length === 0 || creating}
-                >
-                  <option value="" disabled>Select a demo bank</option>
-                  {banks.map((bank) => (
-                    <option value={bank.code} key={bank.code}>{bank.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label htmlFor="demo-account-name">Account Name
-                <input
-                  id="demo-account-name"
-                  value={user?.name || ''}
-                  readOnly
-                  aria-readonly="true"
-                />
-              </label>
-              <p className="landlord-account-help">
-                The system assigns a numeric demo number using this bank's configured demo format.
-                It is an internal DEMO ACCOUNT number, not a real bank account number.
-              </p>
-              <button
-                type="submit"
-                className="landlord-account-button"
-                disabled={creating || !selectedBankCode}
-              >
-                {creating ? 'Creating Demo Account...' : 'Create Demo Bank Account'}
-              </button>
-            </form>
-          </>
+          <div className="bank-account-empty-state">
+            <span className="bank-account-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" focusable="false">
+                <path d="M5 18h38M9 18v21m10-21v21m10-21v21m10-21v21M5 42h38M24 5 4 15h40L24 5Z" />
+              </svg>
+            </span>
+            <h3>No payout bank account has been registered yet.</h3>
+            <p>You need to create a bank account to receive rent payments from tenants.</p>
+            <button type="button" className="landlord-account-button" onClick={openCreateForm}>
+              <span aria-hidden="true">＋</span> Create Bank Account
+            </button>
+          </div>
         )}
-        {!loading && error && account && <p className="landlord-account-message" role="alert">{error}</p>}
+
+        {!loadError && !loading && (
+          <section className="bank-account-transactions" aria-labelledby="bank-account-transactions-title">
+            <div className="bank-account-transactions-heading">
+              <div>
+                <h3 id="bank-account-transactions-title">Account Transactions</h3>
+                <p>Internal rent credits are separate from external bank transfers.</p>
+              </div>
+            </div>
+            {transactions.length === 0 ? (
+              <p className="landlord-account-help">No account transactions have been recorded yet.</p>
+            ) : (
+              <div className="bank-account-transactions-wrap">
+                <table className="bank-account-transactions-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th>Tenant</th>
+                      <th>Property</th>
+                      <th>Amount</th>
+                      <th>Credit/Debit</th>
+                      <th>Landlord Credit</th>
+                      <th>External Transfer</th>
+                      <th>Reference</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map((transaction) => (
+                      <tr key={transaction.id}>
+                        <td>{transaction.date ? new Date(transaction.date).toLocaleDateString() : '—'}</td>
+                        <td>{transaction.description}</td>
+                        <td>{transaction.tenant}</td>
+                        <td>{transaction.property}</td>
+                        <td>{transaction.currency || 'ETB'} {Number(transaction.amount).toLocaleString()}</td>
+                        <td>{transaction.direction}</td>
+                        <td>{transaction.status}</td>
+                        <td>
+                          {String(transaction.externalTransferStatus || 'NOT_EXECUTED').replace(/_/g, ' ')}
+                          {transaction.payoutMode === 'sandbox' && transaction.sandboxTransferStatus && (
+                            <small className="bank-account-field-help">
+                              Sandbox simulation: {transaction.sandboxTransferStatus.toLowerCase()}; no real transfer.
+                            </small>
+                          )}
+                          {transaction.providerReference && (
+                            <small className="bank-account-field-help">Transfer reference: {transaction.providerReference}</small>
+                          )}
+                          {transaction.payoutFailureReason && (
+                            <small className="bank-account-field-help">{transaction.payoutFailureReason}</small>
+                          )}
+                        </td>
+                        <td>{transaction.providerTransactionReference || transaction.paymentReference}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
       </section>
+
+      {showUpdateModal && account && (
+        <div
+          className="bank-account-modal-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !saving) setShowUpdateModal(false);
+          }}
+        >
+          <section
+            className="bank-account-update-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bank-account-update-title"
+          >
+            <div className="bank-account-modal-heading">
+              <h2 id="bank-account-update-title">Update Bank Account</h2>
+              <button
+                type="button"
+                className="bank-account-modal-close"
+                aria-label="Close update bank account dialog"
+                onClick={() => setShowUpdateModal(false)}
+                disabled={saving}
+              >
+                ×
+              </button>
+            </div>
+            <form className="landlord-account-form" onSubmit={(event) => saveBankAccount(event, true)}>
+              {renderFormFields(true)}
+              {error && <p className="landlord-account-message" role="alert">{error}</p>}
+              <div className="landlord-account-actions">
+                <button type="submit" className="landlord-account-button" disabled={saving || banks.length === 0}>
+                  {saving ? 'Saving...' : 'Update Account'}
+                </button>
+                <button
+                  type="button"
+                  className="landlord-account-button"
+                  onClick={() => {
+                    setShowUpdateModal(false);
+                    setError('');
+                  }}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </section>
   );
 };

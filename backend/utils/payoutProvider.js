@@ -10,6 +10,18 @@ const transferConfig = () => ({
 
     .toLowerCase(),
 
+  mode: (process.env.PAYMENT_MODE || 'sandbox')
+
+    .trim()
+
+    .toLowerCase(),
+
+  sandboxEnabled: String(process.env.PAYMENT_SANDBOX || 'false')
+
+    .trim()
+
+    .toLowerCase() === 'true',
+
   // CHAPA_BASE_URL is optional.
 
   // If it is not in .env, use Chapa's default API URL.
@@ -26,6 +38,11 @@ const transferConfig = () => ({
   ).trim(),
 
 });
+
+const isSandboxTransferMode = () => {
+  const config = transferConfig();
+  return config.sandboxEnabled || ['sandbox', 'test'].includes(config.mode);
+};
 
 const hasTransferConfig = () => {
 
@@ -237,6 +254,20 @@ const normalizeChapaBank = (bank) => {
 
 };
 
+const summarizeTransferResponse = (response, payload) => {
+  const data = payload?.data || {};
+  return {
+    httpStatus: response?.status ?? null,
+    apiStatus: String(payload?.status || '').trim(),
+    message: String(payload?.message || payload?.error || '').trim(),
+    reference: String(data.reference || data.tx_ref || payload?.reference || '').trim(),
+    transferId: data.id === undefined || data.id === null ? '' : String(data.id),
+    status: String(data.status || payload?.status || '').trim(),
+    amount: data.amount === undefined ? null : String(data.amount),
+    currency: String(data.currency || '').trim(),
+  };
+};
+
 const initiateChapaTransfer = async ({
 
   accountName,
@@ -248,6 +279,8 @@ const initiateChapaTransfer = async ({
   bankCode,
 
   reference,
+
+  testStatus,
 
 }) => {
 
@@ -268,6 +301,11 @@ const initiateChapaTransfer = async ({
   }
 
   const config = transferConfig();
+  const sandboxMode = isSandboxTransferMode();
+
+  if (sandboxMode && !['success', 'failed', 'pending'].includes(testStatus)) {
+    throw new Error('Chapa sandbox transfer status must be success, failed, or pending.');
+  }
 
   const {
 
@@ -300,19 +338,13 @@ const initiateChapaTransfer = async ({
       },
 
       body: JSON.stringify({
-
         account_name: accountName,
-
         account_number: accountNumber,
-
         amount: Number(amount).toFixed(2),
-
         currency: 'ETB',
-
         reference,
-
         bank_code: bankCode,
-
+        ...(sandboxMode ? { status: testStatus } : {}),
       }),
 
     }
@@ -336,17 +368,9 @@ const initiateChapaTransfer = async ({
   return {
 
     ok:
-
       response.ok &&
-
-      (
-
-        payload?.status === undefined ||
-
-        payload.status === 'success' ||
-
-        payload.status === 'successful'
-
+      ['success', 'successful'].includes(
+        String(payload?.status || '').toLowerCase()
       ),
 
     status: normalizeTransferStatus(
@@ -362,27 +386,17 @@ const initiateChapaTransfer = async ({
 
       payload?.error ||
 
-      'Transfer request failed',
+      `Chapa transfer request failed with HTTP ${response.status}`,
 
-    payload,
+    responseDetails: summarizeTransferResponse(response, payload),
 
   };
 
 };
 
-const verifyChapaTransfer = async (
+const verifyChapaTransfer = async (reference, expectedTransfer = {}) => {
 
-  reference
-
-) => {
-
-  if (
-
-    !hasTransferConfig() ||
-
-    !reference
-
-  ) {
+  if (!hasTransferConfig() || !reference) {
 
     return {
 
@@ -447,8 +461,19 @@ const verifyChapaTransfer = async (
     returnedReference &&
     returnedReference === requestedReference
   );
+  const returnedAmount = Number(data.amount);
+  const expectedAmount = Number(expectedTransfer.amount);
+  const amountConfirmed = expectedTransfer.amount === undefined ||
+    data.amount === undefined ||
+    (Number.isFinite(returnedAmount) &&
+      Number.isFinite(expectedAmount) &&
+      returnedAmount.toFixed(2) === expectedAmount.toFixed(2));
+  const currencyConfirmed = expectedTransfer.currency === undefined ||
+    data.currency === undefined ||
+    String(data.currency || '').trim().toUpperCase() ===
+      String(expectedTransfer.currency).trim().toUpperCase();
   const transactionStatus = normalizeTransferStatus(data.status);
-  const confirmed = apiConfirmed && referenceConfirmed;
+  const confirmed = apiConfirmed && referenceConfirmed && amountConfirmed && currencyConfirmed;
 
   return {
     ok: confirmed,
@@ -457,15 +482,11 @@ const verifyChapaTransfer = async (
       ? returnedReference
       : requestedReference,
 
-    message:
+    message: !amountConfirmed || !currencyConfirmed
+      ? 'Chapa transfer amount or currency does not match the payout.'
+      : (payload?.message || payload?.error || ''),
 
-      payload?.message ||
-
-      payload?.error ||
-
-      '',
-
-    payload,
+    responseDetails: summarizeTransferResponse(response, payload),
 
   };
 
@@ -655,5 +676,7 @@ module.exports = {
   normalizeTransferStatus,
 
   normalizeChapaBank,
+
+  isSandboxTransferMode,
 
 };

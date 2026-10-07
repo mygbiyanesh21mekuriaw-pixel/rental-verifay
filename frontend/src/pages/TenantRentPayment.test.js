@@ -89,17 +89,17 @@ test('tenant rent payment screen never asks for landlord bank information', asyn
   expect(screen.queryByLabelText(/account number/i)).not.toBeInTheDocument();
 });
 
-test('tenant receives a clear message when landlord has not created a demo account', async () => {
+test('tenant receives a clear message when landlord has not registered a bank account', async () => {
   axios.get.mockResolvedValue({
     data: {
       ...tenantPaymentContext,
       landlordBankInformationComplete: false,
-      landlordBankInformationMessage: 'The landlord has not created an active demo bank account. Please contact the landlord before paying rent.',
+      landlordBankInformationMessage: 'The landlord has not registered a complete bank account.',
     },
   });
   renderTenantPayment();
 
-  expect(await screen.findByText(/has not created an active demo bank account/)).toBeInTheDocument();
+  expect(await screen.findByText(/has not registered a complete bank account/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Pay Rent' })).toBeDisabled();
 });
 
@@ -139,6 +139,9 @@ test('shows landlord payment, verification, provider reference, and payout statu
       chapaTransactionReference: 'CHAPA-transaction-1',
       payoutStatus: 'PROCESSING',
       payout: { status: 'PROCESSING' },
+      landlordCreditStatus: 'CREDITED',
+      landlordCredit: { status: 'CREDITED', providerTransactionReference: 'CHAPA-transaction-1' },
+      externalTransferStatus: 'PENDING',
     }],
   });
   render(
@@ -149,6 +152,7 @@ test('shows landlord payment, verification, provider reference, and payout statu
 
   await waitFor(() => expect(screen.getByText('CHAPA-transaction-1')).toBeInTheDocument());
   expect(screen.getByText('Paid')).toBeInTheDocument();
-  expect(screen.getByText('PROCESSING')).toBeInTheDocument();
+  expect(screen.getByText('CREDITED')).toBeInTheDocument();
+  expect(screen.getByText('PENDING')).toBeInTheDocument();
   expect(screen.getByText(/^Yes ·/)).toBeInTheDocument();
 });

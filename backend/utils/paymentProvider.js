@@ -67,6 +67,13 @@ const getProviderConfig = () => {
   };
 };
 
+const getPaymentMode = () => {
+  const config = getProviderConfig();
+  return config.sandboxEnabled || ['sandbox', 'test'].includes(config.mode)
+    ? 'sandbox'
+    : 'live';
+};
+
 const hasChapaConfig = () => {
   const config = getProviderConfig();
 
@@ -153,16 +160,21 @@ const initializeChapaPayment = async ({
       }),
     }
   );
-  console.log(
-  'CHAPA VERIFY RESPONSE:',
-  JSON.stringify(payload, null, 2)
-);
+  const returnedReference = payload?.data?.tx_ref;
+  const referenceMatches = returnedReference === undefined ||
+    (typeof returnedReference === 'string' && returnedReference.trim() === paymentReference);
+  console.info(
+    `[CHAPA] Initialization response HTTP ${response.status}; ` +
+    `providerStatus=${String(payload?.status || 'missing')}; ` +
+    `checkoutUrl=${Boolean(payload?.data?.checkout_url)}; ` +
+    `txRef=${returnedReference === undefined ? 'omitted' : (referenceMatches ? 'matched' : 'mismatched')}.`
+  );
 
   if (
     !response.ok ||
     !['success', 'successful'].includes(String(payload?.status || '').toLowerCase()) ||
     !payload?.data?.checkout_url ||
-    payload?.data?.tx_ref !== paymentReference
+    !referenceMatches
   ) {
     return {
       ok: false,
@@ -180,7 +192,7 @@ const initializeChapaPayment = async ({
     provider: 'chapa',
     providerStatus: 'initialized',
 
-    providerReference: payload.data.tx_ref,
+    providerReference: paymentReference,
 
     providerCheckoutUrl:
       payload.data.checkout_url,
@@ -412,6 +424,7 @@ const normalizeProviderStatus = (status) => {
 
 module.exports = {
   getProviderConfig,
+  getPaymentMode,
   hasChapaConfig,
   initializeChapaPayment,
   verifyChapaPayment,

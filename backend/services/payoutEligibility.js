@@ -13,14 +13,14 @@ const getPayoutEligibility = (landlord) => {
   if (!hasAccountDetails) {
     return {
       eligible: false,
-      message: 'Landlord payout bank details are incomplete.',
+      message: 'The landlord has not registered a complete bank account.',
     };
   }
 
   if (landlord.bankAccountConfigured === false) {
     return {
       eligible: false,
-      message: 'Landlord payout account is not configured for real payouts.',
+      message: 'The landlord bank account is not configured.',
     };
   }
 
@@ -38,7 +38,7 @@ const getPayoutEligibility = (landlord) => {
 
   return {
     eligible: false,
-    message: 'Landlord payout account is not verified for real payouts.',
+    message: 'The landlord bank account is not verified.',
   };
 };
 

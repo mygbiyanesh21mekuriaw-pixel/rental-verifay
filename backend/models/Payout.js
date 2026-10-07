@@ -12,14 +12,24 @@ const PayoutSchema = new mongoose.Schema({
   property: { type: mongoose.Schema.Types.ObjectId, ref: 'Property', required: true },
   amount: { type: Number, required: true, min: 0 },
   currency: { type: String, enum: ['ETB'], default: 'ETB' },
+  mode: { type: String, enum: ['sandbox', 'live'], required: true },
   paymentReference: { type: String, required: true, trim: true },
   payoutReference: { type: String, required: true, unique: true, trim: true },
   providerReference: { type: String, trim: true, unique: true, sparse: true },
   status: {
     type: String,
-    enum: ['PENDING', 'PROCESSING', 'PAID', 'FAILED', 'REVERTED'],
+    enum: ['PENDING', 'PROCESSING', 'PAID', 'FAILED', 'REVERTED', 'SIMULATED'],
     default: 'PENDING',
   },
+  sandboxTransferStatus: {
+    type: String,
+    enum: ['PROCESSING', 'SUCCEEDED', 'FAILED'],
+    default: undefined,
+  },
+  providerRequestResponse: { type: mongoose.Schema.Types.Mixed, default: null },
+  providerVerificationResponse: { type: mongoose.Schema.Types.Mixed, default: null },
+  lastVerifiedAt: { type: Date, default: null },
+  transferAttemptedAt: { type: Date, default: null },
   failureReason: { type: String, trim: true, default: '' },
 }, { timestamps: true });
 

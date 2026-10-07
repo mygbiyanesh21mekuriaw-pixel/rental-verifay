@@ -1,7 +1,17 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const DemoBankAccount = require('../models/DemoBankAccount');
-const { getMyDemoAccount } = require('../controllers/bankAccountController');
+const LandlordCredit = require('../models/LandlordCredit');
+const Payout = require('../models/Payout');
+const Payment = require('../models/Payment');
+const User = require('../models/User');
+const {
+  createLandlordBankAccount,
+  getMyDemoAccount,
+  getMyBankAccount,
+  getMyBankTransactions,
+  getSupportedBanks,
+} = require('../controllers/bankAccountController');
 
 const createResponse = () => ({
   statusCode: null,
@@ -15,6 +25,38 @@ const createResponse = () => ({
     return this;
   },
 });
+
+const withChapaBanks = async (run) => {
+  const originalFetch = global.fetch;
+  const envKeys = ['PAYMENT_PROVIDER', 'CHAPA_SECRET_KEY', 'CHAPA_BASE_URL'];
+  const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+  process.env.PAYMENT_PROVIDER = 'chapa';
+  process.env.CHAPA_SECRET_KEY = 'test-only-secret';
+  process.env.CHAPA_BASE_URL = 'https://chapa.example.test';
+  global.fetch = async (url) => {
+    assert.equal(url, 'https://chapa.example.test/v1/banks');
+    return {
+      ok: true,
+      json: async () => ({
+        status: 'success',
+        data: [
+          { bank_code: 'CBE', bank_name: 'Commercial Bank of Ethiopia (CBE)' },
+          { bank_code: 'AWASH', bank_name: 'Awash Bank' },
+        ],
+      }),
+    };
+  };
+
+  try {
+    await run();
+  } finally {
+    global.fetch = originalFetch;
+    for (const key of envKeys) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+  }
+};
 
 test('account lookup succeeds with a null account when landlord has not created one', async () => {
   const originalFindOne = DemoBankAccount.findOne;
@@ -65,5 +107,221 @@ test('account lookup returns the active landlord account in the success response
     assert.equal(response.body.account.bankCode, 'CBE');
   } finally {
     DemoBankAccount.findOne = originalFindOne;
+  }
+});
+
+test('bank registration options use bank codes supported by Chapa payouts', async () => {
+  await withChapaBanks(async () => {
+    const response = createResponse();
+
+    await getSupportedBanks(
+      { user: { id: 'landlord-id', role: 'landlord' } },
+      response
+    );
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body.banks, [
+      { name: 'Commercial Bank of Ethiopia (CBE)', code: 'CBE', slug: '' },
+      { name: 'Awash Bank', code: 'AWASH', slug: '' },
+    ]);
+  });
+});
+
+test('real account lookup returns null for a landlord with no saved bank account', async () => {
+  const originalFindById = User.findById;
+  const originalPaymentFind = Payment.find;
+  Payment.find = async () => [];
+  User.findById = () => ({
+    select: async () => ({
+      _id: 'landlord-id',
+      bankName: '',
+      bankCode: '',
+      bankAccountName: '',
+      bankAccountNumber: '',
+      bankAccountConfigured: false,
+    }),
+  });
+  const response = createResponse();
+
+  try {
+    await getMyBankAccount(
+      { user: { id: 'landlord-id', role: 'landlord' } },
+      response
+    );
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body, { success: true, account: null });
+  } finally {
+    User.findById = originalFindById;
+    Payment.find = originalPaymentFind;
+  }
+});
+
+test('saves landlord bank details encrypted on the authenticated landlord and only returns a mask', async () => {
+  const originalFindById = User.findById;
+  const originalPaymentFind = Payment.find;
+  Payment.find = async () => [];
+  const previousEncryptionKey = process.env.BANK_ACCOUNT_ENCRYPTION_KEY;
+  const landlord = {
+    _id: 'landlord-id',
+    role: 'landlord',
+    async save() {},
+  };
+  let queriedLandlordId;
+  User.findById = (id) => {
+    queriedLandlordId = id;
+    return { select: async () => landlord };
+  };
+  process.env.BANK_ACCOUNT_ENCRYPTION_KEY = 'test-only-bank-account-encryption-key';
+  const response = createResponse();
+
+  try {
+    await withChapaBanks(async () => {
+      await createLandlordBankAccount(
+        {
+          user: { id: 'landlord-id', role: 'landlord' },
+          body: {
+            bankCode: 'CBE',
+            bankName: 'client-provided name is ignored',
+            accountName: 'Dejen Mulat',
+            accountNumber: '100123456789',
+          },
+        },
+        response
+      );
+
+      assert.equal(response.statusCode, 200);
+      assert.equal(queriedLandlordId, 'landlord-id');
+      assert.equal(landlord.bankName, 'Commercial Bank of Ethiopia (CBE)');
+      assert.equal(landlord.bankCode, 'CBE');
+      assert.equal(landlord.bankAccountName, 'Dejen Mulat');
+      assert.notEqual(landlord.bankAccountNumber, '100123456789');
+      assert.match(landlord.bankAccountNumber, /^enc:v1:/);
+      assert.equal(landlord.bankAccountSource, 'existing_account');
+      assert.equal(landlord.bankAccountConfigured, true);
+      assert.equal(response.body.account.accountNumberMasked, '********6789');
+      assert.equal(Object.hasOwn(response.body.account, 'accountNumber'), false);
+    });
+  } finally {
+    User.findById = originalFindById;
+    Payment.find = originalPaymentFind;
+    if (previousEncryptionKey === undefined) {
+      delete process.env.BANK_ACCOUNT_ENCRYPTION_KEY;
+    } else {
+      process.env.BANK_ACCOUNT_ENCRYPTION_KEY = previousEncryptionKey;
+    }
+  }
+});
+
+test('account update keeps the encrypted account number when no replacement is supplied', async () => {
+  const originalFindById = User.findById;
+  const originalPaymentFind = Payment.find;
+  Payment.find = async () => [];
+  const previousEncryptionKey = process.env.BANK_ACCOUNT_ENCRYPTION_KEY;
+  process.env.BANK_ACCOUNT_ENCRYPTION_KEY = 'test-only-bank-account-encryption-key';
+  const { encryptBankAccountNumber } = require('../utils/bankAccountCrypto');
+  const originalEncryptedNumber = encryptBankAccountNumber('100123456789');
+  const landlord = {
+    _id: 'landlord-id',
+    role: 'landlord',
+    bankAccountNumber: originalEncryptedNumber,
+    async save() {},
+  };
+  User.findById = () => ({ select: async () => landlord });
+  const response = createResponse();
+
+  try {
+    await withChapaBanks(async () => {
+      await createLandlordBankAccount(
+        {
+          user: { id: 'landlord-id', role: 'landlord' },
+          body: {
+            bankCode: 'AWASH',
+            accountName: 'Updated Name',
+          },
+        },
+        response
+      );
+
+      assert.equal(response.statusCode, 200);
+      assert.equal(landlord.bankCode, 'AWASH');
+      assert.equal(landlord.bankAccountName, 'Updated Name');
+      assert.equal(landlord.bankAccountNumber, originalEncryptedNumber);
+      assert.equal(response.body.account.accountNumberMasked, '********6789');
+    });
+  } finally {
+    User.findById = originalFindById;
+    Payment.find = originalPaymentFind;
+    if (previousEncryptionKey === undefined) {
+      delete process.env.BANK_ACCOUNT_ENCRYPTION_KEY;
+    } else {
+      process.env.BANK_ACCOUNT_ENCRYPTION_KEY = previousEncryptionKey;
+    }
+  }
+});
+
+test('landlord transaction lookup returns internal balance and transaction references', async () => {
+  const originals = {
+    findById: User.findById,
+    findPayments: Payment.find,
+    findCredits: LandlordCredit.find,
+    findPayouts: Payout.find,
+  };
+  const transaction = {
+    _id: 'credit-id',
+    payment: 'payment-id',
+    type: 'RENT_PAYMENT_CREDIT',
+    amount: 2000,
+    currency: 'ETB',
+    status: 'CREDITED',
+    createdAt: new Date('2026-10-07T10:00:00.000Z'),
+    creditedAt: new Date('2026-10-07T10:00:00.000Z'),
+    paymentReference: 'RP-payment-id',
+    providerTransactionReference: 'CHAPA-transaction-id',
+    externalTransferStatus: 'NOT_EXECUTED',
+    tenant: { name: 'Tenant Example' },
+    property: { title: 'Rental Home' },
+  };
+  User.findById = () => ({ select: async () => ({ internalBalance: 2000 }) });
+  Payment.find = async () => [];
+  LandlordCredit.find = () => {
+    const query = {
+      populate: () => query,
+      sort: async () => [transaction],
+    };
+    return query;
+  };
+  Payout.find = () => ({
+    select: async () => [{
+      payment: 'payment-id',
+      status: 'PROCESSING',
+      mode: 'live',
+      payoutReference: 'PO-payment-id',
+      providerReference: 'CHAPA-transfer-id',
+      failureReason: '',
+    }],
+  });
+  const response = createResponse();
+
+  try {
+    await getMyBankTransactions(
+      { user: { id: 'landlord-id', role: 'landlord' } },
+      response
+    );
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.balance, 2000);
+    assert.equal(response.body.transactions[0].status, 'CREDITED');
+    assert.equal(response.body.transactions[0].providerTransactionReference, 'CHAPA-transaction-id');
+    assert.equal(response.body.transactions[0].externalTransferStatus, 'PENDING');
+    assert.equal(response.body.transactions[0].payoutReference, 'PO-payment-id');
+    assert.equal(response.body.transactions[0].providerReference, 'CHAPA-transfer-id');
+    assert.equal(response.body.transactions[0].tenant, 'Tenant Example');
+    assert.equal(response.body.transactions[0].property, 'Rental Home');
+  } finally {
+    User.findById = originals.findById;
+    Payment.find = originals.findPayments;
+    LandlordCredit.find = originals.findCredits;
+    Payout.find = originals.findPayouts;
   }
 });

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { FaBuilding, FaCheck, FaHourglassHalf, FaTimes } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import './adminDashboard.css';
 
@@ -23,10 +24,10 @@ const AdminDashboard = () => {
         if (!isActive) return;
         const properties = Array.isArray(response.data) ? response.data : [];
         setStats([
-          { label: 'Total Properties', value: properties.length },
-          { label: 'Verified Properties', value: properties.filter((property) => property.isVerified && property.verificationStatus === 'approved').length },
-          { label: 'Under Review', value: properties.filter((property) => property.verificationStatus === 'pending').length },
-          { label: 'Rejected Properties', value: properties.filter((property) => property.verificationStatus === 'rejected').length },
+          { label: 'Total Properties', value: properties.length, icon: <FaBuilding aria-hidden="true" />, iconClass: 'admin-stat-icon-total' },
+          { label: 'Verified Properties', value: properties.filter((property) => property.isVerified && property.verificationStatus === 'approved').length, icon: <FaCheck aria-hidden="true" />, iconClass: 'admin-stat-icon-verified' },
+          { label: 'Under Review', value: properties.filter((property) => property.verificationStatus === 'pending').length, icon: <FaHourglassHalf aria-hidden="true" />, iconClass: 'admin-stat-icon-review' },
+          { label: 'Rejected Properties', value: properties.filter((property) => property.verificationStatus === 'rejected').length, icon: <FaTimes aria-hidden="true" />, iconClass: 'admin-stat-icon-rejected' },
         ]);
       } catch (error) {
         if (!isActive) return;
@@ -59,9 +60,12 @@ const AdminDashboard = () => {
         <div className="admin-overview-panel admin-dashboard-stats-message" role="alert">{statsError}</div>
       ) : stats ? (
         <section className="admin-dashboard-stats" aria-label="Dashboard statistics">
-          {stats.map(({ label, value }) => (
+          {stats.map(({ label, value, icon, iconClass }) => (
             <article className="admin-analytics-stat-card" key={label}>
-              <div className="admin-analytics-stat-label">{label}</div>
+              <div className="admin-dashboard-stat-heading">
+                <div className="admin-analytics-stat-label">{label}</div>
+                <span className={`admin-dashboard-stat-icon ${iconClass}`}>{icon}</span>
+              </div>
               <div className="admin-analytics-stat-value">{Number(value).toLocaleString()}</div>
             </article>
           ))}

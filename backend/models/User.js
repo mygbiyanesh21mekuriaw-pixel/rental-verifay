@@ -39,6 +39,21 @@ const UserSchema = new mongoose.Schema({
   bankAccountSource: { type: String, enum: ['', 'bank_api', 'existing_account', 'demo'], default: '' },
   bankAccountConfigured: { type: Boolean, default: undefined },
   bankAccountVerified: { type: Boolean, default: false },
+  internalBalance: { type: Number, default: 0, min: 0 },
+  internalCreditReferences: [{
+    _id: false,
+    payment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment', required: true },
+    providerTransactionReference: { type: String, required: true, trim: true },
+    amount: { type: Number, required: true, min: 0 },
+    creditedAt: { type: Date, required: true },
+  }],
+  internalPayoutReferences: [{
+    _id: false,
+    payoutReference: { type: String, required: true, trim: true },
+    amount: { type: Number, required: true, min: 0 },
+    status: { type: String, enum: ['RESERVED', 'EXECUTED', 'REFUNDED'], required: true },
+    createdAt: { type: Date, required: true },
+  }],
   role: {
     type: String,
     enum: ['user', 'tenant', 'landlord', 'admin'],

@@ -53,6 +53,10 @@
 .payment-status-payout-failed,
 .payment-status-payout-reverted { background: #fee2e2; color: #991b1b; }
 .payment-status-payout-na { background: #e5e7eb; color: #475569; }
+.payment-status-credit-credited { background: #dcfce7; color: #166534; }
+.payment-status-credit-pending { background: #fef3c7; color: #92400e; }
+.payment-status-credit-failed { background: #fee2e2; color: #991b1b; }
+.payment-credit-reason { display: block; max-width: 180px; margin-top: 5px; color: #64748b; white-space: normal; }
 
 .payment-receipt {
   margin-top: 20px;

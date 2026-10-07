@@ -8,22 +8,6 @@ const formatStatus = (status) => {
   return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1).toLowerCase();
 };
 
-const formatPayoutStatus = (status) => {
-  const normalized = typeof status === 'string' ? status.trim() : '';
-  if (!normalized) return 'N/A';
-  return normalized.toUpperCase();
-};
-
-const getRealStatusValue = (payment, nestedKey, directKey) => {
-  const directValue = payment?.[directKey];
-  if (typeof directValue === 'string' && directValue.trim()) return directValue.trim();
-
-  const nestedValue = payment?.[nestedKey]?.status;
-  if (typeof nestedValue === 'string' && nestedValue.trim()) return nestedValue.trim();
-
-  return '';
-};
-
 const LandlordPayments = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,15 +39,24 @@ const LandlordPayments = () => {
       <div className="payment-page-header">
         <div><p className="payment-eyebrow">Landlord finance</p><h1>Rent Payments</h1><p>{propertyId ? 'Payments for this rented property.' : 'Payments received for your properties.'}</p></div>
       </div>
+      <p className="payment-muted">
+        Verified live payments are credited and submitted to your registered bank through Chapa. Sandbox requests use Chapa's test simulation and never move real bank funds. A transfer is marked EXECUTED only after Chapa confirms a live transfer.
+      </p>
       <section className="payment-card payment-table-card">
         {loading ? <p className="payment-muted">Loading payments...</p> : payments.length === 0 ? <p className="payment-muted">No rent payments have been submitted yet.</p> : (
           <div className="payment-table-wrap">
             <table className="payment-table">
-              <thead><tr><th>Tenant</th><th>Property</th><th>Amount</th><th>Period</th><th>Date</th><th>Payment Status</th><th>Provider</th><th>Chapa Transaction Reference</th><th>Verified</th><th>Demo Account Credit</th><th>Payout Status</th></tr></thead>
+              <thead><tr><th>Tenant</th><th>Property</th><th>Amount</th><th>Period</th><th>Date</th><th>Payment Status</th><th>Provider</th><th>Chapa Transaction Reference</th><th>Verified</th><th>Landlord Credit</th><th>External Bank Transfer</th></tr></thead>
               <tbody>{payments.map(payment => {
-              const payoutStatus = getRealStatusValue(payment, 'payout', 'payoutStatus') ||
-                (payment.isVerified ? 'PENDING' : '');
-              const verified = payment.isVerified === true && Boolean(payment.verifiedAt);
+            const verified = payment.isVerified === true && Boolean(payment.verifiedAt);
+            const landlordCreditStatus = payment.landlordCreditStatus || (verified ? 'PENDING' : 'N/A');
+            const externalTransferStatus = (payment.externalTransferStatus || 'NOT_EXECUTED')
+              .replace(/_/g, ' ')
+              .toUpperCase();
+            const externalTransferClass = {
+              EXECUTED: 'paid',
+              'NOT EXECUTED': 'na',
+            }[externalTransferStatus] || externalTransferStatus.toLowerCase();
               const paymentStatus = payment.status === 'paid' && !verified
                 ? 'Unverified'
                 : formatStatus(payment.status);
@@ -84,11 +77,27 @@ const LandlordPayments = () => {
                     </span>
                   </td>
                   <td>
-                    {payment.demoBankCredit?.status === 'credited'
-                      ? `${payment.demoBankCredit.accountNumber} · ${Number(payment.demoBankCredit.amount).toLocaleString()} ETB`
-                      : 'Not credited'}
+                    <span className={`payment-status payment-status-credit-${String(landlordCreditStatus).toLowerCase()}`}>
+                      {landlordCreditStatus}
+                    </span>
+                    {payment.landlordCredit?.reason && landlordCreditStatus !== 'CREDITED' && (
+                      <small className="payment-credit-reason">{payment.landlordCredit.reason}</small>
+                    )}
                   </td>
-                  <td><span className={`payment-status payment-status-payout-${String(payoutStatus || 'na').toLowerCase()}`}>{formatPayoutStatus(payoutStatus)}</span></td>
+                  <td>
+                    <span className={`payment-status payment-status-payout-${externalTransferClass}`}>{externalTransferStatus}</span>
+                    {payment.payout?.providerReference && (
+                      <small className="payment-credit-reason">Reference: {payment.payout.providerReference}</small>
+                    )}
+                    {payment.payout?.mode === 'sandbox' && payment.payout?.sandboxTransferStatus && (
+                      <small className="payment-credit-reason">
+                        Sandbox simulation: {payment.payout.sandboxTransferStatus.toLowerCase()}; no real bank transfer occurred.
+                      </small>
+                    )}
+                    {payment.payout?.failureReason && (
+                      <small className="payment-credit-reason">{payment.payout.failureReason}</small>
+                    )}
+                  </td>
                 </tr>
               );
             })}</tbody>

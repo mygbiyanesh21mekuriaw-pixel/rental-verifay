@@ -554,8 +554,56 @@
 }
 
 .admin-dashboard-home .admin-analytics-stat-card {
+  min-height: 136px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   background: #fff;
   border-color: #e2e8f0;
+}
+
+.admin-dashboard-home .admin-dashboard-stat-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-dashboard-home .admin-analytics-stat-label {
+  margin-bottom: 0;
+}
+
+.admin-dashboard-home .admin-dashboard-stat-icon {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  align-items: center;
+  justify-content: center;
+  margin: -4px -2px 0 0;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 13px;
+  font-size: 20px;
+}
+
+.admin-dashboard-home .admin-stat-icon-total {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.admin-dashboard-home .admin-stat-icon-verified {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.admin-dashboard-home .admin-stat-icon-review {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.admin-dashboard-home .admin-stat-icon-rejected {
+  background: #fff1f2;
+  color: #e11d48;
 }
 
 .admin-dashboard-home .admin-analytics-stat-value {

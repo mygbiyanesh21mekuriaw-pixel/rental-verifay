@@ -158,6 +158,47 @@
   text-align: left;
 }
 
+.tenant-dashboard-home .tenant-stat-card-heading {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tenant-dashboard-home .tenant-stat-icon {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  align-items: center;
+  justify-content: center;
+  margin: -6px -6px 0 0;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 13px;
+  font-size: 20px;
+}
+
+.tenant-dashboard-home .tenant-stat-icon-properties {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.tenant-dashboard-home .tenant-stat-icon-requests {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.tenant-dashboard-home .tenant-stat-icon-favorites {
+  background: #fff1f2;
+  color: #e11d48;
+}
+
+.tenant-dashboard-home .tenant-stat-icon-notifications {
+  background: #ecfeff;
+  color: #0891b2;
+}
+
 .tenant-dashboard-home .tenant-stat-number {
   color: #0f172a;
 }
@@ -506,6 +547,70 @@
   grid-template-columns: 112px minmax(0, 1fr);
   align-items: center;
   gap: 8px 12px;
+}
+
+.tenant-keyword-search {
+  width: min(100%, 320px);
+  margin: 0 0 18px 124px;
+}
+
+.tenant-keyword-search > label {
+  display: block;
+  margin-bottom: 6px;
+  color: #26364b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tenant-keyword-search-input {
+  position: relative;
+}
+
+.tenant-keyword-search-input input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px;
+  padding: 0 42px 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font: inherit;
+}
+
+.tenant-keyword-search-input input:focus {
+  border-color: #2563eb;
+  outline: 3px solid rgba(37, 99, 235, 0.14);
+}
+
+.tenant-keyword-search-input button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.tenant-keyword-search-input button:hover {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.tenant-keyword-search-input button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.tenant-keyword-search-input button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }
 
 .tenant-search-layout .tenant-field-label {
@@ -922,6 +1027,11 @@
   gap: 8px;
  }
 
+ .tenant-keyword-search {
+   width: min(100%, 320px);
+   margin-left: 0;
+ }
+
 
 }
 
@@ -941,6 +1051,11 @@
 
   padding:16px;
 
+ }
+
+ .tenant-keyword-search {
+   width: 100%;
+   margin-left: 0;
  }
 
 

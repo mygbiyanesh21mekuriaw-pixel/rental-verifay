@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { FiSearch } from 'react-icons/fi';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -203,6 +204,7 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token, selected, onS
 };
 
 const defaultFilters = {
+  search: '',
   title: '',
   description: '',
   address: '',
@@ -237,6 +239,7 @@ const TenantSearch = () => {
       const params = new URLSearchParams({ verified: 'true' });
 
       const fieldEntries = [
+        ['search', nextFilters.search],
         ['title', nextFilters.title],
         ['description', nextFilters.description],
         ['address', nextFilters.address],
@@ -316,6 +319,23 @@ const TenantSearch = () => {
 
       <div className="tenant-search-form">
         <form onSubmit={handleSearch} className="tenant-search-main-form">
+          <div className="tenant-keyword-search">
+            <label htmlFor="tenant-property-keyword">Search</label>
+            <div className="tenant-keyword-search-input">
+              <input
+                id="tenant-property-keyword"
+                type="search"
+                name="search"
+                value={filters.search}
+                onChange={handleFieldChange}
+                placeholder="Search properties..."
+              />
+              <button type="submit" aria-label="Search keyword">
+                <FiSearch aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
           <div className="tenant-search-controls tenant-search-layout">
             <label className="tenant-field-label">Title</label>
             <div className="tenant-search-input-wrap">
