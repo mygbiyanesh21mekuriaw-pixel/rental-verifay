@@ -13,6 +13,42 @@ const getBankInformationError = (requestError) => {
   return requestError.response?.data?.message || 'Unable to load bank account information.';
 };
 
+const getBankListError = (requestError) => {
+  const status = requestError.response?.status;
+  if (status === 401) return 'Your session has expired. Please log in again.';
+  if (status === 403) return 'Only landlord accounts can load Chapa-supported banks.';
+  return requestError.response?.data?.message ||
+    (requestError.message === 'Network Error'
+      ? 'Unable to reach the backend to load Chapa-supported banks. Check your connection and retry.'
+      : requestError.message || 'Unable to load Chapa-supported banks. Please retry.');
+};
+
+const extractBankRecords = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  for (const key of ['banks', 'data']) {
+    const records = extractBankRecords(payload[key]);
+    if (records.length) return records;
+  }
+  return [];
+};
+
+const normalizeBanksResponse = (response) => extractBankRecords(response?.data ?? response)
+  .filter((bank) => {
+    const canProcessPayouts = bank?.can_process_payouts;
+    return canProcessPayouts === undefined ||
+      ![false, 0, '0', 'false'].includes(
+        typeof canProcessPayouts === 'string'
+          ? canProcessPayouts.trim().toLowerCase()
+          : canProcessPayouts
+      );
+  })
+  .map((bank) => ({
+    code: String(bank?.code ?? bank?.bank_code ?? bank?.id ?? '').trim(),
+    name: String(bank?.name ?? bank?.bank_name ?? bank?.bankName ?? bank?.label ?? '').trim(),
+  }))
+  .filter((bank) => bank.code && bank.name);
+
 const LandlordBankInformation = () => {
   const { user } = useAuth();
   const [banks, setBanks] = useState([]);
@@ -42,11 +78,9 @@ const LandlordBankInformation = () => {
           `${process.env.REACT_APP_API_URL}/api/bank-accounts/banks`,
           getAuthConfig()
         );
-        const availableBanks = Array.isArray(response.data?.banks)
-          ? response.data.banks
-          : [];
+        const availableBanks = normalizeBanksResponse(response);
         if (availableBanks.length === 0) {
-          throw new Error('No payout banks are currently available from Chapa.');
+          throw new Error('Unable to load Chapa-supported banks. The bank list response contained no valid bank names and codes.');
         }
         return availableBanks;
       };
@@ -64,7 +98,7 @@ const LandlordBankInformation = () => {
 
       const availableBanks = banksResult.status === 'fulfilled' ? banksResult.value : [];
       if (banksResult.status === 'rejected') {
-        setBankListError(getBankInformationError(banksResult.reason));
+        setBankListError(getBankListError(banksResult.reason));
       }
       const accountResponse = accountResult.value;
       const transactionsResponse = transactionsResult.value;
@@ -126,7 +160,7 @@ const LandlordBankInformation = () => {
     const selectedBank = banks.find((bank) => bank.code === form.bankCode);
     const accountName = form.accountName.trim();
     const accountNumber = form.accountNumber.trim();
-    if (!selectedBank || !accountName || (!accountNumber && !isUpdate)) {
+    if (!selectedBank || !accountName || (!accountNumber && (!isUpdate || account?.bankAccountNeedsUpdate))) {
       setError('Select a bank and enter the account holder name and account number.');
       return;
     }
@@ -157,6 +191,16 @@ const LandlordBankInformation = () => {
     }
   };
 
+  const hasSavedAccountNumber = Boolean(
+    account?.accountNumberMasked && !account?.bankAccountNeedsUpdate
+  );
+  const selectedBank = banks.find((bank) => bank.code === form.bankCode);
+  const canSubmitForm = Boolean(
+    selectedBank &&
+    form.accountName.trim() &&
+    (form.accountNumber.trim() || (showUpdateModal && hasSavedAccountNumber))
+  );
+
   const renderFormFields = (isUpdate) => (
     <>
       <label htmlFor={isUpdate ? 'update-landlord-bank' : 'create-landlord-bank'}>
@@ -170,7 +214,7 @@ const LandlordBankInformation = () => {
         >
           <option value="">Select a bank</option>
           {banks.map((bank) => (
-            <option key={bank.code} value={bank.code}>{bank.name}</option>
+            <option key={bank.code} value={bank.code}>{bank.name} ({bank.code})</option>
           ))}
         </select>
       </label>
@@ -198,8 +242,10 @@ const LandlordBankInformation = () => {
           autoComplete="off"
           value={form.accountNumber}
           onChange={(event) => setForm((current) => ({ ...current, accountNumber: event.target.value }))}
-          placeholder={isUpdate ? 'Enter a new number or leave blank to keep current' : 'Enter account number'}
-          required={!isUpdate}
+          placeholder={isUpdate && !account?.bankAccountNeedsUpdate
+            ? 'Enter a new number or leave blank to keep current'
+            : 'Enter account number'}
+          required={!isUpdate || Boolean(account?.bankAccountNeedsUpdate)}
           disabled={saving}
         />
         {isUpdate && (
@@ -242,13 +288,15 @@ const LandlordBankInformation = () => {
           <p className="landlord-account-help" role="status">Loading bank information...</p>
         ) : account ? (
           <>
-            <div className="bank-account-active-banner">
-              <span aria-hidden="true">✓</span>
+            <div className={`bank-account-active-banner${account.bankAccountNeedsUpdate ? ' bank-account-warning-banner' : ''}`}>
+              <span aria-hidden="true">{account.bankAccountNeedsUpdate ? '!' : '✓'}</span>
               <div>
-                <strong>Your bank account is active</strong>
-                <p>Verified live rent payments are submitted to this bank account through Chapa. Sandbox requests are simulations and do not move real bank funds. A transfer is marked executed only after Chapa confirms a live transfer.</p>
+                <strong>{account.bankAccountNeedsUpdate ? 'Please update your bank account number' : 'Your bank account is active'}</strong>
+                <p>{account.bankAccountNeedsUpdate
+                  ? 'The saved account number can no longer be securely read. Enter your bank account number again to restore payouts. Your internal rent credits are not affected.'
+                  : 'Verified live rent payments are submitted to this bank account through Chapa. Sandbox requests are simulations and do not move real bank funds. A transfer is marked executed only after Chapa confirms a live transfer.'}</p>
               </div>
-              <span className="bank-account-status">Active</span>
+              <span className="bank-account-status">{account.bankAccountNeedsUpdate ? 'Update needed' : 'Active'}</span>
             </div>
 
             <div className="bank-account-details">
@@ -257,7 +305,7 @@ const LandlordBankInformation = () => {
                 <div><dt>Bank</dt><dd>{account.bankName} ({account.bankCode})</dd></div>
                 <div><dt>Account Name</dt><dd>{account.accountName}</dd></div>
                 <div><dt>Account Number</dt><dd>{account.accountNumberMasked || '••••'}</dd></div>
-                <div><dt>Status</dt><dd className="bank-account-active-text">Active</dd></div>
+                <div><dt>Status</dt><dd className={account.bankAccountNeedsUpdate ? '' : 'bank-account-active-text'}>{account.bankAccountNeedsUpdate ? 'Update needed' : 'Active'}</dd></div>
                 <div><dt>Internal Available Balance</dt><dd>{account.currency || 'ETB'} {Number(account.balance || 0).toLocaleString()}</dd></div>
               </dl>
               <p className="bank-account-field-help">
@@ -281,7 +329,7 @@ const LandlordBankInformation = () => {
                 {renderFormFields(false)}
                 {error && <p className="landlord-account-message" role="alert">{error}</p>}
                 <div className="landlord-account-actions">
-                  <button type="submit" className="landlord-account-button" disabled={saving || banks.length === 0}>
+                  <button type="submit" className="landlord-account-button" disabled={saving || !canSubmitForm}>
                     {saving ? 'Saving...' : 'Create Account'}
                   </button>
                   <button
@@ -366,18 +414,101 @@ const LandlordBankInformation = () => {
                         <td>{transaction.direction}</td>
                         <td>{transaction.status}</td>
                         <td>
-                          {String(transaction.externalTransferStatus || 'NOT_EXECUTED').replace(/_/g, ' ')}
-                          {transaction.payoutMode === 'sandbox' && transaction.sandboxTransferStatus && (
-                            <small className="bank-account-field-help">
-                              Sandbox simulation: {transaction.sandboxTransferStatus.toLowerCase()}; no real transfer.
-                            </small>
-                          )}
-                          {transaction.providerReference && (
-                            <small className="bank-account-field-help">Transfer reference: {transaction.providerReference}</small>
-                          )}
-                          {transaction.payoutFailureReason && (
-                            <small className="bank-account-field-help">{transaction.payoutFailureReason}</small>
-                          )}
+                          <div className="bank-account-transfer-status">
+                            <span className={`bank-account-transfer-badge bank-account-transfer-badge-${String(transaction.externalTransferStatus || 'NOT_EXECUTED').toLowerCase().replace(/_/g, '-')}`}>
+                              {String(transaction.externalTransferStatus || 'NOT_EXECUTED').replace(/_/g, ' ')}
+                            </span>
+                            {transaction.payoutMode === 'sandbox' ? (
+                              <small className="bank-account-transfer-detail">
+                                Sandbox only
+                                {transaction.payoutFailureReason?.startsWith('Sandbox payout was not submitted.')
+                                  ? ' — not submitted'
+                                  : transaction.sandboxTransferStatus
+                                  ? ` — ${transaction.sandboxTransferStatus === 'PROCESSING' &&
+                                    /payout remains unconfirmed/i.test(transaction.payoutFailureReason || '')
+                                    ? 'verification incomplete'
+                                    : transaction.sandboxTransferStatus.toLowerCase()}`
+                                  : transaction.payoutStatus
+                                    ? ` — ${transaction.payoutStatus.toLowerCase()} simulation`
+                                    : ''}
+                                ; no real bank transfer was made.
+                              </small>
+                            ) : (
+                              <>
+                                {transaction.payoutStatus && (
+                                  <small className="bank-account-transfer-detail">
+                                    Payout status: {transaction.payoutStatus.toLowerCase()}
+                                  </small>
+                                )}
+                                {transaction.providerRequestResponse && (
+                                  <small className="bank-account-transfer-detail">
+                                    Chapa submission: {transaction.providerRequestResponse.apiStatus || 'unknown'}
+                                    {transaction.providerRequestResponse.httpStatus
+                                      ? ` (HTTP ${transaction.providerRequestResponse.httpStatus})`
+                                      : ''}
+                                    {transaction.providerRequestResponse.message
+                                      ? ` — ${transaction.providerRequestResponse.message}`
+                                      : ''}
+                                  </small>
+                                )}
+                                {transaction.providerVerificationResponse && (
+                                  <small className="bank-account-transfer-detail">
+                                    Chapa verification: {transaction.providerVerificationResponse.status || 'unknown'}
+                                    {transaction.providerVerificationResponse.httpStatus
+                                      ? ` (HTTP ${transaction.providerVerificationResponse.httpStatus})`
+                                      : ''}
+                                    {transaction.providerVerificationResponse.message
+                                      ? ` — ${transaction.providerVerificationResponse.message}`
+                                      : ''}
+                                  </small>
+                                )}
+                                {transaction.payoutFailureReason && (
+                                  <small className="bank-account-transfer-detail">{transaction.payoutFailureReason}</small>
+                                )}
+                              </>
+                            )}
+                            {transaction.payoutMode === 'sandbox' &&
+                              (['FAILED', 'PROCESSING'].includes(transaction.sandboxTransferStatus) ||
+                                (transaction.payoutStatus === 'PENDING' && transaction.payoutFailureReason)) && (
+                              <>
+                                {transaction.providerRequestResponse && (
+                                  <small className="bank-account-transfer-detail">
+                                    Chapa submission: {transaction.providerRequestResponse.apiStatus || 'unknown'}
+                                    {transaction.providerRequestResponse.httpStatus
+                                      ? ` (HTTP ${transaction.providerRequestResponse.httpStatus})`
+                                      : ''}
+                                    {transaction.providerRequestResponse.message
+                                      ? ` — ${transaction.providerRequestResponse.message}`
+                                      : ''}
+                                  </small>
+                                )}
+                                {transaction.providerVerificationResponse && (
+                                  <small className="bank-account-transfer-detail">
+                                    Chapa verification: {transaction.providerVerificationResponse.status || 'unknown'}
+                                    {transaction.providerVerificationResponse.httpStatus
+                                      ? ` (HTTP ${transaction.providerVerificationResponse.httpStatus})`
+                                      : ''}
+                                    {transaction.providerVerificationResponse.message
+                                      ? ` — ${transaction.providerVerificationResponse.message}`
+                                      : ''}
+                                  </small>
+                                )}
+                                {transaction.payoutFailureReason && (
+                                  <small className="bank-account-transfer-detail">{transaction.payoutFailureReason}</small>
+                                )}
+                              </>
+                            )}
+                            {transaction.externalTransferStatus === 'EXECUTED' && transaction.payoutReference && (
+                              <small className="bank-account-transfer-detail">
+                                Payout reference: {transaction.payoutReference}
+                              </small>
+                            )}
+                            {transaction.externalTransferStatus === 'EXECUTED' && transaction.providerReference && (
+                              <small className="bank-account-transfer-detail">
+                                Chapa transfer reference: {transaction.providerReference}
+                              </small>
+                            )}
+                          </div>
                         </td>
                         <td>{transaction.providerTransactionReference || transaction.paymentReference}</td>
                       </tr>
@@ -418,9 +549,15 @@ const LandlordBankInformation = () => {
             </div>
             <form className="landlord-account-form" onSubmit={(event) => saveBankAccount(event, true)}>
               {renderFormFields(true)}
+              {bankListError && <p className="landlord-account-message" role="alert">{bankListError}</p>}
+              {!bankListError && banks.length === 0 && (
+                <p className="landlord-account-message" role="alert">
+                  No supported Chapa banks are available. Retry loading bank information before updating your account.
+                </p>
+              )}
               {error && <p className="landlord-account-message" role="alert">{error}</p>}
               <div className="landlord-account-actions">
-                <button type="submit" className="landlord-account-button" disabled={saving || banks.length === 0}>
+                <button type="submit" className="landlord-account-button" disabled={saving || !canSubmitForm}>
                   {saving ? 'Saving...' : 'Update Account'}
                 </button>
                 <button

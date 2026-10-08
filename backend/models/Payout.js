@@ -16,6 +16,11 @@ const PayoutSchema = new mongoose.Schema({
   paymentReference: { type: String, required: true, trim: true },
   payoutReference: { type: String, required: true, unique: true, trim: true },
   providerReference: { type: String, trim: true, unique: true, sparse: true },
+  destinationBankCode: { type: String, trim: true, default: '' },
+  destinationBankName: { type: String, trim: true, default: '' },
+  destinationBankSlug: { type: String, trim: true, default: '' },
+  destinationAccountName: { type: String, trim: true, default: '' },
+  destinationAccountNumber: { type: String, trim: true, default: '', select: false },
   status: {
     type: String,
     enum: ['PENDING', 'PROCESSING', 'PAID', 'FAILED', 'REVERTED', 'SIMULATED'],

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { getFavoriteIds, toggleFavorite } from '../utils/favorites';
+import { fetchFavoriteIds, getFavoriteIds, toggleFavorite } from '../utils/favorites';
 import BackToDashboard from '../components/BackToDashboard';
 import PropertyImage from '../components/PropertyImage';
 import { getPropertyImages } from '../utils/propertyMedia';
@@ -165,20 +165,21 @@ const sectionConfig = {
   rented: { title: 'Rented Property', empty: 'You do not have an approved rented property yet.' },
 };
 
-const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
-  const [isFavorite, setIsFavorite] = useState(() =>getFavoriteIds(userId).has(String(property._id)));
+const PropertyCard = ({ property, userId, onFavoriteChange, token, favoriteIds, favoritesReady, favoritesError }) => {
+  const isFavorite = favoriteIds.has(String(property._id));
   const [isUpdating, setIsUpdating] = useState(false);
+  const [favoriteError, setFavoriteError] = useState('');
 
   const handleFavorite = async (event) => {
     event.preventDefault();
     event.stopPropagation();
     setIsUpdating(true);
+    setFavoriteError('');
     try {
       const nextIsFavorite = await toggleFavorite(userId, property._id, token);
-      setIsFavorite(nextIsFavorite);
       onFavoriteChange?.(property._id, nextIsFavorite);
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      setFavoriteError(error.response?.data?.message || error.message || 'Unable to update favorite.');
     } finally {
       setIsUpdating(false);
     }
@@ -204,15 +205,20 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token }) => {
       <p className="tenant-card-detail">Landlord: {property.landlord?.name || 'Not available'}</p>
       <p className="tenant-card-description">{property.description}</p>
       <p className="tenant-card-detail">Verification status: Approved</p>
-      <button 
-        type="button" 
-        className={`tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`} 
-        onClick={handleFavorite}
-        disabled={isUpdating}
-      >
-        {isUpdating ? '' : isFavorite ? 'Favorited' : 'Favorite'}
-      </button>
-      <Link to={`/property/${property._id}`} className="tenant-card-btn">Request to Rent</Link>
+      <div className="tenant-card-actions">
+        <button
+          type="button"
+          className={`tenant-card-action tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`}
+          onClick={handleFavorite}
+          disabled={isUpdating || !favoritesReady}
+        >
+          {isUpdating ? 'Saving...' : favoritesError ? 'Favorite unavailable' : !favoritesReady ? 'Loading...' : isFavorite ? 'Favorited' : 'Favorite'}
+        </button>
+        <Link to={`/property/${property._id}`} className="tenant-card-action tenant-card-btn">Request to Rent</Link>
+      </div>
+      {(favoriteError || favoritesError) && (
+        <p className="tenant-favorite-error" role="alert">{favoriteError || favoritesError}</p>
+      )}
     </div>
   </div>
   );
@@ -319,7 +325,28 @@ const TenantSectionPage = ({ type }) => {
   const [items, setItems] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [favoriteIds, setFavoriteIds] = useState(() => getFavoriteIds(user?.id));
+  const [favoritesReady, setFavoritesReady] = useState(false);
+  const [favoritesError, setFavoritesError] = useState('');
   const config = sectionConfig[type];
+
+  useEffect(() => {
+    let isCurrent = true;
+    fetchFavoriteIds(localStorage.getItem('token'), user?.id)
+      .then((ids) => {
+        if (!isCurrent) return;
+        setFavoriteIds(ids);
+        setFavoritesReady(true);
+      })
+      .catch((error) => {
+        if (!isCurrent) return;
+        setFavoritesError(error.response?.data?.message || 'Unable to load saved favorites. Please refresh and try again.');
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [user?.id]);
 
   const fetchSection = useCallback(async () => {
     setLoading(true);
@@ -368,6 +395,12 @@ const TenantSectionPage = ({ type }) => {
   }, [searchTerm, type, user.id]);
 
   const handleFavoriteChange = (propertyId, isFavorite) => {
+    setFavoriteIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (isFavorite) nextIds.add(String(propertyId));
+      else nextIds.delete(String(propertyId));
+      return nextIds;
+    });
     if (type === 'favorites' && !isFavorite) {
       setItems(currentItems =>currentItems.filter(property =>property._id !== propertyId));
     }
@@ -407,6 +440,9 @@ const TenantSectionPage = ({ type }) => {
               property={property} 
               userId={user.id} 
               token={localStorage.getItem('token')}
+              favoriteIds={favoriteIds}
+              favoritesReady={favoritesReady}
+              favoritesError={favoritesError}
               onFavoriteChange={handleFavoriteChange} 
             />
           ))}</div>

@@ -19,37 +19,53 @@ const normalizeLoginEmail = (email) => {
 
 const normalizeAccountEmail = (email) => normalizeLoginEmail(email);
 
-const serializeUser = (user) => ({
-  id: user._id ? user._id.toString() : user.id,
-  name: user.name,
-  email: user.email,
-  phone: user.phone || '',
-  profilePhoto: user.profilePhoto || '',
-  role: user.role,
-  adminType: user.role === 'admin'
-    ? user.adminType || (user.adminAreas?.length ? 'area' : 'platform')
-    : undefined,
-  adminAreas: user.role === 'admin' ? user.adminAreas || [] : undefined,
-  bankAccountName: user.role === 'landlord' ? user.bankAccountName || '' : undefined,
-  bankCode: user.role === 'landlord' ? user.bankCode || '' : undefined,
-  bankName: user.role === 'landlord' ? user.bankName || '' : undefined,
-  bankAccountMasked: user.role === 'landlord' && user.bankAccountSource !== 'demo'
-    ? maskBankAccountNumber(decryptBankAccountNumber(user.bankAccountNumber))
-    : '',
-  bankAccountDisplay: user.role === 'landlord' && user.bankAccountSource === 'demo'
-    ? decryptBankAccountNumber(user.bankAccountNumber)
-    : undefined,
-  bankAccountSource: user.role === 'landlord' ? user.bankAccountSource || '' : undefined,
-  bankAccountConfigured: user.role === 'landlord'
-    ? Boolean(user.bankAccountConfigured ?? (
-      ['existing_account', 'demo'].includes(user.bankAccountSource) &&
-      user.bankAccountName &&
-      user.bankAccountNumber &&
-      user.bankCode
-    ))
-    : undefined,
-  bankAccountVerified: user.role === 'landlord' ? user.bankAccountVerified === true : undefined,
-});
+const serializeUser = (user) => {
+  const isLandlord = user.role === 'landlord';
+  let bankAccountNumber = '';
+  let bankAccountNeedsUpdate = false;
+
+  if (isLandlord && user.bankAccountNumber) {
+    try {
+      bankAccountNumber = decryptBankAccountNumber(user.bankAccountNumber);
+    } catch (error) {
+      bankAccountNeedsUpdate = true;
+      console.error('[BANK ACCOUNT] Stored account number cannot be decrypted; the landlord must enter it again.');
+    }
+  }
+
+  return {
+    id: user._id ? user._id.toString() : user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone || '',
+    profilePhoto: user.profilePhoto || '',
+    role: user.role,
+    adminType: user.role === 'admin'
+      ? user.adminType || (user.adminAreas?.length ? 'area' : 'platform')
+      : undefined,
+    adminAreas: user.role === 'admin' ? user.adminAreas || [] : undefined,
+    bankAccountName: isLandlord ? user.bankAccountName || '' : undefined,
+    bankCode: isLandlord ? user.bankCode || '' : undefined,
+    bankName: isLandlord ? user.bankName || '' : undefined,
+    bankAccountMasked: isLandlord && user.bankAccountSource !== 'demo' && !bankAccountNeedsUpdate
+      ? maskBankAccountNumber(bankAccountNumber)
+      : '',
+    bankAccountDisplay: isLandlord && user.bankAccountSource === 'demo' && !bankAccountNeedsUpdate
+      ? bankAccountNumber
+      : undefined,
+    bankAccountSource: isLandlord ? user.bankAccountSource || '' : undefined,
+    bankAccountConfigured: isLandlord
+      ? !bankAccountNeedsUpdate && Boolean(user.bankAccountConfigured ?? (
+        ['existing_account', 'demo'].includes(user.bankAccountSource) &&
+        user.bankAccountName &&
+        user.bankAccountNumber &&
+        user.bankCode
+      ))
+      : undefined,
+    bankAccountNeedsUpdate: isLandlord ? bankAccountNeedsUpdate : undefined,
+    bankAccountVerified: isLandlord ? user.bankAccountVerified === true : undefined,
+  };
+};
 
 // አዲስ ተጠቃሚ መመዝገብ
 const register = async (req, res) => {
@@ -170,7 +186,26 @@ const login = async (req, res) => {
       user: serializeUser(user),
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    const isDatabaseAuthenticationFailure = error?.code === 8000 ||
+      (error?.name === 'MongoServerError' &&
+        /bad auth\s*:\s*authentication failed/i.test(String(error.message || '')));
+
+    if (isDatabaseAuthenticationFailure) {
+      console.error(
+        '[AUTH] MongoDB rejected database authentication (code=8000). Verify the backend MONGO_URI database credentials.'
+      );
+      return res.status(503).json({
+        message: 'Login is temporarily unavailable because the database connection failed. Please try again later.',
+      });
+    }
+
+    console.error('[AUTH] Login request failed:', {
+      name: error?.name || 'Error',
+      code: error?.code || 'unknown',
+    });
+    return res.status(500).json({
+      message: 'Unable to log in right now. Please try again later.',
+    });
   }
 };
 
@@ -443,4 +478,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, updateProfilePhoto, changePassword, requestPasswordReset, resetPassword, logout };
+module.exports = { register, login, getMe, updateProfile, updateProfilePhoto, changePassword, requestPasswordReset, resetPassword, logout, serializeUser };

@@ -8,9 +8,12 @@ export const getFavoriteIds = (userId) => {
   }
 };
 
-export const fetchFavoriteIds = async (token = localStorage.getItem('token')) => {
+export const fetchFavoriteIds = async (
+  token = localStorage.getItem('token'),
+  userId = JSON.parse(localStorage.getItem('user') || '{}')?.id
+) => {
   if (!token) {
-    return new Set();
+    throw new Error('Please sign in to load your favorites.');
   }
 
   try {
@@ -19,13 +22,11 @@ export const fetchFavoriteIds = async (token = localStorage.getItem('token')) =>
     });
 
     const favoriteIds = new Set((response.data || []).map(property => String(property._id)));
-    if (response.data && response.data.length > 0) {
-      localStorage.setItem(`favorites:${localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).id : 'guest'}`, JSON.stringify([...favoriteIds]));
-    }
+    if (userId) localStorage.setItem(`favorites:${userId}`, JSON.stringify([...favoriteIds]));
     return favoriteIds;
   } catch (error) {
     console.warn('Unable to load server favorites:', error);
-    return getFavoriteIds(JSON.parse(localStorage.getItem('user') || '{}')?.id || 'guest');
+    throw error;
   }
 };
 
@@ -35,6 +36,9 @@ export const toggleFavorite = async (userId, propertyId, token = null) => {
   try {
     if (!token) {
       token = localStorage.getItem('token');
+    }
+    if (!token) {
+      throw new Error('Please sign in to save favorites.');
     }
 
     if (token) {
@@ -59,24 +63,6 @@ export const toggleFavorite = async (userId, propertyId, token = null) => {
       return response.data.isFavorite;
     }
   } catch (error) {
-    console.warn('Failed to sync favorite with backend, using local storage:', error);
+    throw error;
   }
-
-  const favoriteIds = getFavoriteIds(userId);
-  const isFavorite = favoriteIds.has(normalizedId);
-
-  if (isFavorite) {
-    favoriteIds.delete(normalizedId);
-  } else {
-    favoriteIds.add(normalizedId);
-  }
-
-  localStorage.setItem(`favorites:${userId}`, JSON.stringify([...favoriteIds]));
-  window.dispatchEvent(new CustomEvent('favorites-changed', {
-    detail: { propertyId: normalizedId, isFavorite: !isFavorite },
-  }));
-
-  return !isFavorite;
 };
-
-

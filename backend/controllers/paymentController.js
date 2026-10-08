@@ -23,6 +23,8 @@ const {
 } = require('../utils/payoutProvider');
 const { getPayoutEligibility } = require('../services/payoutEligibility');
 const {
+  getPayoutEligibilityFailure,
+  getVerifiedProviderReference,
   processLandlordPayout,
   toExternalTransferStatus,
 } = require('../services/landlordPayoutService');
@@ -426,9 +428,12 @@ const applyChapaVerification = async (payment, verification, req) => {
   }
 
   const status = verificationResult.status;
+  const resolvedPaymentMode = payment.paymentMode || getPaymentMode();
   const update = {
     $set: {
       rentalRequest: rental._id,
+      provider: 'chapa',
+      paymentMode: resolvedPaymentMode,
       providerReference: verification.providerReference,
       providerTransactionReference: verification.providerTransactionReference,
       status: verification.providerStatus,
@@ -605,15 +610,27 @@ const getLandlordPayments = async (req, res) => {
         mode: payout.mode || null,
         sandboxTransferStatus: payout.sandboxTransferStatus || null,
         payoutReference: payout.payoutReference || null,
-        providerReference: payout.providerReference || null,
+        providerReference: getVerifiedProviderReference(payout),
         failureReason: payout.failureReason || null,
         providerRequestResponse: payout.providerRequestResponse || null,
         providerVerificationResponse: payout.providerVerificationResponse || null,
         lastVerifiedAt: payout.lastVerifiedAt || null,
+      } : credit?.status === 'CREDITED' ? {
+        status: 'NOT_SUBMITTED',
+        mode: payment.paymentMode || null,
+        failureReason: getPayoutEligibilityFailure(payment, {
+          checkTransferConfiguration: true,
+        }) ||
+          'No payout record exists for this credited payment. Check the backend payout logs for the submission error.',
       } : null;
-      payment.transfer = payout?.providerReference ? { status: payoutStatus, providerReference: payout.providerReference, payoutReference: payout.payoutReference || null } : null;
+      payment.payoutFailureReason = payout?.failureReason ||
+        (credit?.status === 'CREDITED' ? payment.payout.failureReason : '');
+      const verifiedProviderReference = getVerifiedProviderReference(payout);
+      payment.transfer = verifiedProviderReference
+        ? { status: payoutStatus, providerReference: verifiedProviderReference, payoutReference: payout.payoutReference || null }
+        : null;
       payment.payoutReference = payout?.payoutReference || null;
-      payment.transferReference = payout?.providerReference || payout?.payoutReference || null;
+      payment.transferReference = verifiedProviderReference || payout?.payoutReference || null;
       payment.paymentProvider = payment.provider || null;
       payment.chapaTransactionReference = payment.providerTransactionReference || null;
       return payment;

@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { FiSearch } from 'react-icons/fi';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAuth } from '../context/AuthContext';
-import { getFavoriteIds, toggleFavorite } from '../utils/favorites';
+import { fetchFavoriteIds, getFavoriteIds, toggleFavorite } from '../utils/favorites';
 import BackToDashboard from '../components/BackToDashboard';
 import PropertyImage from '../components/PropertyImage';
 import { getPropertyImages } from '../utils/propertyMedia';
+import { FiSearch } from 'react-icons/fi';
 import './TenantDashboard.css';
 
 const DEFAULT_MAP_CENTER = [9.145, 40.4897];
@@ -131,20 +131,31 @@ const PropertyMap = ({ properties, selectedPropertyId, onSelectProperty }) => {
   );
 };
 
-const PropertyCard = ({ property, userId, onFavoriteChange, token, selected, onSelect }) => {
-  const [isFavorite, setIsFavorite] = useState(() =>getFavoriteIds(userId).has(String(property._id)));
+const PropertyCard = ({
+  property,
+  userId,
+  onFavoriteChange,
+  token,
+  favoriteIds,
+  favoritesReady,
+  favoritesError,
+  selected,
+  onSelect,
+}) => {
+  const isFavorite = favoriteIds.has(String(property._id));
   const [isUpdating, setIsUpdating] = useState(false);
+  const [favoriteError, setFavoriteError] = useState('');
 
   const handleFavorite = async (event) => {
     event.preventDefault();
     event.stopPropagation();
     setIsUpdating(true);
+    setFavoriteError('');
     try {
       const nextIsFavorite = await toggleFavorite(userId, property._id, token);
-      setIsFavorite(nextIsFavorite);
       onFavoriteChange?.(property._id, nextIsFavorite);
     } catch (error) {
-      console.error('Error toggling favorite:', error);
+      setFavoriteError(error.response?.data?.message || error.message || 'Unable to update favorite.');
     } finally {
       setIsUpdating(false);
     }
@@ -189,25 +200,28 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token, selected, onS
         )}
         <p className="tenant-card-description">{property.description}</p>
         <p className="tenant-card-detail">Verification status: Approved</p>
-        <button 
-          type="button" 
-          className={`tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`} 
-          onClick={handleFavorite}
-          disabled={isUpdating}
-        >
-          {isUpdating ? '' : isFavorite ? 'Favorited' : 'Favorite'}
-        </button>
-        <Link to={`/property/${property._id}`} className="tenant-card-btn">Request to Rent</Link>
+        <div className="tenant-card-actions">
+          <button
+            type="button"
+            className={`tenant-card-action tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`}
+            onClick={handleFavorite}
+            disabled={isUpdating || !favoritesReady}
+          >
+            {isUpdating ? 'Saving...' : favoritesError ? 'Favorite unavailable' : !favoritesReady ? 'Loading...' : isFavorite ? 'Favorited' : 'Favorite'}
+          </button>
+          <Link to={`/property/${property._id}`} className="tenant-card-action tenant-card-btn">Request to Rent</Link>
+        </div>
+        {(favoriteError || favoritesError) && (
+          <p className="tenant-favorite-error" role="alert">{favoriteError || favoritesError}</p>
+        )}
       </div>
     </div>
   );
 };
 
 const defaultFilters = {
-  search: '',
   title: '',
   description: '',
-  address: '',
   bedrooms: '',
   region: '',
   zone: '',
@@ -229,6 +243,27 @@ const TenantSearch = () => {
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [favoriteIds, setFavoriteIds] = useState(() => getFavoriteIds(user?.id));
+  const [favoritesReady, setFavoritesReady] = useState(false);
+  const [favoritesError, setFavoritesError] = useState('');
+
+  useEffect(() => {
+    let isCurrent = true;
+    fetchFavoriteIds(localStorage.getItem('token'), user?.id)
+      .then((ids) => {
+        if (!isCurrent) return;
+        setFavoriteIds(ids);
+        setFavoritesReady(true);
+      })
+      .catch((error) => {
+        if (!isCurrent) return;
+        setFavoritesError(error.response?.data?.message || 'Unable to load saved favorites. Please refresh and try again.');
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [user?.id]);
 
   const fetchProperties = useCallback(async (nextFilters = defaultFilters) => {
     setLoading(true);
@@ -239,10 +274,8 @@ const TenantSearch = () => {
       const params = new URLSearchParams({ verified: 'true' });
 
       const fieldEntries = [
-        ['search', nextFilters.search],
         ['title', nextFilters.title],
         ['description', nextFilters.description],
-        ['address', nextFilters.address],
         ['bedrooms', nextFilters.bedrooms],
         ['region', nextFilters.region],
         ['zone', nextFilters.zone],
@@ -304,7 +337,14 @@ const TenantSearch = () => {
     fetchProperties(defaultFilters);
   };
 
-  const handleFavoriteChange = () => {};
+  const handleFavoriteChange = (propertyId, isFavorite) => {
+    setFavoriteIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (isFavorite) nextIds.add(String(propertyId));
+      else nextIds.delete(String(propertyId));
+      return nextIds;
+    });
+  };
 
   const selectedProperty = properties.find((property) =>property._id === selectedPropertyId) || null;
 
@@ -319,23 +359,6 @@ const TenantSearch = () => {
 
       <div className="tenant-search-form">
         <form onSubmit={handleSearch} className="tenant-search-main-form">
-          <div className="tenant-keyword-search">
-            <label htmlFor="tenant-property-keyword">Search</label>
-            <div className="tenant-keyword-search-input">
-              <input
-                id="tenant-property-keyword"
-                type="search"
-                name="search"
-                value={filters.search}
-                onChange={handleFieldChange}
-                placeholder="Search properties..."
-              />
-              <button type="submit" aria-label="Search keyword">
-                <FiSearch aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-
           <div className="tenant-search-controls tenant-search-layout">
             <label className="tenant-field-label">Title</label>
             <div className="tenant-search-input-wrap">
@@ -347,7 +370,9 @@ const TenantSearch = () => {
                 placeholder="Title"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by title"></button>
+              <button type="submit" className="tenant-field-search-btn" aria-label="Search by Title">
+                <FiSearch aria-hidden="true" />
+              </button>
             </div>
           </div>
 
@@ -362,7 +387,9 @@ const TenantSearch = () => {
                 placeholder="Description"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by description"></button>
+              <button type="submit" className="tenant-field-search-btn" aria-label="Search by Description">
+                <FiSearch aria-hidden="true" />
+              </button>
             </div>
           </div>
 
@@ -379,7 +406,9 @@ const TenantSearch = () => {
                 placeholder="Bedrooms"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by bedrooms"></button>
+              <button type="submit" className="tenant-field-search-btn" aria-label="Search by Bedrooms">
+                <FiSearch aria-hidden="true" />
+              </button>
             </div>
           </div>
 
@@ -395,129 +424,133 @@ const TenantSearch = () => {
                 placeholder="Price"
                 className="tenant-search-input"
               />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by price"></button>
+              <button type="submit" className="tenant-field-search-btn" aria-label="Search by Price">
+                <FiSearch aria-hidden="true" />
+              </button>
             </div>
           </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Address</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="address"
-                value={filters.address}
-                onChange={handleFieldChange}
-                placeholder="Address"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by address"></button>
+          <fieldset className="tenant-address-search-group">
+            <legend>Address</legend>
+            <div className="tenant-search-controls tenant-search-layout">
+              <label className="tenant-field-label">Region</label>
+              <div className="tenant-search-input-wrap">
+                <input
+                  type="search"
+                  name="region"
+                  value={filters.region}
+                  onChange={handleFieldChange}
+                  placeholder="Region"
+                  className="tenant-search-input"
+                />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Region">
+                  <FiSearch aria-hidden="true" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Region</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="region"
-                value={filters.region}
-                onChange={handleFieldChange}
-                placeholder="Region"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by region"></button>
+            <div className="tenant-search-controls tenant-search-layout">
+              <label className="tenant-field-label">Zone</label>
+              <div className="tenant-search-input-wrap">
+                <input
+                  type="search"
+                  name="zone"
+                  value={filters.zone}
+                  onChange={handleFieldChange}
+                  placeholder="Zone"
+                  className="tenant-search-input"
+                />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Zone">
+                  <FiSearch aria-hidden="true" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Zone</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="zone"
-                value={filters.zone}
-                onChange={handleFieldChange}
-                placeholder="Zone"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by zone"></button>
+            <div className="tenant-search-controls tenant-search-layout">
+              <label className="tenant-field-label">Wereda</label>
+              <div className="tenant-search-input-wrap">
+                <input
+                  type="search"
+                  name="wereda"
+                  value={filters.wereda}
+                  onChange={handleFieldChange}
+                  placeholder="Wereda"
+                  className="tenant-search-input"
+                />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Wereda">
+                  <FiSearch aria-hidden="true" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Wereda</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="wereda"
-                value={filters.wereda}
-                onChange={handleFieldChange}
-                placeholder="Wereda"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by wereda"></button>
+            <div className="tenant-search-controls tenant-search-layout">
+              <label className="tenant-field-label">City</label>
+              <div className="tenant-search-input-wrap">
+                <input
+                  type="search"
+                  name="city"
+                  value={filters.city}
+                  onChange={handleFieldChange}
+                  placeholder="City"
+                  className="tenant-search-input"
+                />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by City">
+                  <FiSearch aria-hidden="true" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">City</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="city"
-                value={filters.city}
-                onChange={handleFieldChange}
-                placeholder="City"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by city"></button>
+            <div className="tenant-search-controls tenant-search-layout">
+              <label className="tenant-field-label">Sub-city</label>
+              <div className="tenant-search-input-wrap">
+                <input
+                  type="search"
+                  name="subCity"
+                  value={filters.subCity}
+                  onChange={handleFieldChange}
+                  placeholder="Sub-city"
+                  className="tenant-search-input"
+                />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Sub-city">
+                  <FiSearch aria-hidden="true" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Sub-city</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="subCity"
-                value={filters.subCity}
-                onChange={handleFieldChange}
-                placeholder="Sub-city"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by sub-city"></button>
+            <div className="tenant-search-controls tenant-search-layout">
+              <label className="tenant-field-label">Kebele</label>
+              <div className="tenant-search-input-wrap">
+                <input
+                  type="search"
+                  name="kebele"
+                  value={filters.kebele}
+                  onChange={handleFieldChange}
+                  placeholder="Kebele"
+                  className="tenant-search-input"
+                />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Kebele">
+                  <FiSearch aria-hidden="true" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Kebele</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="kebele"
-                value={filters.kebele}
-                onChange={handleFieldChange}
-                placeholder="Kebele"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by kebele"></button>
+            <div className="tenant-search-controls tenant-search-layout">
+              <label className="tenant-field-label">House Number</label>
+              <div className="tenant-search-input-wrap">
+                <input
+                  type="search"
+                  name="houseNumber"
+                  value={filters.houseNumber}
+                  onChange={handleFieldChange}
+                  placeholder="House Number"
+                  className="tenant-search-input"
+                />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by House Number">
+                  <FiSearch aria-hidden="true" />
+                </button>
+              </div>
             </div>
-          </div>
-
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">House Number</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="houseNumber"
-                value={filters.houseNumber}
-                onChange={handleFieldChange}
-                placeholder="House Number"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-search-icon-btn" aria-label="Search by house number"></button>
-            </div>
-          </div>
+          </fieldset>
 
           <div className="tenant-search-controls tenant-search-layout-secondary">
             <select name="availability" value={filters.availability} onChange={handleFieldChange} className="tenant-search-input">
@@ -588,6 +621,9 @@ const TenantSearch = () => {
                 property={property}
                 userId={user?.id}
                 token={localStorage.getItem('token')}
+                favoriteIds={favoriteIds}
+                favoritesReady={favoritesReady}
+                favoritesError={favoritesError}
                 onFavoriteChange={handleFavoriteChange}
                 selected={selectedPropertyId === property._id}
                 onSelect={setSelectedPropertyId}

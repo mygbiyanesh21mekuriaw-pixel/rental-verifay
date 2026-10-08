@@ -211,7 +211,8 @@ test('payout is PAID only when Chapa confirms the requested transfer reference',
     const mismatchedReference = await verifyChapaTransfer('PO-test-123', { amount: 3000, currency: 'ETB' });
     assert.equal(mismatchedReference.status, 'PROCESSING');
     assert.equal(mismatchedReference.ok, false);
-    assert.equal(mismatchedReference.providerReference, 'PO-test-123');
+    assert.equal(mismatchedReference.providerReference, '');
+    assert.match(mismatchedReference.message, /reference does not match/i);
 
     global.fetch = async () => ({
       ok: true,

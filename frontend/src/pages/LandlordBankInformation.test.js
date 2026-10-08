@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import LandlordBankInformation from './LandlordBankInformation';
 import { useAuth } from '../context/AuthContext';
 
@@ -38,9 +38,22 @@ const rentCredit = {
   direction: 'CREDIT',
   status: 'CREDITED',
   externalTransferStatus: 'PENDING',
+  payoutStatus: 'PROCESSING',
   payoutMode: 'live',
   payoutReference: 'PO-test-123',
-  providerReference: 'CHAPA-payout-123',
+  providerReference: 'PO-test-123',
+  providerRequestResponse: {
+    httpStatus: 200,
+    apiStatus: 'success',
+    message: 'Transfer accepted',
+  },
+  providerVerificationResponse: {
+    httpStatus: 200,
+    apiStatus: 'success',
+    status: 'pending',
+    message: 'Transfer is pending',
+  },
+  payoutFailureReason: 'Chapa transfer is still pending confirmation.',
   date: '2026-10-07T10:00:00.000Z',
   paymentReference: 'RP-payment-1',
   providerTransactionReference: 'CHAPA-transaction-1',
@@ -119,6 +132,115 @@ test('shows saved landlord account details with a masked number', async () => {
   expect(screen.queryByLabelText('Account Number')).not.toBeInTheDocument();
 });
 
+test('loads Chapa bank names and codes into the update bank selector', async () => {
+  axios.get.mockImplementation((url) => (
+    Promise.resolve({
+      data: {
+        success: true,
+        ...(url.endsWith('/banks') ? { banks } : { account }),
+      },
+    })
+  ));
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const bankSelect = document.getElementById('update-landlord-bank');
+  await waitFor(() => expect(bankSelect).toHaveTextContent('Commercial Bank of Ethiopia (CBE) (CBE)'));
+  expect(bankSelect).toHaveTextContent('Awash Bank (AWASH)');
+});
+
+test('accepts the direct bank-array response from the existing Chapa banks API', async () => {
+  axios.get.mockImplementation((url) => (
+    Promise.resolve({
+      data: url.endsWith('/banks') ? banks : { success: true, account },
+    })
+  ));
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  expect(document.getElementById('update-landlord-bank')).toHaveTextContent('Commercial Bank of Ethiopia (CBE) (CBE)');
+  expect(document.getElementById('update-landlord-bank')).toHaveTextContent('Awash Bank (AWASH)');
+  expect(screen.getByRole('button', { name: 'Update Account' })).toBeEnabled();
+});
+
+test.each([
+  ['nested data array', { data: { data: banks } }],
+  ['nested data banks', { data: { data: { banks } } }],
+  ['bank API wrapper', { data: { data: { success: true, banks } } }],
+])('normalizes %s and shows the supported banks', async (_shape, response) => {
+  axios.get.mockImplementation((url) => (
+    Promise.resolve(url.endsWith('/banks')
+      ? response
+      : { data: { success: true, account } })
+  ));
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const bankSelect = document.getElementById('update-landlord-bank');
+  expect(bankSelect).toHaveTextContent('Commercial Bank of Ethiopia (CBE) (CBE)');
+  expect(bankSelect).toHaveTextContent('Awash Bank (AWASH)');
+});
+
+test('normalizes Chapa bank id and label fields into a selectable code and name', async () => {
+  axios.get.mockImplementation((url) => (
+    Promise.resolve(url.endsWith('/banks')
+      ? { data: { message: 'Banks retrieved', data: [{ id: 946, label: 'Commercial Bank of Ethiopia (CBE)' }] } }
+      : { data: { success: true, account: { ...account, bankCode: '946' } } })
+  ));
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const bankSelect = document.getElementById('update-landlord-bank');
+  expect(bankSelect).toHaveTextContent('Commercial Bank of Ethiopia (CBE) (946)');
+  expect(bankSelect).toHaveValue('946');
+});
+
+test('excludes Chapa banks that explicitly do not support payouts', async () => {
+  axios.get.mockImplementation((url) => (
+    Promise.resolve(url.endsWith('/banks')
+      ? {
+        data: {
+          banks: [
+            { id: 946, name: 'Commercial Bank of Ethiopia (CBE)', can_process_payouts: 1 },
+            { id: 687, name: 'Payout-disabled bank', can_process_payouts: 0 },
+          ],
+        },
+      }
+      : { data: { success: true, account } })
+  ));
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const bankSelect = document.getElementById('update-landlord-bank');
+  expect(bankSelect).toHaveTextContent('Commercial Bank of Ethiopia (CBE) (946)');
+  expect(bankSelect).not.toHaveTextContent('Payout-disabled bank');
+});
+
+test('requires a new account number when the saved encrypted number cannot be recovered', async () => {
+  const accountNeedsUpdate = {
+    ...account,
+    bankAccountConfigured: false,
+    bankAccountNeedsUpdate: true,
+    accountNumberMasked: '',
+    status: 'inactive',
+  };
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({ data: { transactions: [] } });
+    }
+    return Promise.resolve({ data: { success: true, account: accountNeedsUpdate } });
+  });
+
+  render(<LandlordBankInformation />);
+
+  expect(await screen.findByText('Please update your bank account number')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Update Bank Account' }));
+  const accountNumberInput = document.getElementById('update-landlord-account-number');
+  expect(accountNumberInput).toBeRequired();
+  expect(accountNumberInput).toHaveAttribute('placeholder', 'Enter account number');
+});
+
 test('explains that Chapa confirms external transfers before they are marked executed', async () => {
   axios.get.mockImplementation((url) => (
     Promise.resolve({
@@ -156,7 +278,174 @@ test('shows persistent internal balance and credited rent transaction history', 
   expect(screen.getByText('CHAPA-transaction-1')).toBeInTheDocument();
   expect(screen.getByText('CREDITED')).toBeInTheDocument();
   expect(screen.getByText('PENDING')).toBeInTheDocument();
-  expect(screen.getByText('Transfer reference: CHAPA-payout-123')).toBeInTheDocument();
+  expect(screen.getByText('Payout status: processing')).toBeInTheDocument();
+  expect(screen.queryByText('Payout reference: PO-test-123')).not.toBeInTheDocument();
+  expect(screen.queryByText('Chapa transfer reference: PO-test-123')).not.toBeInTheDocument();
+  expect(screen.getByText(/Chapa submission: success \(HTTP 200\).*Transfer accepted/)).toBeInTheDocument();
+  expect(screen.getByText(/Chapa verification: pending \(HTTP 200\).*Transfer is pending/)).toBeInTheDocument();
+  expect(screen.getByText('Chapa transfer is still pending confirmation.')).toBeInTheDocument();
+});
+
+test('keeps external-transfer status separate from reasons and clarifies sandbox results are not bank transfers', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({
+        data: {
+          balance: 2000,
+          currency: 'ETB',
+          transactions: [{
+            ...rentCredit,
+            externalTransferStatus: 'NOT_EXECUTED',
+            payoutMode: 'sandbox',
+            payoutStatus: 'PAID',
+            sandboxTransferStatus: null,
+            payoutFailureReason: 'Sandbox verification reported success.',
+          }],
+        },
+      });
+    }
+    return Promise.resolve({ data: { success: true, account } });
+  });
+  render(<LandlordBankInformation />);
+
+  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
+  expect(screen.getByText('Sandbox only — paid simulation; no real bank transfer was made.')).toBeInTheDocument();
+  expect(screen.queryByText('Payout status: paid')).not.toBeInTheDocument();
+  expect(screen.queryByText('Sandbox verification reported success.')).not.toBeInTheDocument();
+});
+
+test('shows Chapa response details for a failed sandbox simulation without treating it as a real payout failure', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({
+        data: {
+          balance: 2000,
+          currency: 'ETB',
+          transactions: [{
+            ...rentCredit,
+            externalTransferStatus: 'NOT_EXECUTED',
+            payoutMode: 'sandbox',
+            payoutStatus: 'SIMULATED',
+            sandboxTransferStatus: 'FAILED',
+            payoutFailureReason: 'Invalid sandbox destination account.',
+            providerRequestResponse: {
+              apiStatus: 'error',
+              httpStatus: 400,
+              message: 'Invalid sandbox destination account.',
+            },
+          }],
+        },
+      });
+    }
+    return Promise.resolve({ data: { success: true, account } });
+  });
+  render(<LandlordBankInformation />);
+
+  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
+  expect(screen.getByText('Sandbox only — failed; no real bank transfer was made.')).toBeInTheDocument();
+  expect(screen.getByText('Chapa submission: error (HTTP 400) — Invalid sandbox destination account.')).toBeInTheDocument();
+  expect(screen.getByText('Invalid sandbox destination account.')).toBeInTheDocument();
+  expect(screen.queryByText('Payout status: simulated')).not.toBeInTheDocument();
+  expect(screen.queryByText('FAILED', { selector: 'span' })).not.toBeInTheDocument();
+});
+
+test('shows why an unconfirmed sandbox transfer remains processing', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({
+        data: {
+          balance: 2000,
+          currency: 'ETB',
+          transactions: [{
+            ...rentCredit,
+            externalTransferStatus: 'NOT_EXECUTED',
+            payoutMode: 'sandbox',
+            payoutStatus: 'PROCESSING',
+            sandboxTransferStatus: 'PROCESSING',
+            providerRequestResponse: {
+              apiStatus: 'success',
+              httpStatus: 200,
+              message: 'Transfer queued successfully in Test Mode.',
+            },
+            providerVerificationResponse: {
+              apiStatus: 'success',
+              httpStatus: 200,
+              status: 'success',
+              message: 'Transfer details (Test Mode)',
+            },
+            payoutFailureReason: 'Chapa test-mode verification reference was omitted, amount was omitted, and currency was omitted; the payout remains unconfirmed.',
+          }],
+        },
+      });
+    }
+    return Promise.resolve({ data: { success: true, account } });
+  });
+  render(<LandlordBankInformation />);
+
+  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
+  expect(screen.getByText('Sandbox only — verification incomplete; no real bank transfer was made.')).toBeInTheDocument();
+  expect(screen.getByText(/Chapa submission: success \(HTTP 200\).*Transfer queued successfully in Test Mode/)).toBeInTheDocument();
+  expect(screen.getByText(/Chapa verification: success \(HTTP 200\).*Transfer details \(Test Mode\)/)).toBeInTheDocument();
+  expect(screen.getByText(/reference was omitted, amount was omitted, and currency was omitted/)).toBeInTheDocument();
+});
+
+test('shows when a sandbox payout was not submitted because no test destination is configured', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({
+        data: {
+          balance: 2000,
+          currency: 'ETB',
+          transactions: [{
+            ...rentCredit,
+            externalTransferStatus: 'NOT_EXECUTED',
+            payoutMode: 'sandbox',
+            payoutStatus: 'PENDING',
+            sandboxTransferStatus: null,
+            providerRequestResponse: null,
+            providerVerificationResponse: null,
+            payoutFailureReason: 'Sandbox payout was not submitted. Configure CHAPA_TRANSFER_TEST_ACCOUNT_NUMBER with a test destination supplied by Chapa; the saved landlord account is not sent in sandbox mode.',
+          }],
+        },
+      });
+    }
+    return Promise.resolve({ data: { success: true, account } });
+  });
+  render(<LandlordBankInformation />);
+
+  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
+  expect(screen.getByText('Sandbox only — not submitted; no real bank transfer was made.')).toBeInTheDocument();
+  expect(screen.getByText(/Configure CHAPA_TRANSFER_TEST_ACCOUNT_NUMBER with a test destination supplied by Chapa/)).toBeInTheDocument();
+  expect(screen.queryByText(/Chapa submission:/)).not.toBeInTheDocument();
+});
+
+test('shows payout references only for executed transfers and keeps the payment reference separate', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({
+        data: {
+          balance: 2000,
+          currency: 'ETB',
+          transactions: [{
+            ...rentCredit,
+            externalTransferStatus: 'EXECUTED',
+            payoutStatus: 'PAID',
+          }],
+        },
+      });
+    }
+    return Promise.resolve({ data: { success: true, account } });
+  });
+  render(<LandlordBankInformation />);
+
+  expect(await screen.findByText('Payout reference: PO-test-123')).toBeInTheDocument();
+  expect(screen.getByText('Chapa transfer reference: PO-test-123')).toBeInTheDocument();
+  expect(screen.getByText('CHAPA-transaction-1')).toBeInTheDocument();
 });
 
 test('does not offer demo-bank codes when Chapa payout banks are unavailable', async () => {
@@ -209,7 +498,10 @@ test('landlord can update account details without exposing the current account n
   const dialog = screen.getByRole('dialog', { name: 'Update Bank Account' });
   expect(dialog).toBeInTheDocument();
   expect(document.getElementById('update-landlord-account-number')).toHaveValue('');
+  expect(document.getElementById('update-landlord-bank')).toHaveValue('CBE');
+  expect(document.getElementById('update-landlord-account-name')).toHaveValue('Dejen Mulat');
   expect(screen.getByText(/Leave this blank to keep it unchanged/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Update Account' })).toBeEnabled();
 
   fireEvent.change(document.getElementById('update-landlord-account-name'), { target: { value: 'Updated Name' } });
   fireEvent.click(screen.getByRole('button', { name: 'Update Account' }));
@@ -227,6 +519,149 @@ test('landlord can update account details without exposing the current account n
   ));
   expect(await screen.findByText('Updated Name')).toBeInTheDocument();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('selecting a supported bank allows an account update while keeping the saved number masked', async () => {
+  axios.get.mockImplementation((url) => (
+    Promise.resolve({
+      data: {
+        success: true,
+        ...(url.endsWith('/banks') ? { banks } : { account }),
+      },
+    })
+  ));
+  axios.post.mockResolvedValue({
+    data: { message: 'Landlord payout account saved successfully.' },
+  });
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  fireEvent.change(document.getElementById('update-landlord-bank'), { target: { value: 'AWASH' } });
+  fireEvent.change(document.getElementById('update-landlord-account-number'), { target: { value: '1234567890' } });
+
+  expect(document.getElementById('update-landlord-account-name')).toHaveValue('Dejen Mulat');
+  expect(document.getElementById('update-landlord-account-number')).toHaveValue('1234567890');
+  expect(screen.getByRole('button', { name: 'Update Account' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Update Account' }));
+
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+    expect.stringContaining('/api/bank-accounts'),
+    {
+      bankCode: 'AWASH',
+      bankName: 'Awash Bank',
+      accountName: 'Dejen Mulat',
+      accountNumber: '1234567890',
+    },
+    expect.anything()
+  ));
+});
+
+test('requires a supported bank and valid account details before enabling update', async () => {
+  axios.get.mockImplementation((url) => (
+    Promise.resolve({
+      data: {
+        success: true,
+        ...(url.endsWith('/banks') ? { banks } : { account }),
+      },
+    })
+  ));
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const bankSelect = document.getElementById('update-landlord-bank');
+  const updateButton = screen.getByRole('button', { name: 'Update Account' });
+  fireEvent.change(bankSelect, { target: { value: '' } });
+  expect(updateButton).toBeDisabled();
+  fireEvent.change(bankSelect, { target: { value: 'NOT-SUPPORTED' } });
+  expect(updateButton).toBeDisabled();
+  fireEvent.change(bankSelect, { target: { value: 'CBE' } });
+  fireEvent.change(document.getElementById('update-landlord-account-name'), { target: { value: ' ' } });
+  expect(updateButton).toBeDisabled();
+});
+
+test('shows a bank API failure inside the update modal and keeps the bank invalid', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/api/bank-accounts/banks')) {
+      return Promise.reject({
+        response: { status: 503, data: { message: 'Chapa bank list is unavailable.' } },
+      });
+    }
+    return Promise.resolve({
+      data: {
+        success: true,
+        ...(url.endsWith('/my-account/transactions') ? { transactions: [] } : { account }),
+      },
+    });
+  });
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const dialog = screen.getByRole('dialog', { name: 'Update Bank Account' });
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('Chapa bank list is unavailable.');
+  expect(document.getElementById('update-landlord-bank')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Update Account' })).toBeDisabled();
+});
+
+test.each([
+  [401, 'The server rejected the request.', 'Your session has expired. Please log in again.'],
+  [403, 'The server rejected the request.', 'Only landlord accounts can load Chapa-supported banks.'],
+  [500, 'Chapa bank service failed.', 'Chapa bank service failed.'],
+])('shows an actionable message when the bank API returns HTTP %s', async (status, apiMessage, expectedMessage) => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/api/bank-accounts/banks')) {
+      return Promise.reject({ response: { status, data: { message: apiMessage } } });
+    }
+    return Promise.resolve({
+      data: {
+        success: true,
+        ...(url.endsWith('/my-account/transactions') ? { transactions: [] } : { account }),
+      },
+    });
+  });
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const dialog = screen.getByRole('dialog', { name: 'Update Bank Account' });
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(expectedMessage);
+  expect(screen.getByRole('button', { name: 'Update Account' })).toBeDisabled();
+});
+
+test('shows a connection-specific bank API error when the backend is unreachable', async () => {
+  axios.get.mockImplementation((url) => (
+    url.endsWith('/api/bank-accounts/banks')
+      ? Promise.reject(new Error('Network Error'))
+      : Promise.resolve({
+        data: {
+          success: true,
+          ...(url.endsWith('/my-account/transactions') ? { transactions: [] } : { account }),
+        },
+      })
+  ));
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const dialog = screen.getByRole('dialog', { name: 'Update Bank Account' });
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    'Unable to reach the backend to load Chapa-supported banks. Check your connection and retry.'
+  );
+  expect(screen.getByRole('button', { name: 'Update Account' })).toBeDisabled();
+});
+
+test('shows a clear error when the bank API success payload contains no valid banks', async () => {
+  axios.get.mockImplementation((url) => (
+    Promise.resolve(url.endsWith('/banks')
+      ? { data: { success: true, message: 'Banks retrieved', data: [{ id: 946 }] } }
+      : { data: { success: true, account } })
+  ));
+  render(<LandlordBankInformation />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Update Bank Account' }));
+  const dialog = screen.getByRole('dialog', { name: 'Update Bank Account' });
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    'Unable to load Chapa-supported banks. The bank list response contained no valid bank names and codes.'
+  );
+  expect(document.getElementById('update-landlord-bank')).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Update Account' })).toBeDisabled();
 });
 
 test('reports a bank-account save error without pretending the account was created', async () => {

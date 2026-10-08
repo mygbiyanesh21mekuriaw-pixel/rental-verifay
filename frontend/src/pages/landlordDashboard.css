@@ -397,6 +397,21 @@
   color: #166534;
 }
 
+.bank-account-active-banner.bank-account-warning-banner {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.bank-account-active-banner.bank-account-warning-banner > span:first-child {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.bank-account-active-banner.bank-account-warning-banner strong,
+.bank-account-active-banner.bank-account-warning-banner p {
+  color: #92400e;
+}
+
 .bank-account-active-banner > span:first-child {
   display: grid;
   width: 28px;
@@ -582,6 +597,59 @@
   white-space: nowrap;
 }
 
+.bank-account-transactions-table td:nth-child(8) {
+  min-width: 205px;
+  max-width: 320px;
+  white-space: normal;
+  vertical-align: top;
+}
+
+.bank-account-transfer-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.bank-account-transfer-badge {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.bank-account-transfer-badge-executed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.bank-account-transfer-badge-pending,
+.bank-account-transfer-badge-processing {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.bank-account-transfer-badge-failed,
+.bank-account-transfer-badge-reverted,
+.bank-account-transfer-badge-not-executed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.bank-account-transfer-detail {
+  display: block;
+  max-width: 100%;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .bank-account-transactions-table th {
   color: #64748b;
   font-size: 11px;
@@ -727,6 +795,48 @@
 
 .landlord-property-form-title {
   font-size: 24px;
+}
+
+.landlord-property-form-fields .landlord-property-field {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.landlord-property-form-fields .landlord-property-field > label {
+  margin: 0;
+}
+
+.landlord-property-form-fields .landlord-property-field > input,
+.landlord-property-form-fields .landlord-property-field > textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+
+.landlord-property-form-fields .landlord-property-field > textarea {
+  min-height: 110px;
+}
+
+.landlord-property-form-fields fieldset .landlord-property-field {
+  grid-template-columns: 112px minmax(0, 1fr);
+}
+
+@media (max-width: 768px) {
+  .landlord-property-form-fields .landlord-property-field,
+  .landlord-property-form-fields fieldset .landlord-property-field {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .landlord-property-form-fields .landlord-property-field,
+  .landlord-property-form-fields fieldset .landlord-property-field {
+    grid-template-columns: 1fr;
+  }
 }
 
 .landlord-main-header {

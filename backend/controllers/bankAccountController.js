@@ -1,5 +1,6 @@
 const DemoBankAccount = require('../models/DemoBankAccount');
 const LandlordCredit = require('../models/LandlordCredit');
+const Payment = require('../models/Payment');
 const Payout = require('../models/Payout');
 const User = require('../models/User');
 const {
@@ -12,7 +13,12 @@ const {
 } = require('../utils/bankAccountCrypto');
 const maskBankAccountNumber = require('../utils/maskBankAccountNumber');
 const { retryLandlordCredits } = require('../services/landlordCreditService');
-const { toExternalTransferStatus } = require('../services/landlordPayoutService');
+const {
+  getPayoutEligibilityFailure,
+  getVerifiedProviderReference,
+  processLandlordPayout,
+  toExternalTransferStatus,
+} = require('../services/landlordPayoutService');
 const { listChapaBanks } = require('../utils/payoutProvider');
 
 const toAccountResponse = (account) => account ? ({
@@ -30,10 +36,18 @@ const toAccountResponse = (account) => account ? ({
 const toLandlordAccountResponse = (user) => {
   if (!user) return null;
 
-  const storedAccountNumber = user.bankAccountNumber
-    ? decryptBankAccountNumber(user.bankAccountNumber)
-    : '';
-  const configured = Boolean(user.bankAccountName?.trim() && user.bankCode?.trim() && storedAccountNumber && user.bankAccountConfigured !== false);
+  let storedAccountNumber = '';
+  let bankAccountNeedsUpdate = false;
+  if (user.bankAccountNumber) {
+    try {
+      storedAccountNumber = decryptBankAccountNumber(user.bankAccountNumber);
+    } catch (error) {
+      bankAccountNeedsUpdate = true;
+      console.error('[BANK ACCOUNT] Stored account number cannot be decrypted; the landlord must enter it again.');
+    }
+  }
+  const configured = !bankAccountNeedsUpdate &&
+    Boolean(user.bankAccountName?.trim() && user.bankCode?.trim() && storedAccountNumber && user.bankAccountConfigured !== false);
 
   return {
     id: user._id,
@@ -43,6 +57,7 @@ const toLandlordAccountResponse = (user) => {
     accountNumberMasked: maskBankAccountNumber(storedAccountNumber),
     status: configured ? 'active' : 'inactive',
     bankAccountConfigured: configured,
+    bankAccountNeedsUpdate,
     bankAccountVerified: user.bankAccountVerified === true,
     bankAccountSource: user.bankAccountSource || 'existing_account',
     balance: Number(user.internalBalance || 0),
@@ -188,7 +203,15 @@ const createLandlordBankAccount = async (req, res) => {
     if (!landlord || landlord.role !== 'landlord') {
       return res.status(404).json({ message: 'Landlord account not found.' });
     }
-    if (!accountNumber && !landlord.bankAccountNumber) {
+    let hasRecoverableAccountNumber = Boolean(landlord.bankAccountNumber);
+    if (hasRecoverableAccountNumber) {
+      try {
+        decryptBankAccountNumber(landlord.bankAccountNumber);
+      } catch (error) {
+        hasRecoverableAccountNumber = false;
+      }
+    }
+    if (!accountNumber && !hasRecoverableAccountNumber) {
       return res.status(400).json({
         message: 'Account number is required to create your bank account.',
         code: 'BANK_ACCOUNT_NUMBER_REQUIRED',
@@ -233,7 +256,7 @@ const getMyBankAccount = async (req, res) => {
     const account = toLandlordAccountResponse(user);
     return res.status(200).json({
       success: true,
-      account: account?.bankAccountConfigured ? account : null,
+      account: account?.bankAccountConfigured || account?.bankAccountNeedsUpdate ? account : null,
     });
   } catch (error) {
     console.error('Landlord bank account lookup failed.', error);
@@ -246,6 +269,19 @@ const getMyBankTransactions = async (req, res) => {
 
   try {
     await retryLandlordCredits(req.user.id);
+    const creditedPayments = await LandlordCredit.find({
+      landlord: req.user.id,
+      status: 'CREDITED',
+    }).select('payment');
+    const paymentById = new Map();
+    for (const credit of creditedPayments) {
+      const payment = await Payment.findById(credit.payment);
+      if (payment) {
+        paymentById.set(String(credit.payment), payment);
+        await processLandlordPayout(payment);
+      }
+    }
+
     const [landlord, credits] = await Promise.all([
       User.findById(req.user.id).select('internalBalance'),
       LandlordCredit.find({ landlord: req.user.id })
@@ -256,7 +292,9 @@ const getMyBankTransactions = async (req, res) => {
     const payouts = await Payout.find({
       landlord: req.user.id,
       payment: { $in: credits.map((credit) => credit.payment) },
-    }).select('payment status mode sandboxTransferStatus payoutReference providerReference failureReason');
+    }).select(
+      'payment status mode sandboxTransferStatus payoutReference providerReference failureReason providerRequestResponse providerVerificationResponse lastVerifiedAt transferAttemptedAt'
+    );
     const payoutByPayment = new Map(
       payouts.map((payout) => [String(payout.payment), payout])
     );
@@ -283,11 +321,22 @@ const getMyBankTransactions = async (req, res) => {
           externalTransferStatus: payout
             ? toExternalTransferStatus(payout.status, payout.mode)
             : credit.externalTransferStatus,
+          payoutStatus: payout?.status || null,
           sandboxTransferStatus: payout?.sandboxTransferStatus || credit.sandboxTransferStatus || null,
           payoutReference: payout?.payoutReference || null,
-          providerReference: payout?.providerReference || null,
-          payoutFailureReason: payout?.failureReason || '',
+          providerReference: getVerifiedProviderReference(payout),
+          payoutFailureReason: payout?.failureReason ||
+            (!payout
+              ? getPayoutEligibilityFailure(
+                paymentById.get(String(credit.payment)),
+                { checkTransferConfiguration: true }
+              ) || 'No payout record exists; check backend payout logs for the submission error.'
+              : ''),
           payoutMode: payout?.mode || null,
+          providerRequestResponse: payout?.providerRequestResponse || null,
+          providerVerificationResponse: payout?.providerVerificationResponse || null,
+          lastVerifiedAt: payout?.lastVerifiedAt || null,
+          transferAttemptedAt: payout?.transferAttemptedAt || null,
         };
       }),
     });

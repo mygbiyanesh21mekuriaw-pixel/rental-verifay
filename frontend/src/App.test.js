@@ -263,6 +263,7 @@ expect(
     name: /bank information/i,
   }).length
 ).toBeGreaterThan(0);
+});
 
 test('clears the session and redirects to login when logout is clicked', async () => {
   localStorage.setItem(

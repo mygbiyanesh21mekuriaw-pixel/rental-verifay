@@ -6,6 +6,10 @@ const Payout = require('../models/Payout');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
 const {
+  decryptBankAccountNumber,
+  encryptBankAccountNumber,
+} = require('../utils/bankAccountCrypto');
+const {
   createLandlordBankAccount,
   getMyDemoAccount,
   getMyBankAccount,
@@ -157,6 +161,50 @@ test('real account lookup returns null for a landlord with no saved bank account
   }
 });
 
+test('real account lookup asks the landlord to re-enter an undecryptable saved number', async () => {
+  const originalFindById = User.findById;
+  const originalPaymentFind = Payment.find;
+  const previousEncryptionKey = process.env.BANK_ACCOUNT_ENCRYPTION_KEY;
+  const originalConsoleError = console.error;
+  const loggedMessages = [];
+  process.env.BANK_ACCOUNT_ENCRYPTION_KEY = 'old-bank-encryption-key';
+  const encryptedNumber = encryptBankAccountNumber('001234567890');
+  process.env.BANK_ACCOUNT_ENCRYPTION_KEY = 'new-bank-encryption-key';
+  Payment.find = async () => [];
+  User.findById = () => ({
+    select: async () => ({
+      _id: 'landlord-id',
+      role: 'landlord',
+      bankName: 'Example Bank',
+      bankCode: 'EXAMPLE',
+      bankAccountName: 'Dejen',
+      bankAccountNumber: encryptedNumber,
+      bankAccountConfigured: true,
+    }),
+  });
+  console.error = (...args) => loggedMessages.push(args.join(' '));
+  const response = createResponse();
+
+  try {
+    await getMyBankAccount(
+      { user: { id: 'landlord-id', role: 'landlord' } },
+      response
+    );
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.account.bankAccountConfigured, false);
+    assert.equal(response.body.account.bankAccountNeedsUpdate, true);
+    assert.equal(response.body.account.accountNumberMasked, '');
+    assert.match(loggedMessages[0], /must enter it again/);
+  } finally {
+    User.findById = originalFindById;
+    Payment.find = originalPaymentFind;
+    console.error = originalConsoleError;
+    if (previousEncryptionKey === undefined) delete process.env.BANK_ACCOUNT_ENCRYPTION_KEY;
+    else process.env.BANK_ACCOUNT_ENCRYPTION_KEY = previousEncryptionKey;
+  }
+});
+
 test('saves landlord bank details encrypted on the authenticated landlord and only returns a mask', async () => {
   const originalFindById = User.findById;
   const originalPaymentFind = Payment.find;
@@ -247,6 +295,7 @@ test('account update keeps the encrypted account number when no replacement is s
       assert.equal(landlord.bankCode, 'AWASH');
       assert.equal(landlord.bankAccountName, 'Updated Name');
       assert.equal(landlord.bankAccountNumber, originalEncryptedNumber);
+      assert.equal(decryptBankAccountNumber(landlord.bankAccountNumber), '100123456789');
       assert.equal(response.body.account.accountNumberMasked, '********6789');
     });
   } finally {
@@ -263,6 +312,7 @@ test('account update keeps the encrypted account number when no replacement is s
 test('landlord transaction lookup returns internal balance and transaction references', async () => {
   const originals = {
     findById: User.findById,
+    paymentFindById: Payment.findById,
     findPayments: Payment.find,
     findCredits: LandlordCredit.find,
     findPayouts: Payout.find,
@@ -283,10 +333,12 @@ test('landlord transaction lookup returns internal balance and transaction refer
     property: { title: 'Rental Home' },
   };
   User.findById = () => ({ select: async () => ({ internalBalance: 2000 }) });
+  Payment.findById = async () => null;
   Payment.find = async () => [];
   LandlordCredit.find = () => {
     const query = {
       populate: () => query,
+      select: async () => [{ payment: 'payment-id' }],
       sort: async () => [transaction],
     };
     return query;
@@ -297,7 +349,8 @@ test('landlord transaction lookup returns internal balance and transaction refer
       status: 'PROCESSING',
       mode: 'live',
       payoutReference: 'PO-payment-id',
-      providerReference: 'CHAPA-transfer-id',
+      providerReference: 'PO-payment-id',
+      providerVerificationResponse: { reference: 'PO-payment-id' },
       failureReason: '',
     }],
   });
@@ -315,11 +368,12 @@ test('landlord transaction lookup returns internal balance and transaction refer
     assert.equal(response.body.transactions[0].providerTransactionReference, 'CHAPA-transaction-id');
     assert.equal(response.body.transactions[0].externalTransferStatus, 'PENDING');
     assert.equal(response.body.transactions[0].payoutReference, 'PO-payment-id');
-    assert.equal(response.body.transactions[0].providerReference, 'CHAPA-transfer-id');
+    assert.equal(response.body.transactions[0].providerReference, 'PO-payment-id');
     assert.equal(response.body.transactions[0].tenant, 'Tenant Example');
     assert.equal(response.body.transactions[0].property, 'Rental Home');
   } finally {
     User.findById = originals.findById;
+    Payment.findById = originals.paymentFindById;
     Payment.find = originals.findPayments;
     LandlordCredit.find = originals.findCredits;
     Payout.find = originals.findPayouts;

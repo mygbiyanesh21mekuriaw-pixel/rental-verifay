@@ -1,10 +1,13 @@
 const express = require('express');
+const { chapaTransferApproval } = require('../controllers/chapaTransferApprovalController');
 
 const {
   listChapaBanks,
 } = require('../utils/payoutProvider');
 
 const router = express.Router();
+
+router.post('/transfer-approval', chapaTransferApproval);
 
 // GET /api/chapa/banks
 router.get('/banks', async (req, res) => {

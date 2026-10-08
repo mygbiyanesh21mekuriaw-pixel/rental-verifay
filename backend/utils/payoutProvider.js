@@ -58,6 +58,9 @@ const hasTransferConfig = () => {
 
 };
 
+const hasTransferApprovalConfig = () =>
+  Boolean((process.env.CHAPA_TRANSFER_APPROVAL_SECRET || '').trim());
+
 const hasBankListConfig = () => {
 
   const config = transferConfig();
@@ -203,30 +206,14 @@ const normalizeTransferStatus = (status) => {
 };
 
 const normalizeChapaBank = (bank) => {
-
-  const name =
-
+  const name = String(
     bank?.name ||
-
     bank?.bank_name ||
-
-    bank?.bankName;
-
-  const code = String(
-
-    bank?.bank_code ??
-
-      bank?.code ??
-
-      bank?.id ??
-
-      bank?.bank_slug ??
-
-      bank?.slug ??
-
-      ''
-
+    bank?.bankName ||
+    bank?.label ||
+    ''
   ).trim();
+  const code = String(bank?.bank_code ?? bank?.code ?? bank?.id ?? '').trim();
 
   const slug = String(
 
@@ -238,19 +225,17 @@ const normalizeChapaBank = (bank) => {
 
   ).trim();
 
-  return name && code
+  const canProcessPayouts = bank?.can_process_payouts;
+  const payoutSupported = canProcessPayouts === undefined ||
+      ![false, 0, '0', 'false'].includes(
+        typeof canProcessPayouts === 'string'
+          ? canProcessPayouts.trim().toLowerCase()
+          : canProcessPayouts
+      );
 
-    ? {
-
-        name,
-
-        code,
-
-        slug,
-
-      }
-
-    : null;
+  return name && code && payoutSupported
+      ? { name, code, slug }
+      : null;
 
 };
 
@@ -280,6 +265,8 @@ const initiateChapaTransfer = async ({
 
   reference,
 
+  currency = 'ETB',
+
   testStatus,
 
 }) => {
@@ -302,6 +289,46 @@ const initiateChapaTransfer = async ({
 
   const config = transferConfig();
   const sandboxMode = isSandboxTransferMode();
+  const normalizedAccountName = String(accountName || '').trim();
+  const normalizedAccountNumber = String(accountNumber || '').trim();
+  const normalizedBankCode = String(bankCode || '').trim();
+  const normalizedReference = String(reference || '').trim();
+  const normalizedCurrency = String(currency || '').trim().toUpperCase();
+  const numericAmount = Number(amount);
+  const invalidDetails = [];
+
+  if (!normalizedAccountName) invalidDetails.push('account name');
+  if (!normalizedAccountNumber) invalidDetails.push('account number');
+  if (!normalizedBankCode) invalidDetails.push('bank code');
+  if (!normalizedReference) invalidDetails.push('transfer reference');
+  if (normalizedCurrency !== 'ETB') invalidDetails.push('ETB currency');
+  if (
+    !Number.isFinite(numericAmount) ||
+    numericAmount <= 0 ||
+    Math.abs(numericAmount - Number(numericAmount.toFixed(2))) > 1e-8
+  ) {
+    invalidDetails.push('positive amount with no more than two decimal places');
+  }
+
+  if (invalidDetails.length) {
+    return {
+      ok: false,
+      outcomeUnknown: false,
+      status: 'FAILED',
+      providerReference: '',
+      message: `Chapa transfer was not submitted: invalid ${invalidDetails.join(', ')}.`,
+      responseDetails: {
+        httpStatus: null,
+        apiStatus: 'not_submitted',
+        message: `Invalid ${invalidDetails.join(', ')}.`,
+        reference: '',
+        transferId: '',
+        status: '',
+        amount: null,
+        currency: '',
+      },
+    };
+  }
 
   if (sandboxMode && !['success', 'failed', 'pending'].includes(testStatus)) {
     throw new Error('Chapa sandbox transfer status must be success, failed, or pending.');
@@ -338,12 +365,14 @@ const initiateChapaTransfer = async ({
       },
 
       body: JSON.stringify({
-        account_name: accountName,
-        account_number: accountNumber,
-        amount: Number(amount).toFixed(2),
-        currency: 'ETB',
-        reference,
-        bank_code: bankCode,
+        account_name: normalizedAccountName,
+        account_number: normalizedAccountNumber,
+        amount: numericAmount.toFixed(2),
+        currency: normalizedCurrency,
+        reference: normalizedReference,
+        bank_code: /^\d+$/.test(normalizedBankCode)
+          ? Number(normalizedBankCode)
+          : normalizedBankCode,
         ...(sandboxMode ? { status: testStatus } : {}),
       }),
 
@@ -354,6 +383,10 @@ const initiateChapaTransfer = async ({
   const data =
 
     payload?.data || {};
+  const providerStatus = String(payload?.status || '').trim().toLowerCase();
+  const accepted = response.ok && ['success', 'successful'].includes(providerStatus);
+  const explicitlyRejected = ['error', 'failed'].includes(providerStatus) ||
+    (!response.ok && response.status >= 400 && response.status < 500);
 
   const providerReference =
 
@@ -363,15 +396,12 @@ const initiateChapaTransfer = async ({
 
     payload?.reference ||
 
-    reference;
+    '';
 
   return {
 
-    ok:
-      response.ok &&
-      ['success', 'successful'].includes(
-        String(payload?.status || '').toLowerCase()
-      ),
+    ok: accepted,
+    outcomeUnknown: !accepted && !explicitlyRejected,
 
     status: normalizeTransferStatus(
       data.status
@@ -463,28 +493,38 @@ const verifyChapaTransfer = async (reference, expectedTransfer = {}) => {
   );
   const returnedAmount = Number(data.amount);
   const expectedAmount = Number(expectedTransfer.amount);
-  const amountConfirmed = expectedTransfer.amount === undefined ||
-    data.amount === undefined ||
-    (Number.isFinite(returnedAmount) &&
-      Number.isFinite(expectedAmount) &&
-      returnedAmount.toFixed(2) === expectedAmount.toFixed(2));
-  const currencyConfirmed = expectedTransfer.currency === undefined ||
-    data.currency === undefined ||
+  const amountConfirmed = data.amount !== undefined &&
+    Number.isFinite(returnedAmount) &&
+    Number.isFinite(expectedAmount) &&
+    returnedAmount.toFixed(2) === expectedAmount.toFixed(2);
+  const currencyConfirmed = Boolean(data.currency) &&
+    Boolean(expectedTransfer.currency) &&
     String(data.currency || '').trim().toUpperCase() ===
       String(expectedTransfer.currency).trim().toUpperCase();
   const transactionStatus = normalizeTransferStatus(data.status);
   const confirmed = apiConfirmed && referenceConfirmed && amountConfirmed && currencyConfirmed;
+  const verificationIssues = [];
+  if (!returnedReference) verificationIssues.push('reference was omitted');
+  else if (!referenceConfirmed) verificationIssues.push('reference does not match the payout');
+  if (!amountConfirmed) {
+    verificationIssues.push(data.amount === undefined ? 'amount was omitted' : 'amount does not match the payout');
+  }
+  if (!currencyConfirmed) {
+    verificationIssues.push(data.currency ? 'currency does not match the payout' : 'currency was omitted');
+  }
+  const providerMessage = payload?.message || payload?.error || '';
+  const isTestModeResponse = /test mode/i.test(providerMessage);
 
   return {
     ok: confirmed,
     status: confirmed ? transactionStatus : 'PROCESSING',
-    providerReference: referenceConfirmed
-      ? returnedReference
-      : requestedReference,
+    providerReference: referenceConfirmed ? returnedReference : '',
 
-    message: !amountConfirmed || !currencyConfirmed
-      ? 'Chapa transfer amount or currency does not match the payout.'
-      : (payload?.message || payload?.error || ''),
+    message: !apiConfirmed
+      ? (providerMessage || `Chapa transfer verification failed with HTTP ${response.status}.`)
+      : verificationIssues.length
+        ? `${isTestModeResponse ? 'Chapa test-mode verification' : 'Chapa verification'} ${verificationIssues.join(', ')}; the payout remains unconfirmed.`
+        : providerMessage,
 
     responseDetails: summarizeTransferResponse(response, payload),
 
@@ -599,15 +639,10 @@ const listChapaBanks = async () => {
 
     }
 
-    console.error(
-
-      'Chapa bank list request failed:',
-
-      payload?.message ||
-
-        response.status
-
-    );
+    const failureMessage = response.ok
+      ? 'Chapa returned no usable payout banks.'
+      : (payload?.message || `Chapa bank list request failed with HTTP ${response.status}.`);
+    console.error('Chapa bank list request failed:', failureMessage);
 
     return {
 
@@ -615,11 +650,9 @@ const listChapaBanks = async () => {
 
       banks: [],
 
-      message:
-
-        payload?.message ||
-
-        'Unable to load Chapa-supported banks. Please try again.',
+      message: response.ok
+        ? `${failureMessage} Please try again later.`
+        : failureMessage,
 
     };
 
@@ -662,6 +695,7 @@ const createPayoutReference = () =>
 module.exports = {
 
   hasTransferConfig,
+  hasTransferApprovalConfig,
 
   hasBankListConfig,
 

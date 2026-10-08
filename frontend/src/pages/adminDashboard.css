@@ -149,21 +149,29 @@
 }
 
 .admin-profile-edit-button,
-.admin-profile-submit-button {
+.admin-profile-submit-button,
+.admin-profile-cancel-button {
   border: 1px solid #493ed6;
   background: #493ed6;
   color: #fff;
 }
 
 .admin-profile-edit-button:hover,
-.admin-profile-submit-button:hover:not(:disabled) {
+.admin-profile-submit-button:hover:not(:disabled),
+.admin-profile-cancel-button:hover {
   background: #6675e8;
 }
 
-.admin-profile-cancel-button {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  color: #334155;
+.admin-profile-actions button {
+  box-sizing: border-box;
+  width: 140px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .admin-profile-details {

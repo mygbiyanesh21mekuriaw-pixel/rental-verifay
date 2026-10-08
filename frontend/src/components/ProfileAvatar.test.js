@@ -2,6 +2,20 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ProfileAvatar from './ProfileAvatar';
 
+const originalApiUrl = process.env.REACT_APP_API_URL;
+
+beforeEach(() => {
+  process.env.REACT_APP_API_URL = 'http://localhost:5000';
+});
+
+afterAll(() => {
+  if (originalApiUrl === undefined) {
+    delete process.env.REACT_APP_API_URL;
+  } else {
+    process.env.REACT_APP_API_URL = originalApiUrl;
+  }
+});
+
 describe('ProfileAvatar', () => {
   test('shows the profile photo when one is available', () => {
     render(
@@ -13,7 +27,7 @@ describe('ProfileAvatar', () => {
     const avatar = screen.getByRole('img', { name: 'Dejen profile' });
     const photo = avatar.querySelector('img');
 
-    expect(photo).toHaveAttribute('src', '/uploads/dejen.jpg');
+    expect(photo).toHaveAttribute('src', 'http://localhost:5000/uploads/dejen.jpg');
     expect(avatar).toHaveTextContent('D');
   });
 

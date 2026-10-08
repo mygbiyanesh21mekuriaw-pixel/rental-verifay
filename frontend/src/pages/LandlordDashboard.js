@@ -671,61 +671,61 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
             {editLoading ? (
               <div style={styles.loadingMsg}>Loading property...</div>
             ) : (
-              <form onSubmit={handleSubmit} style={styles.form} className="space-y-5">
-                <div className="space-y-2">
+              <form onSubmit={handleSubmit} style={styles.form} className="landlord-property-form-fields space-y-5">
+                <div className="landlord-property-field space-y-2">
                   <label className="block text-sm font-semibold text-slate-700">Property title *</label>
                   <input type="text" name="title" placeholder="Example: House in Bole" value={formData.title} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="landlord-property-field space-y-2">
                   <label className="block text-sm font-semibold text-slate-700">Description *</label>
                   <textarea name="description" placeholder="Enter a property description" value={formData.description} onChange={handleFormChange} required className="min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="landlord-property-field space-y-2">
                   <label className="block text-sm font-semibold text-slate-700">Price in ETB *</label>
                   <input type="number" name="price" placeholder="Price" min="1" value={formData.price} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                 </div>
 
                 <fieldset className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <legend className="px-2 text-base font-bold text-slate-800">Address *</legend>
-                  <div className="space-y-2">
+                  <div className="landlord-property-field space-y-2">
                     <label className="block text-sm font-semibold text-slate-700">Region *</label>
                     <input type="text" name="region" placeholder="Region" value={formData.region} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="landlord-property-field space-y-2">
                     <label className="block text-sm font-semibold text-slate-700">Zone *</label>
                     <input type="text" name="zone" placeholder="Zone" value={formData.zone} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="landlord-property-field space-y-2">
                     <label className="block text-sm font-semibold text-slate-700">Wereda *</label>
                     <input type="text" name="wereda" placeholder="Wereda" value={formData.wereda} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="landlord-property-field space-y-2">
                     <label className="block text-sm font-semibold text-slate-700">City *</label>
                     <input type="text" name="city" placeholder="City" value={formData.city} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="landlord-property-field space-y-2">
                     <label className="block text-sm font-semibold text-slate-700">Sub-city *</label>
                     <input type="text" name="subCity" placeholder="Sub-city" value={formData.subCity} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="landlord-property-field space-y-2">
                     <label className="block text-sm font-semibold text-slate-700">Kebele *</label>
                     <input type="text" name="kebele" placeholder="Kebele" value={formData.kebele} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="landlord-property-field space-y-2">
                     <label className="block text-sm font-semibold text-slate-700">House Number *</label>
                     <input type="text" name="houseNumber" placeholder="House number" value={formData.houseNumber} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                   </div>
                 </fieldset>
 
-                <div className="space-y-2">
+                <div className="landlord-property-field space-y-2">
                   <label className="block text-sm font-semibold text-slate-700">Number of bedrooms *</label>
                   <input type="number" name="bedrooms" placeholder="Number of bedrooms" min="1" value={formData.bedrooms} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                 </div>

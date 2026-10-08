@@ -4,7 +4,12 @@ const LandlordCredit = require('../models/LandlordCredit');
 const Payout = require('../models/Payout');
 const User = require('../models/User');
 const { encryptBankAccountNumber } = require('../utils/bankAccountCrypto');
-const { processLandlordPayout } = require('../services/landlordPayoutService');
+const {
+  getPayoutEligibilityFailure,
+  processLandlordPayout,
+  getVerifiedProviderReference,
+  toExternalTransferStatus,
+} = require('../services/landlordPayoutService');
 
 const confirmedPayment = {
   _id: 'payment-id',
@@ -22,10 +27,57 @@ const confirmedPayment = {
   verifiedAt: new Date('2026-10-07T10:00:00.000Z'),
 };
 
-const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = {}) => {
+test('only live Chapa payout results are exposed as executed or failed bank transfers', () => {
+  assert.equal(toExternalTransferStatus('PAID', 'live'), 'EXECUTED');
+  assert.equal(toExternalTransferStatus('PROCESSING', 'live'), 'PENDING');
+  assert.equal(toExternalTransferStatus('FAILED', 'live'), 'FAILED');
+  assert.equal(toExternalTransferStatus('REVERTED', 'live'), 'FAILED');
+  assert.equal(toExternalTransferStatus('PAID', 'sandbox'), 'NOT_EXECUTED');
+  assert.equal(toExternalTransferStatus('PAID', undefined), 'NOT_EXECUTED');
+});
+
+test('only a matching payout reference from Chapa verification is exposed as the provider reference', () => {
+  assert.equal(getVerifiedProviderReference({
+    payoutReference: 'PO-match',
+    providerReference: 'PO-match',
+    providerVerificationResponse: { reference: 'PO-match' },
+  }), 'PO-match');
+  assert.equal(getVerifiedProviderReference({
+    payoutReference: 'PO-local',
+    providerReference: 'PO-local',
+    providerVerificationResponse: { reference: 'PO-other' },
+  }), null);
+  assert.equal(getVerifiedProviderReference({
+    payoutReference: 'PO-local',
+    providerReference: 'PO-local',
+  }), null);
+});
+
+test('explains payments which cannot be submitted because their mode is absent or mismatched', async () => {
+  await withPayoutStore(async () => {
+    assert.match(
+      getPayoutEligibilityFailure({ ...confirmedPayment, paymentMode: undefined }),
+      /payment mode was not recorded/i
+    );
+    assert.match(
+      getPayoutEligibilityFailure({ ...confirmedPayment, paymentMode: 'sandbox' }),
+      /configured for live mode/i
+    );
+    delete process.env.CHAPA_TRANSFER_APPROVAL_SECRET;
+    assert.match(
+      getPayoutEligibilityFailure(confirmedPayment, { checkTransferConfiguration: true }),
+      /server approval is not configured/i
+    );
+  });
+});
+
+const withPayoutStore = async (
+  run,
+  { mode = 'live', testStatus = 'success', existingPayoutReference = '' } = {}
+) => {
   const originals = {
     env: Object.fromEntries(
-      ['PAYMENT_PROVIDER', 'PAYMENT_MODE', 'PAYMENT_SANDBOX', 'CHAPA_TRANSFER_TEST_STATUS', 'CHAPA_SECRET_KEY', 'CHAPA_BASE_URL', 'JWT_SECRET']
+      ['PAYMENT_PROVIDER', 'PAYMENT_MODE', 'PAYMENT_SANDBOX', 'CHAPA_TRANSFER_TEST_STATUS', 'CHAPA_TRANSFER_TEST_ACCOUNT_NUMBER', 'CHAPA_SECRET_KEY', 'CHAPA_TRANSFER_APPROVAL_SECRET', 'CHAPA_BASE_URL', 'JWT_SECRET']
         .map((key) => [key, process.env[key]])
     ),
     fetch: global.fetch,
@@ -41,7 +93,9 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
   process.env.PAYMENT_MODE = mode;
   process.env.PAYMENT_SANDBOX = String(mode === 'sandbox');
   process.env.CHAPA_TRANSFER_TEST_STATUS = testStatus;
+  process.env.CHAPA_TRANSFER_TEST_ACCOUNT_NUMBER = 'CHAPA_TEST_ACCOUNT_FIXTURE';
   process.env.CHAPA_SECRET_KEY = 'test-only-secret';
+  process.env.CHAPA_TRANSFER_APPROVAL_SECRET = 'test-only-approval-secret';
   process.env.CHAPA_BASE_URL = 'https://chapa.example.test';
   process.env.JWT_SECRET = 'test-only-encryption-secret';
 
@@ -49,7 +103,7 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
     _id: 'landlord-id',
     bankAccountName: 'Landlord Example',
     bankAccountNumber: encryptBankAccountNumber('100123456789'),
-    bankCode: 'CBE',
+    bankCode: '946',
     bankName: 'Commercial Bank of Ethiopia',
     bankAccountConfigured: true,
     bankAccountSource: 'existing_account',
@@ -57,11 +111,27 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
     internalPayoutReferences: [],
   };
   const credit = { payment: 'payment-id', status: 'CREDITED', externalTransferStatus: 'NOT_EXECUTED' };
-  let payout = null;
+  let payout = existingPayoutReference ? {
+    _id: 'payout-id',
+    payment: confirmedPayment._id,
+    tenant: confirmedPayment.tenant,
+    landlord: confirmedPayment.landlord,
+    property: confirmedPayment.property,
+    amount: confirmedPayment.amount,
+    currency: confirmedPayment.currency,
+    mode,
+    paymentReference: confirmedPayment.paymentReference,
+    payoutReference: existingPayoutReference,
+    status: 'PENDING',
+  } : null;
   let verificationStatus = 'successful';
   let transferApiStatus = 'success';
   let transferRequestThrows = false;
+  let transferFailureMessage = '';
+  let verificationAmount = '3000.00';
+  let verificationCurrency = 'ETB';
   let transferRequests = 0;
+  const verifiedTransferReferences = [];
   let submittedAccountNumber = null;
   let submittedTransferBody = null;
 
@@ -121,7 +191,7 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
         ok: true,
         json: async () => ({
           status: 'success',
-          data: [{ bank_code: 'CBE', bank_name: 'Commercial Bank of Ethiopia' }],
+          data: [{ bank_code: 946, bank_name: 'Commercial Bank of Ethiopia (CBE)' }],
         }),
       };
     }
@@ -130,8 +200,16 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
       submittedTransferBody = JSON.parse(options.body);
       submittedAccountNumber = submittedTransferBody.account_number;
       if (transferRequestThrows) throw new Error('simulated network timeout');
+      if (transferFailureMessage) {
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({ status: 'error', message: transferFailureMessage }),
+        };
+      }
       return {
         ok: true,
+        status: 200,
         json: async () => ({
           status: transferApiStatus,
           data: { reference: 'PO-test-123', status: 'processing' },
@@ -140,6 +218,7 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
     }
     if (url.includes('/v1/transfers/verify/')) {
       const reference = decodeURIComponent(url.split('/').pop());
+      verifiedTransferReferences.push(reference);
       return {
         ok: true,
         json: async () => ({
@@ -147,8 +226,8 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
           data: {
             reference,
             status: verificationStatus,
-            amount: '3000.00',
-            currency: 'ETB',
+            amount: verificationAmount,
+            currency: verificationCurrency,
           },
         }),
       };
@@ -164,9 +243,13 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
       setVerificationStatus: (status) => { verificationStatus = status; },
       setTransferApiStatus: (status) => { transferApiStatus = status; },
       setTransferRequestThrows: (value) => { transferRequestThrows = value; },
+      setTransferFailureMessage: (message) => { transferFailureMessage = message; },
+      setVerificationAmount: (amount) => { verificationAmount = amount; },
+      setVerificationCurrency: (currency) => { verificationCurrency = currency; },
       getTransferRequests: () => transferRequests,
       getSubmittedAccountNumber: () => submittedAccountNumber,
       getSubmittedTransferBody: () => submittedTransferBody,
+      getVerifiedTransferReferences: () => verifiedTransferReferences,
     });
   } finally {
     global.fetch = originals.fetch;
@@ -184,22 +267,26 @@ const withPayoutStore = async (run, { mode = 'live', testStatus = 'success' } = 
   }
 };
 
-test('verified landlord credit is paid through Chapa and only marked executed after transfer verification', async () => {
+test('verified landlord credit uses its established payout reference and only executes after transfer verification', async () => {
   await withPayoutStore(async (store) => {
     const result = await processLandlordPayout(confirmedPayment);
 
     assert.equal(result.status, 'PAID');
     assert.equal(result.providerReference, 'PO-test-123');
+    assert.equal(getVerifiedProviderReference(result), 'PO-test-123');
     assert.equal(store.credit.externalTransferStatus, 'EXECUTED');
     assert.equal(store.landlord.internalBalance, 0);
     assert.equal(store.landlord.internalPayoutReferences[0].status, 'EXECUTED');
     assert.equal(store.getSubmittedAccountNumber(), '100123456789');
+    assert.equal(store.getSubmittedTransferBody().reference, 'PO-test-123');
+    assert.deepEqual(store.getVerifiedTransferReferences(), ['PO-test-123']);
+    assert.equal(store.getPayout().payoutReference, 'PO-test-123');
     assert.equal(store.getTransferRequests(), 1);
 
     await processLandlordPayout(confirmedPayment);
     assert.equal(store.getTransferRequests(), 1);
     assert.equal(store.landlord.internalBalance, 0);
-  });
+  }, { existingPayoutReference: 'PO-test-123' });
 });
 
 test('an ambiguous transfer response is not treated as failed or executed without verification', async () => {
@@ -210,6 +297,7 @@ test('an ambiguous transfer response is not treated as failed or executed withou
     const result = await processLandlordPayout(confirmedPayment);
 
     assert.equal(result.status, 'PROCESSING');
+    assert.equal(result.providerReference, undefined);
     assert.equal(store.credit.externalTransferStatus, 'PENDING');
     assert.equal(store.landlord.internalBalance, 0);
     assert.equal(store.landlord.internalPayoutReferences[0].status, 'RESERVED');
@@ -231,6 +319,19 @@ test('legacy payments without a recorded mode are not automatically paid out', a
   });
 });
 
+test('live payout is held pending until Chapa server approval is configured', async () => {
+  await withPayoutStore(async (store) => {
+    delete process.env.CHAPA_TRANSFER_APPROVAL_SECRET;
+    const result = await processLandlordPayout(confirmedPayment);
+
+    assert.equal(result.status, 'PENDING');
+    assert.match(result.failureReason, /server-approval is not configured/i);
+    assert.equal(store.credit.externalTransferStatus, 'NOT_EXECUTED');
+    assert.equal(store.getTransferRequests(), 0);
+    assert.equal(store.landlord.internalBalance, 3000);
+  });
+});
+
 test('sandbox uses Chapa test transfer behavior without claiming real execution', async () => {
   await withPayoutStore(async (store) => {
     const result = await processLandlordPayout({
@@ -246,8 +347,8 @@ test('sandbox uses Chapa test transfer behavior without claiming real execution'
     assert.equal(store.landlord.internalBalance, 3000);
     assert.equal(store.landlord.internalPayoutReferences.length, 0);
     assert.equal(store.getSubmittedTransferBody().account_name, 'Landlord Example');
-    assert.equal(store.getSubmittedTransferBody().account_number, '100123456789');
-    assert.equal(store.getSubmittedTransferBody().bank_code, 'CBE');
+    assert.equal(store.getSubmittedTransferBody().account_number, 'CHAPA_TEST_ACCOUNT_FIXTURE');
+    assert.equal(store.getSubmittedTransferBody().bank_code, 946);
     assert.equal(store.getSubmittedTransferBody().amount, '3000.00');
     assert.equal(store.getSubmittedTransferBody().status, 'success');
     assert.equal(store.getTransferRequests(), 1);
@@ -256,6 +357,41 @@ test('sandbox uses Chapa test transfer behavior without claiming real execution'
       ...confirmedPayment,
       paymentMode: 'sandbox',
     });
+    assert.equal(store.getTransferRequests(), 1);
+    assert.equal(store.landlord.internalBalance, 3000);
+  }, { mode: 'sandbox', testStatus: 'success' });
+});
+
+  test('sandbox payout will not submit the saved landlord account without a Chapa test destination', async () => {
+    await withPayoutStore(async (store) => {
+      delete process.env.CHAPA_TRANSFER_TEST_ACCOUNT_NUMBER;
+      const result = await processLandlordPayout({
+        ...confirmedPayment,
+        paymentMode: 'sandbox',
+      });
+
+      assert.equal(result.status, 'PENDING');
+      assert.match(result.failureReason, /CHAPA_TRANSFER_TEST_ACCOUNT_NUMBER.*test destination supplied by Chapa/i);
+      assert.equal(store.getTransferRequests(), 0);
+      assert.equal(store.getSubmittedAccountNumber(), null);
+      assert.equal(store.credit.externalTransferStatus, 'NOT_EXECUTED');
+    }, { mode: 'sandbox' });
+  });
+
+  test('a rejected sandbox transfer remains a non-executed simulation and preserves the Chapa error', async () => {
+  await withPayoutStore(async (store) => {
+    store.setTransferFailureMessage('Invalid sandbox destination account');
+    const result = await processLandlordPayout({
+      ...confirmedPayment,
+      paymentMode: 'sandbox',
+    });
+
+    assert.equal(result.status, 'SIMULATED');
+    assert.equal(result.sandboxTransferStatus, 'FAILED');
+    assert.equal(store.credit.externalTransferStatus, 'NOT_EXECUTED');
+    assert.equal(result.providerRequestResponse.message, 'Invalid sandbox destination account');
+    assert.match(result.failureReason, /Invalid sandbox destination account/i);
+    assert.equal(store.getSubmittedTransferBody().status, 'success');
     assert.equal(store.getTransferRequests(), 1);
     assert.equal(store.landlord.internalBalance, 3000);
   }, { mode: 'sandbox', testStatus: 'success' });
@@ -290,7 +426,21 @@ test('an explicit Chapa payout rejection is recorded as FAILED with the provider
     const result = await processLandlordPayout(confirmedPayment);
 
     assert.equal(result.status, 'FAILED');
+    assert.equal(result.providerReference, undefined);
     assert.match(result.failureReason, /Chapa transfer request failed/i);
+    assert.equal(store.credit.externalTransferStatus, 'FAILED');
+    assert.equal(store.landlord.internalBalance, 3000);
+    assert.equal(store.landlord.internalPayoutReferences[0].status, 'REFUNDED');
+  });
+});
+
+test('Chapa rejects an invalid landlord bank account without claiming execution', async () => {
+  await withPayoutStore(async (store) => {
+    store.setTransferFailureMessage('Invalid bank account number');
+    const result = await processLandlordPayout(confirmedPayment);
+
+    assert.equal(result.status, 'FAILED');
+    assert.match(result.failureReason, /Invalid bank account number/i);
     assert.equal(store.credit.externalTransferStatus, 'FAILED');
     assert.equal(store.landlord.internalBalance, 3000);
     assert.equal(store.landlord.internalPayoutReferences[0].status, 'REFUNDED');
@@ -321,6 +471,7 @@ test('pending Chapa transfer is verified on retry without submitting a duplicate
     const pending = await processLandlordPayout(confirmedPayment);
     assert.equal(pending.status, 'PROCESSING');
     assert.equal(store.credit.externalTransferStatus, 'PENDING');
+    assert.match(pending.failureReason, /pending confirmation/i);
     assert.equal(store.landlord.internalBalance, 0);
     assert.equal(store.getTransferRequests(), 1);
 
@@ -328,6 +479,19 @@ test('pending Chapa transfer is verified on retry without submitting a duplicate
     const confirmed = await processLandlordPayout(confirmedPayment);
     assert.equal(confirmed.status, 'PAID');
     assert.equal(store.credit.externalTransferStatus, 'EXECUTED');
+    assert.equal(store.getTransferRequests(), 1);
+  });
+});
+
+test('transfer verification does not execute a payout when Chapa returns the wrong amount or currency', async () => {
+  await withPayoutStore(async (store) => {
+    store.setVerificationAmount('2999.00');
+    const result = await processLandlordPayout(confirmedPayment);
+
+    assert.equal(result.status, 'PROCESSING');
+    assert.equal(store.credit.externalTransferStatus, 'PENDING');
+    assert.match(result.failureReason, /amount.*does not match/i);
+    assert.equal(store.landlord.internalPayoutReferences[0].status, 'RESERVED');
     assert.equal(store.getTransferRequests(), 1);
   });
 });

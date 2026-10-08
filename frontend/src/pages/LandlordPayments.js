@@ -86,16 +86,47 @@ const LandlordPayments = () => {
                   </td>
                   <td>
                     <span className={`payment-status payment-status-payout-${externalTransferClass}`}>{externalTransferStatus}</span>
-                    {payment.payout?.providerReference && (
-                      <small className="payment-credit-reason">Reference: {payment.payout.providerReference}</small>
+                    {externalTransferStatus === 'EXECUTED' && payment.payout?.payoutReference && (
+                      <small className="payment-credit-reason">
+                        Payout reference: {payment.payout.payoutReference}
+                      </small>
+                    )}
+                    {externalTransferStatus === 'EXECUTED' && payment.payout?.providerReference && (
+                      <small className="payment-credit-reason">
+                        Chapa transfer reference: {payment.payout.providerReference}
+                      </small>
                     )}
                     {payment.payout?.mode === 'sandbox' && payment.payout?.sandboxTransferStatus && (
                       <small className="payment-credit-reason">
                         Sandbox simulation: {payment.payout.sandboxTransferStatus.toLowerCase()}; no real bank transfer occurred.
                       </small>
                     )}
-                    {payment.payout?.failureReason && (
-                      <small className="payment-credit-reason">{payment.payout.failureReason}</small>
+                    {(payment.payout?.failureReason || payment.payoutFailureReason) && (
+                      <small className="payment-credit-reason">
+                        {payment.payout?.failureReason || payment.payoutFailureReason}
+                      </small>
+                    )}
+                    {payment.payout?.providerRequestResponse && (
+                      <small className="payment-credit-reason">
+                        Chapa submission: {payment.payout.providerRequestResponse.apiStatus || 'unknown'}
+                        {payment.payout.providerRequestResponse.httpStatus
+                          ? ` (HTTP ${payment.payout.providerRequestResponse.httpStatus})`
+                          : ''}
+                        {payment.payout.providerRequestResponse.message
+                          ? ` — ${payment.payout.providerRequestResponse.message}`
+                          : ''}
+                      </small>
+                    )}
+                    {payment.payout?.providerVerificationResponse && (
+                      <small className="payment-credit-reason">
+                        Chapa verification: {payment.payout.providerVerificationResponse.status || 'unknown'}
+                        {payment.payout.providerVerificationResponse.httpStatus
+                          ? ` (HTTP ${payment.payout.providerVerificationResponse.httpStatus})`
+                          : ''}
+                        {payment.payout.providerVerificationResponse.message
+                          ? ` — ${payment.payout.providerVerificationResponse.message}`
+                          : ''}
+                      </small>
                     )}
                   </td>
                 </tr>
