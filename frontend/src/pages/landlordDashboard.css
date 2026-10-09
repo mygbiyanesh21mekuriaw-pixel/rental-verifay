@@ -1215,10 +1215,18 @@
     left: 0;
     width: min(260px, 85vw);
     max-width: 100%;
-    overflow: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     transform: translateX(-105%) !important;
     transition: transform 180ms ease;
     box-shadow: 0 12px 30px rgba(15, 23, 42, 0.22);
+  }
+
+  .landlord-layout .landlord-sidebar-navigation {
+    min-height: 0;
+    flex: 1 0 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .landlord-layout .landlord-sidebar.is-open {

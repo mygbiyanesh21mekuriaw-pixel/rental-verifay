@@ -13,7 +13,13 @@ const VerificationRequestSchema = new mongoose.Schema({
   },
   documentUrl: {
     type: String,
-    required: true,
+    default: '',
+  },
+  documentAsset: {
+    publicId: { type: String },
+    resourceType: { type: String, enum: ['image', 'raw'] },
+    format: { type: String },
+    deliveryType: { type: String, enum: ['authenticated'] },
   },
   status: {
     type: String,

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
+import { FaTrash } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
@@ -44,6 +45,8 @@ const AdminSectionPage = ({ type }) => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+  const [userDeleteLoading, setUserDeleteLoading] = useState(null);
+  const [userDeleteFeedback, setUserDeleteFeedback] = useState(null);
   const [adminForm, setAdminForm] = useState({
     name: '',
     email: '',
@@ -249,6 +252,35 @@ const AdminSectionPage = ({ type }) => {
       setAdminFormError(error.response?.data?.message || 'Unable to delete Area Admin.');
     } finally {
       setAdminActionLoading(null);
+    }
+  };
+
+  const handleDeleteUser = async (targetUser) => {
+    const confirmed = window.confirm(
+      `Delete ${targetUser.name} (${targetUser.email})? This action cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setUserDeleteLoading(targetUser._id);
+    setUserDeleteFeedback(null);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(
+        `${process.env.REACT_APP_API_URL}/api/admin/users/${targetUser._id}`,
+        { headers: { Authorization: 'Bearer ' + token } },
+      );
+      setItems((currentItems) =>currentItems.filter((item) =>String(item._id) !== String(targetUser._id)));
+      setUserDeleteFeedback({
+        type: 'success',
+        message: response.data?.message || 'User deleted successfully.',
+      });
+    } catch (error) {
+      setUserDeleteFeedback({
+        type: 'error',
+        message: error.response?.data?.message || error.message || 'Unable to delete user.',
+      });
+    } finally {
+      setUserDeleteLoading(null);
     }
   };
 
@@ -459,7 +491,8 @@ const AdminSectionPage = ({ type }) => {
             <p className="admin-card-detail">Requested: {selectedRentalRequest.createdAt ? new Date(selectedRentalRequest.createdAt).toLocaleString() : 'Date unavailable'}</p>
             <p className="admin-card-detail">Status: {selectedRentalRequest.status || 'pending'}</p>
             <PropertyOwnershipProof
-              src={selectedRentalRequest.property?.verificationDocument}
+              propertyId={selectedRentalRequest.property?._id}
+              hasProof={selectedRentalRequest.property?.hasVerificationDocument}
               title={selectedRentalRequest.property?.title}
               className="admin-card-detail"
               imageClassName="admin-card-image"
@@ -491,7 +524,7 @@ const AdminSectionPage = ({ type }) => {
       )}
 
       {type !== 'paymentPeriod' && !isAdminManagementPage && type !== 'rentalRequests' && (
-        <section className="admin-detail-section admin-dedicated-content">
+        <section className={`admin-detail-section admin-dedicated-content${isUserListPage ? ' admin-user-list-panel' : ''}`}>
           {loading ? (
             <div className="admin-loading-small">Loading...</div>
           ) : loadError ? (
@@ -500,19 +533,49 @@ const AdminSectionPage = ({ type }) => {
             <div className="admin-empty-text">No records found.</div>
           ) : isUserListPage ? (
             <div className="admin-grid admin-user-list-grid">
-              {items.map(user => (
-                <div key={user._id} className="admin-card admin-user-list-card">
-                  <h4 className="admin-card-title"> {user.name}</h4>
-                  <p className="admin-card-detail"> {user.email}</p>
-                  <p className="admin-card-detail">Role: {user.role}</p>
-                  <p className="admin-card-detail"> {user.phone || 'No phone provided'}</p>
-                  {user.role === 'admin' && (
-                    <p className="admin-card-detail">
-                       {user.adminType || 'platform'}{user.adminAreas?.length ? `: ${user.adminAreas.map(area =>area.city || area.region || area.zone).filter(Boolean).join(', ')}` : ''}
-                    </p>
-                  )}
-                </div>
-              ))}
+                {userDeleteFeedback && (
+                  <p
+                    className={`admin-user-delete-feedback admin-user-delete-feedback-${userDeleteFeedback.type}`}
+                    role={userDeleteFeedback.type === 'error' ? 'alert' : 'status'}
+                  >
+                    {userDeleteFeedback.message}
+                  </p>
+                )}
+                {items.map((user) => {
+                  const canDeleteUser = isPlatformAdmin
+                    && String(user._id) !== String(currentUser?._id || currentUser?.id);
+
+                  return (
+                    <div key={user._id} className="admin-card admin-user-list-card">
+                      <h4 className="admin-card-title">{user.name}</h4>
+                      <p className="admin-card-detail">{user.email}</p>
+                      <p className="admin-card-detail">Role: {user.role}</p>
+                      <p className="admin-card-detail">{user.phone || 'No phone provided'}</p>
+                      {user.role === 'admin' && (
+                        <p className="admin-card-detail">
+                          {user.adminType || 'platform'}
+                          {user.adminAreas?.length
+                            ? `: ${user.adminAreas.map((area) =>area.city || area.region || area.zone).filter(Boolean).join(', ')}`
+                            : ''}
+                        </p>
+                      )}
+                      {canDeleteUser && (
+                        <div className="admin-card-actions">
+                          <button
+                            type="button"
+                            className="admin-btn admin-user-delete-btn"
+                            onClick={() =>handleDeleteUser(user)}
+                            disabled={userDeleteLoading !== null}
+                            aria-label={`Delete ${user.name}`}
+                            title="Delete user"
+                          >
+                            <FaTrash aria-hidden="true" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           ) : (
             <div className="admin-grid">
@@ -535,7 +598,8 @@ const AdminSectionPage = ({ type }) => {
                   <p className="admin-card-detail">Status: {displayVerificationStatus(property)}
                   </p>
                   <PropertyOwnershipProof
-                    src={property.verificationDocument}
+                    propertyId={property._id}
+                    hasProof={property.hasVerificationDocument}
                     title={property.title}
                     className="admin-card-detail"
                     imageClassName="admin-card-image"

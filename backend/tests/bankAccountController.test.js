@@ -15,7 +15,9 @@ const {
   getMyBankAccount,
   getMyBankTransactions,
   getSupportedBanks,
+  retryMyPayoutVerification,
 } = require('../controllers/bankAccountController');
+const { auth } = require('../middleware/auth');
 
 const createResponse = () => ({
   statusCode: null,
@@ -272,6 +274,13 @@ test('account update keeps the encrypted account number when no replacement is s
   const landlord = {
     _id: 'landlord-id',
     role: 'landlord',
+    internalBalance: 37000,
+    internalCreditReferences: [{ payment: 'existing-payment', amount: 1000 }],
+    internalPayoutReferences: [{
+      payoutReference: 'PO-existing',
+      amount: 1000,
+      status: 'RESERVED',
+    }],
     bankAccountNumber: originalEncryptedNumber,
     async save() {},
   };
@@ -296,6 +305,13 @@ test('account update keeps the encrypted account number when no replacement is s
       assert.equal(landlord.bankAccountName, 'Updated Name');
       assert.equal(landlord.bankAccountNumber, originalEncryptedNumber);
       assert.equal(decryptBankAccountNumber(landlord.bankAccountNumber), '100123456789');
+      assert.equal(landlord.internalBalance, 37000);
+      assert.deepEqual(landlord.internalCreditReferences, [{ payment: 'existing-payment', amount: 1000 }]);
+      assert.deepEqual(landlord.internalPayoutReferences, [{
+        payoutReference: 'PO-existing',
+        amount: 1000,
+        status: 'RESERVED',
+      }]);
       assert.equal(response.body.account.accountNumberMasked, '********6789');
     });
   } finally {
@@ -333,7 +349,11 @@ test('landlord transaction lookup returns internal balance and transaction refer
     property: { title: 'Rental Home' },
   };
   User.findById = () => ({ select: async () => ({ internalBalance: 2000 }) });
-  Payment.findById = async () => null;
+  Payment.findById = async () => ({
+    _id: 'payment-id',
+    status: 'pending',
+    paymentPeriod: '2026-10',
+  });
   Payment.find = async () => [];
   LandlordCredit.find = () => {
     const query = {
@@ -366,8 +386,11 @@ test('landlord transaction lookup returns internal balance and transaction refer
     assert.equal(response.body.balance, 2000);
     assert.equal(response.body.transactions[0].status, 'CREDITED');
     assert.equal(response.body.transactions[0].providerTransactionReference, 'CHAPA-transaction-id');
+    assert.equal(response.body.transactions[0].paymentPeriod, '2026-10');
     assert.equal(response.body.transactions[0].externalTransferStatus, 'PENDING');
     assert.equal(response.body.transactions[0].payoutReference, 'PO-payment-id');
+    assert.equal(response.body.transactions[0].transferReference, 'PO-payment-id');
+    assert.equal(response.body.transactions[0].chapaTransferReference, 'PO-payment-id');
     assert.equal(response.body.transactions[0].providerReference, 'PO-payment-id');
     assert.equal(response.body.transactions[0].tenant, 'Tenant Example');
     assert.equal(response.body.transactions[0].property, 'Rental Home');
@@ -377,5 +400,122 @@ test('landlord transaction lookup returns internal balance and transaction refer
     Payment.find = originals.findPayments;
     LandlordCredit.find = originals.findCredits;
     Payout.find = originals.findPayouts;
+  }
+});
+
+test('retry endpoint returns an explicit sandbox-unconfirmed result and preserves the provider reference', async () => {
+  const originals = {
+    env: Object.fromEntries(
+      ['PAYMENT_PROVIDER', 'PAYMENT_MODE', 'PAYMENT_SANDBOX', 'CHAPA_SECRET_KEY', 'CHAPA_BASE_URL']
+        .map((key) => [key, process.env[key]])
+    ),
+    fetch: global.fetch,
+    payoutFindOne: Payout.findOne,
+    payoutFindOneAndUpdate: Payout.findOneAndUpdate,
+    payoutFindById: Payout.findById,
+    creditUpdateOne: LandlordCredit.updateOne,
+  };
+  Object.assign(process.env, {
+    PAYMENT_PROVIDER: 'chapa',
+    PAYMENT_MODE: 'sandbox',
+    PAYMENT_SANDBOX: 'true',
+    CHAPA_SECRET_KEY: 'test-only-secret',
+    CHAPA_BASE_URL: 'https://chapa.example.test',
+  });
+  const payout = {
+    _id: 'payout-id',
+    payment: 'payment-id',
+    landlord: 'landlord-id',
+    amount: 4000,
+    currency: 'ETB',
+    mode: 'sandbox',
+    payoutReference: 'PO-internal-reference',
+    providerReference: 'APQfhhNqwnvoZ',
+    status: 'PROCESSING',
+    transferAttemptedAt: new Date(),
+    providerRequestResponse: { reference: 'APQfhhNqwnvoZ', httpStatus: 200, apiStatus: 'success' },
+  };
+  Payout.findOne = async (query) => {
+    assert.equal(query.landlord, 'landlord-id');
+    assert.ok(query.$or.some((condition) => condition.providerReference === 'APQfhhNqwnvoZ'));
+    return payout;
+  };
+  Payout.findOneAndUpdate = async (_filter, update) => {
+    Object.assign(payout, update.$set);
+    return payout;
+  };
+  Payout.findById = async () => payout;
+  LandlordCredit.updateOne = async () => ({ acknowledged: true });
+  global.fetch = async (url) => {
+    assert.equal(url, 'https://chapa.example.test/v1/transfers/verify/APQfhhNqwnvoZ');
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'success',
+        message: 'Transfer details (Test Mode)',
+        data: { status: 'success' },
+      }),
+    };
+  };
+  const response = createResponse();
+
+  try {
+    await retryMyPayoutVerification(
+      {
+        params: { reference: 'APQfhhNqwnvoZ' },
+        user: { id: 'landlord-id', role: 'landlord' },
+      },
+      response
+    );
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.transaction.verificationOutcome, 'sandbox_unconfirmed');
+    assert.equal(response.body.transaction.transferReference, 'APQfhhNqwnvoZ');
+    assert.equal(response.body.transaction.externalTransferStatus, 'NOT_EXECUTED');
+    assert.equal(response.body.transaction.payoutFailureReason.includes('amount was omitted'), true);
+    assert.equal(payout.status, 'PROCESSING');
+  } finally {
+    global.fetch = originals.fetch;
+    Payout.findOne = originals.payoutFindOne;
+    Payout.findOneAndUpdate = originals.payoutFindOneAndUpdate;
+    Payout.findById = originals.payoutFindById;
+    LandlordCredit.updateOne = originals.creditUpdateOne;
+    for (const [key, value] of Object.entries(originals.env)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test('retry endpoint enforces landlord access and reports missing payouts with structured errors', async () => {
+  const originalFindOne = Payout.findOne;
+  Payout.findOne = async () => null;
+  const response = createResponse();
+
+  try {
+    await retryMyPayoutVerification(
+      { params: { reference: 'APQfhhNqwnvoZ' }, user: { id: 'tenant-id', role: 'tenant' } },
+      response
+    );
+    assert.equal(response.statusCode, 403);
+    assert.match(response.body.message, /only landlords/i);
+
+    const missingResponse = createResponse();
+    await retryMyPayoutVerification(
+      { params: { reference: 'APQfhhNqwnvoZ' }, user: { id: 'landlord-id', role: 'landlord' } },
+      missingResponse
+    );
+    assert.equal(missingResponse.statusCode, 404);
+    assert.equal(missingResponse.body.error.code, 'PAYOUT_NOT_FOUND');
+    assert.match(missingResponse.body.error.message, /no existing payout/i);
+
+    const authResponse = createResponse();
+    auth({ header: () => undefined }, authResponse, () => {
+      assert.fail('Unauthenticated retry requests must not reach the route handler.');
+    });
+    assert.equal(authResponse.statusCode, 401);
+    assert.match(authResponse.body.message, /no token/i);
+  } finally {
+    Payout.findOne = originalFindOne;
   }
 });

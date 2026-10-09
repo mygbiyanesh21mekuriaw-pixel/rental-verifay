@@ -10,6 +10,7 @@ const {
   createLandlordBankAccount,
   getMyBankAccount,
   getMyBankTransactions,
+  retryMyPayoutVerification,
 } = require('../controllers/bankAccountController');
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.post('/', auth, createLandlordBankAccount);
 router.get('/me', auth, getMyBankAccount);
 router.get('/my-account', auth, getMyBankAccount);
 router.get('/my-account/transactions', auth, getMyBankTransactions);
+router.post('/my-account/transactions/:reference/verify', auth, retryMyPayoutVerification);
 router.get('/demo/banks', auth, getDemoBanks);
 router.post('/demo', auth, createDemoAccount);
 router.get('/demo/my-account', auth, getMyDemoAccount);

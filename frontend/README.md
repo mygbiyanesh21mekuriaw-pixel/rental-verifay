@@ -1,96 +1,141 @@
-# House Rental Management System
+﻿# RentalVerify — House Rental Management System
 
-## Getting Started with Create React App
+RentalVerify is a web application for managing rental properties and rent payments. It provides role-based workspaces for tenants, landlords, area administrators, and platform administrators.
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Technology Stack
 
-## Available Scripts
+### Frontend
+- React 18
+- React Router
+- Axios
+- Leaflet and React Leaflet
+- Create React App
 
-## API configuration
+### Backend
+- Node.js and Express
+- MongoDB and Mongoose
+- JWT authentication
+- Chapa payment and transfer integration
+- Cloudinary and Multer for file handling
+
+## Project Structure
+
+```text
+rental-verifay/
+├── backend/
+│   ├── server.js
+│   ├── package.json
+│   └── ...
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   ├── .env.development
+│   ├── .env.production
+│   └── README.md
+└── .gitignore
+```
+
+## Requirements
+
+- Node.js and npm
+- MongoDB
+- Chapa credentials for payment integration
+- Cloudinary credentials if using Cloudinary uploads
+
+## Run Locally
+
+Open two PowerShell terminals from the project root.
+
+### 1. Start the backend
+
+```powershell
+cd backend
+npm.cmd install
+npm.cmd start
+```
+
+For development with automatic restarts:
+
+```powershell
+npm.cmd run dev
+```
+
+The backend uses `server.js`. Configure its required environment variables in `backend/.env`. Do not commit secrets to Git.
+
+### 2. Start the frontend
+
+In the second terminal:
+
+```powershell
+cd frontend
+npm.cmd install
+npm.cmd start
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+The backend normally runs locally at `http://localhost:5000`. The frontend package proxy points to this backend.
+
+## Frontend Environment Configuration
 
 The frontend uses environment-specific API URLs:
 
-- `npm start` loads `.env.development` and connects to `http://localhost:5000`.
-- `npm run build` loads `.env.production` and connects to `https://rental-verifay.onrender.com`.
+- `.env.development`: `REACT_APP_API_URL=http://localhost:5000`
+- `.env.production`: `REACT_APP_API_URL=https://rental-verifay.onrender.com`
 
-For a different deployment backend, set `REACT_APP_API_URL` in the Render frontend service's environment variables and redeploy. This value is public frontend configuration; never put API secrets in frontend environment variables.
+If the backend URL changes, update the appropriate environment file and rebuild or redeploy the frontend. Frontend environment variables are public; never store API secrets in them.
 
-Landlords register an existing bank account from **Landlord Workspace → Bank Information**. The account details are stored on the authenticated landlord's user record; the account number is encrypted at rest and only a masked number is returned to the frontend. Registration does not create an account at a bank. A landlord can update the same saved account; account details are never accepted for another landlord ID from the client.
+## Tests and Production Build
 
-Tenant rent checkout and payment verification use Chapa. Once a live-mode rent payment is verified as paid, the backend credits the internal balance of the landlord who owns the rented property and records an idempotent rent-credit ledger entry. The backend then submits an idempotent Chapa transfer to the landlord's registered bank account through `POST https://api.chapa.co/v1/transfers`, using Chapa's bearer-authenticated transfer fields (`account_name`, `account_number`, `amount`, `currency`, `reference`, and `bank_code`). It verifies the saved reference through `GET https://api.chapa.co/v1/transfers/verify/{reference}` and requires Chapa to confirm the same reference, amount, currency, and successful status before showing `EXECUTED`. While a live transfer is pending, its amount is reserved from the landlord's internal balance; failed or reverted transfers release that reservation. Sandbox payments use Chapa's transfer test mode (`CHAPA_TRANSFER_TEST_STATUS=success|failed|pending`) and are always shown as `NOT EXECUTED` because no real bank funds move. See [Chapa Transfers](https://developer.chapa.co/transfer/transfers).
+Run frontend commands from `frontend/`:
 
-Real bank registration and payouts require `PAYMENT_MODE=live`, `PAYMENT_SANDBOX=false`, Chapa's live backend secret key, a valid bank code from Chapa's bank list, an eligible Chapa merchant balance, and server approval enabled in the Chapa Dashboard. Set the backend-only `CHAPA_TRANSFER_APPROVAL_SECRET` to the dashboard approval secret and register `https://<backend-host>/api/chapa/transfer-approval` as the approval URL. Automatic payouts remain pending and are not submitted if the approval secret is missing; an account configured for manual OTP approval cannot complete unattended payouts through this flow. Sandbox requests only simulate provider outcomes, while historical payments without a recorded mode are never treated as live payouts. Secrets must remain on the backend and must never be sent to the frontend.
+```powershell
+npm.cmd test
+npm.cmd run build
+```
 
-Landlord bank-account API (all endpoints require authentication):
+Run backend tests from `backend/`:
 
-- `GET /api/bank-accounts/banks` — available bank choices for registration.
-- `POST /api/bank-accounts` with `{ "bankCode": "CBE", "accountName": "Dejen", "accountNumber": "100123456789" }` — save/update the authenticated landlord's account.
-- `GET /api/bank-accounts/my-account` — return the saved account with a masked account number and internal balance.
-- `GET /api/bank-accounts/my-account/transactions` — return the internal credit ledger and balance.
+```powershell
+npm.cmd test
+```
 
-The separate `/api/bank-accounts/demo/*` and `/api/admin/demo-bank-accounts` routes are retained for the legacy internal simulation only; they are not used to register landlord payout details.
+## Rent Payments and Chapa Transfers
 
-In the project directory, you can run:
+The tenant rent-payment flow uses Chapa for checkout and backend payment verification.
 
-### `npm start`
+- A payment must be verified by the backend before it is recorded as paid.
+- A verified rent payment credits the landlord associated with the rented property.
+- Rent-credit and transfer processing must be idempotent to prevent duplicate credits or transfers.
+- A landlord's saved bank-account details are associated with the authenticated landlord. Account numbers should remain encrypted at rest and masked in frontend responses.
+- A transfer is marked `EXECUTED` only after Chapa confirms the expected reference, amount, currency, and successful transfer status.
+- Sandbox transfers simulate provider outcomes and do not move real bank funds. They must not be represented as completed real payouts.
+- Failed, pending, or unverified transfers must not be displayed as successfully executed.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Live Payout Requirements
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Live transfers require the appropriate backend-only Chapa credentials, live payment configuration, a supported bank code, sufficient eligible provider balance, and any required Chapa dashboard approval settings.
 
-### `npm test`
+Configure required secrets only in the backend environment, such as the hosting provider's environment settings or the local `backend/.env`. Never put Chapa secret keys or transfer-approval secrets in frontend variables or source control.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Refer to the official [Chapa Transfers documentation](https://developer.chapa.co/transfer/transfers) for provider requirements.
 
-### `npm run build`
+## Deployment
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- Frontend: [Vercel](https://rental-verifay.vercel.app)
+- Backend: [Render](https://rental-verifay.onrender.com)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Configure the frontend production API URL to point to the deployed backend. Configure backend environment variables in Render and redeploy after changing them. Do not expose secrets in the frontend or commit `.env` files containing credentials.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Security Notes
 
-### `npm run eject`
+- Never commit API keys, JWT secrets, database credentials, or payment-provider secrets.
+- Keep authentication and authorization checks on the backend.
+- Verify payment and transfer results on the backend; do not trust a browser redirect alone.
+- Do not treat sandbox results as real money transfers.
+- Do not use real customer bank details in test-mode configuration.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## License
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This project currently uses the license metadata specified in its package configuration. Check with the project owner before redistributing or relicensing it.

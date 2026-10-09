@@ -186,8 +186,8 @@ const Navbar = () => {
       '/landlord/notifications',
     ],
 
-    [FaCog, 'Account Settings', '/landlord/account-settings'],
     [FaMoneyBill, 'Bank Information', '/landlord/bank-information'],
+    [FaCog, 'Account Settings', '/landlord/account-settings'],
   ];
 
   // ==========================================
@@ -226,6 +226,12 @@ const Navbar = () => {
       FaBell,
       'Notifications',
       '/tenant/notifications',
+    ],
+
+    [
+      FaCog,
+      'Account Settings',
+      '/tenant/account-settings',
     ],
   ];
 
@@ -267,12 +273,6 @@ const Navbar = () => {
       FaCreditCard,
       'Payment Period',
       '/admin-dashboard/payment-period',
-    ],
-
-    [
-      FaCreditCard,
-      'Demo Bank Accounts',
-      '/admin-dashboard/demo-bank-accounts',
     ],
 
     [
@@ -414,8 +414,7 @@ const Navbar = () => {
               className="navbar-topbar-logo"
             />
             <span className="navbar-topbar-brand-copy">
-              <strong>House Rental</strong>
-              <span>Management Portal</span>
+              <strong>House Rental Management System</strong>
             </span>
           </Link>
           <div className="navbar-topbar-context">
@@ -490,14 +489,7 @@ const Navbar = () => {
             />
 
             <span className="navbar-logo-text">
-              {user ? (
-                <>
-                  <span className="navbar-name-desktop">House Rental Management System</span>
-                  <span className="navbar-name-mobile">House Rental</span>
-                </>
-              ) : (
-                'House Rental'
-              )}
+              House Rental Management System
             </span>
           </Link>
 
@@ -594,7 +586,7 @@ const Navbar = () => {
 
                 <Link
                   to="/login"
-                  className={`navbar-link ${
+                  className={`navbar-link navbar-link-login ${
                     location.pathname === '/login'
                       ? 'active'
                       : ''
@@ -606,7 +598,7 @@ const Navbar = () => {
 
                 <Link
                   to="/register"
-                  className={`navbar-link ${
+                  className={`navbar-link navbar-link-register ${
                     location.pathname === '/register'
                       ? 'active'
                       : ''
@@ -649,8 +641,10 @@ const Navbar = () => {
                         key={path}
                         to={path}
                         className={`navbar-link ${
-                          isActive ? 'active' : ''
-                        }`}
+                          path === '/landlord/bank-information'
+                            ? 'navbar-link-bank-information'
+                            : ''
+                        } ${isActive ? 'active' : ''}`}
                       >
                         {/* ICON */}
                         <span

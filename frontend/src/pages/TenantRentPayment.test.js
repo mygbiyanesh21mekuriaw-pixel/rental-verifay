@@ -129,7 +129,7 @@ test('downloads a PDF from the verified receipt', async () => {
   }
 });
 
-test('shows landlord payment, verification, provider reference, and payout statuses', async () => {
+test('shows landlord payment and verification details without exposing payout statuses', async () => {
   axios.get.mockResolvedValue({
     data: [{
       ...verifiedPayment,
@@ -153,6 +153,7 @@ test('shows landlord payment, verification, provider reference, and payout statu
   await waitFor(() => expect(screen.getByText('CHAPA-transaction-1')).toBeInTheDocument());
   expect(screen.getByText('Paid')).toBeInTheDocument();
   expect(screen.getByText('CREDITED')).toBeInTheDocument();
-  expect(screen.getByText('PENDING')).toBeInTheDocument();
+  expect(screen.queryByText('PENDING')).not.toBeInTheDocument();
+  expect(screen.queryByText('PROCESSING')).not.toBeInTheDocument();
   expect(screen.getByText(/^Yes ·/)).toBeInTheDocument();
 });

@@ -65,8 +65,8 @@ export const landlordSidebarItems = [
   { key: 'rejected', label: 'Rejected', icon: <FaTimes aria-hidden="true" />, path: '/landlord/rejected' },
   { key: 'rentPayments', label: 'Rent Payments', icon: <FaMoneyBill aria-hidden="true" />, path: '/landlord/rent-payments' },
   { key: 'notifications', label: 'Notifications', icon: <FaBell aria-hidden="true" />, path: '/landlord/notifications' },
-  { key: 'accountSettings', label: 'Account Settings', icon: <FaCog aria-hidden="true" />, path: '/landlord/account-settings' },
   { key: 'bankInformation', label: 'Bank Information', icon: <FaBuilding aria-hidden="true" />, path: '/landlord/bank-information' },
+  { key: 'accountSettings', label: 'Account Settings', icon: <FaCog aria-hidden="true" />, path: '/landlord/account-settings' },
 ];
 
 export const LandlordSidebar = ({
@@ -108,7 +108,7 @@ export const LandlordSidebar = ({
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4">
+        <nav className="landlord-sidebar-navigation flex-1 space-y-1.5 overflow-y-auto px-3 py-4">
           {landlordSidebarItems.map(({ key, label, icon, path }) => {
             const isActive = activeSection === key;
             const isNotifications = key === 'notifications';
@@ -246,14 +246,17 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   const [imageFiles, setImageFiles] = useState([]);
   const [existingPropertyImages, setExistingPropertyImages] = useState([]);
   const [documentFile, setDocumentFile] = useState(null);
-  const [existingProofOfOwnership, setExistingProofOfOwnership] = useState('');
+  const [existingProofOfOwnership, setExistingProofOfOwnership] = useState(false);
 
   useEffect(() => {
     setShowForm(initialShowForm || isEditMode);
     if (initialShowForm) {
       setActiveSection('addProperty');
     }
-    if (!isEditMode) return;
+    if (!isEditMode) {
+      setExistingProofOfOwnership(false);
+      return;
+    }
 
     const loadProperty = async () => {
       try {
@@ -277,7 +280,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
           houseNumber: property.houseNumber || '',
           bedrooms: property.bedrooms ?? '',
         });
-        setExistingProofOfOwnership(property.verificationDocument || '');
+        setExistingProofOfOwnership(Boolean(property.hasVerificationDocument));
       } catch (error) {
         setFormError(error.response?.data?.message || 'Unable to load property');
       } finally {
@@ -765,9 +768,9 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                   <label className="block text-sm font-semibold text-slate-700">Proof of ownership</label>
                   {existingProofOfOwnership && (
                     <>
-                      <span className="block text-sm font-medium text-emerald-700"> {existingProofOfOwnership.split('/').pop()}</span>
                       <PropertyOwnershipProof
-                        src={existingProofOfOwnership}
+                        propertyId={propertyId}
+                        hasProof={existingProofOfOwnership}
                         title={formData.title}
                         className="mt-2 grid gap-2 text-sm"
                         imageClassName="max-h-40 w-full rounded-lg object-contain"

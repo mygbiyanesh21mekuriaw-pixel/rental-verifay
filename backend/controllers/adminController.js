@@ -54,7 +54,9 @@ const getCanonicalAreaField = (area) => {
 
 const applyAdminAreaScope = async (adminId, filter = {}) => {
   const admin = await User.findById(adminId).select('adminType adminAreas').lean();
-  if (admin?.adminType !== 'area') return filter;
+  const isAreaAdmin = admin?.adminType === 'area'
+    || (!admin?.adminType && (admin?.adminAreas || []).length > 0);
+  if (!isAreaAdmin) return filter;
 
   const areas = (admin.adminAreas || [])
     .map((area) => normalizeAdminAreaObject(area))
@@ -68,6 +70,16 @@ const applyAdminAreaScope = async (adminId, filter = {}) => {
       buildAdminAreaQuery(areas),
     ],
   };
+};
+
+const sanitizeAdminProperty = (property) => {
+  const sanitized = typeof property.toObject === 'function' ? property.toObject() : { ...property };
+  sanitized.hasVerificationDocument = Boolean(
+    property.verificationDocument || property.verificationDocumentAsset?.publicId,
+  );
+  delete sanitized.verificationDocument;
+  delete sanitized.verificationDocumentAsset;
+  return sanitized;
 };
 
 const normalizeAdminAreas = (areas) => {
@@ -305,7 +317,7 @@ const getPendingProperties = async (req, res) => {
     const pendingProperties = await Property.find(filter)
       .populate('landlord', 'name email phone profilePhoto role');
 
-    res.json(pendingProperties);
+    res.json(pendingProperties.map(sanitizeAdminProperty));
   } catch (error) {
     console.error('Verify property failed', { propertyId: req.params.id, adminId: req.user?.id, message: error.message });
     res.status(500).json({ message: 'Unable to verify property', error: error.message });
@@ -375,7 +387,7 @@ const getAdminProperties = async (req, res) => {
       });
     }
 
-    res.json(properties);
+    res.json(properties.map(sanitizeAdminProperty));
   } catch (error) {
     console.error('Reject property failed', { propertyId: req.params.id, adminId: req.user?.id, message: error.message });
     res.status(500).json({ message: 'Unable to reject property', error: error.message });
@@ -437,7 +449,7 @@ const verifyProperty = async (req, res) => {
       ipAddress: req.ip || '',
     });
 
-    res.json({ message: 'Property verified successfully', property });
+    res.json({ message: 'Property verified successfully', property: sanitizeAdminProperty(property) });
   } catch (error) {
     console.error('Verify property failed', {
       propertyId: req.params.id,
@@ -505,7 +517,7 @@ const rejectProperty = async (req, res) => {
       ipAddress: req.ip || '',
     });
 
-    res.json({ message: 'Property rejected', property });
+    res.json({ message: 'Property rejected', property: sanitizeAdminProperty(property) });
   } catch (error) {
     console.error('Reject property failed', {
       propertyId: req.params.id,

@@ -183,7 +183,7 @@ test('payout is PAID only when Chapa confirms the requested transfer reference',
       ok: true,
       json: async () => ({
         status: 'success',
-        data: { status: 'successful', reference: 'PO-test-123', amount: '3000.00', currency: 'ETB' },
+        data: { status: 'success', reference: 'PO-test-123', amount: '3000.00', currency: 'ETB' },
       }),
     });
     const confirmed = await verifyChapaTransfer('PO-test-123', { amount: 3000, currency: 'ETB' });
@@ -194,7 +194,7 @@ test('payout is PAID only when Chapa confirms the requested transfer reference',
       ok: true,
       json: async () => ({
         status: 'success',
-        data: { status: 'successful', amount: '3000.00', currency: 'ETB' },
+        data: { status: 'success', amount: '3000.00', currency: 'ETB' },
       }),
     });
     const missingReference = await verifyChapaTransfer('PO-test-123', { amount: 3000, currency: 'ETB' });
@@ -205,7 +205,7 @@ test('payout is PAID only when Chapa confirms the requested transfer reference',
       ok: true,
       json: async () => ({
         status: 'success',
-        data: { status: 'successful', reference: 'PO-other-transfer', amount: '3000.00', currency: 'ETB' },
+        data: { status: 'success', reference: 'PO-other-transfer', amount: '3000.00', currency: 'ETB' },
       }),
     });
     const mismatchedReference = await verifyChapaTransfer('PO-test-123', { amount: 3000, currency: 'ETB' });
@@ -218,7 +218,7 @@ test('payout is PAID only when Chapa confirms the requested transfer reference',
       ok: true,
       json: async () => ({
         status: 'success',
-        data: { status: 'successful', reference: 'PO-test-123', amount: '2999.00', currency: 'ETB' },
+        data: { status: 'success', reference: 'PO-test-123', amount: '2999.00', currency: 'ETB' },
       }),
     });
     const wrongAmount = await verifyChapaTransfer('PO-test-123', { amount: 3000, currency: 'ETB' });

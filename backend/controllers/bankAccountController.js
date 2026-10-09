@@ -15,8 +15,11 @@ const maskBankAccountNumber = require('../utils/maskBankAccountNumber');
 const { retryLandlordCredits } = require('../services/landlordCreditService');
 const {
   getPayoutEligibilityFailure,
+  getChapaTransferReference,
+  getPayoutTransferReference,
   getVerifiedProviderReference,
   processLandlordPayout,
+  retryPayoutVerification,
   toExternalTransferStatus,
 } = require('../services/landlordPayoutService');
 const { listChapaBanks } = require('../utils/payoutProvider');
@@ -315,6 +318,7 @@ const getMyBankTransactions = async (req, res) => {
           direction: 'CREDIT',
           status: credit.status,
           date: credit.creditedAt || credit.createdAt,
+          paymentPeriod: paymentById.get(String(credit.payment))?.paymentPeriod || null,
           paymentReference: credit.paymentReference,
           providerTransactionReference: credit.providerTransactionReference,
           reason: credit.reason || '',
@@ -324,6 +328,8 @@ const getMyBankTransactions = async (req, res) => {
           payoutStatus: payout?.status || null,
           sandboxTransferStatus: payout?.sandboxTransferStatus || credit.sandboxTransferStatus || null,
           payoutReference: payout?.payoutReference || null,
+          transferReference: payout ? getPayoutTransferReference(payout) : null,
+          chapaTransferReference: payout ? getChapaTransferReference(payout) || null : null,
           providerReference: getVerifiedProviderReference(payout),
           payoutFailureReason: payout?.failureReason ||
             (!payout
@@ -343,6 +349,96 @@ const getMyBankTransactions = async (req, res) => {
   } catch (error) {
     console.error('Landlord account transaction lookup failed:', error);
     return res.status(500).json({ message: 'Unable to load your account transactions.' });
+  }
+};
+
+const retryMyPayoutVerification = async (req, res) => {
+  if (!landlordOnly(req, res)) return;
+
+  try {
+    const payout = await retryPayoutVerification(req.params.reference, req.user.id);
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'PAYOUT_NOT_FOUND',
+          message: 'No existing payout matches this reference for your landlord account.',
+        },
+      });
+    }
+
+    const verificationData = payout.providerVerificationResponse || {};
+    const transferReference = getPayoutTransferReference(payout);
+    const verifiedAmount = Number(verificationData.amount);
+    const expectedAmount = Number(payout.amount);
+    const dataComplete = Boolean(
+      verificationData.reference === transferReference &&
+      verificationData.amount !== null &&
+      verificationData.amount !== undefined &&
+      Number.isFinite(verifiedAmount) &&
+      Number.isFinite(expectedAmount) &&
+      verifiedAmount.toFixed(2) === expectedAmount.toFixed(2) &&
+      String(verificationData.currency || '').trim().toUpperCase() ===
+        String(payout.currency || '').trim().toUpperCase()
+    );
+    const verificationOutcome = payout.status === 'PAID'
+      ? (payout.mode === 'sandbox' ? 'sandbox_simulated' : 'confirmed')
+      : ['FAILED', 'REVERTED'].includes(payout.status)
+        ? 'failed'
+        : payout.status === 'SIMULATED'
+          ? (payout.sandboxTransferStatus === 'FAILED' ? 'sandbox_failed' : 'sandbox_simulated')
+          : payout.mode === 'sandbox' && !dataComplete
+            ? 'sandbox_unconfirmed'
+            : payout.status === 'PROCESSING'
+              ? 'pending'
+              : 'unconfirmed';
+    return res.status(200).json({
+      success: true,
+      transaction: {
+        payoutReference: payout.payoutReference,
+        transferReference: getPayoutTransferReference(payout),
+        payoutStatus: payout.status,
+        payoutMode: payout.mode,
+        verificationOutcome,
+        verificationOutcome,
+        sandboxTransferStatus: payout.sandboxTransferStatus || null,
+        externalTransferStatus: toExternalTransferStatus(payout.status, payout.mode),
+        providerReference: getVerifiedProviderReference(payout),
+        payoutFailureReason: payout.failureReason || '',
+        providerRequestResponse: payout.providerRequestResponse || null,
+        providerVerificationResponse: payout.providerVerificationResponse || null,
+        lastVerifiedAt: payout.lastVerifiedAt || null,
+      },
+    });
+  } catch (error) {
+    if ([400, 409].includes(error.statusCode)) {
+      return res.status(error.statusCode).json({
+        success: false,
+        error: {
+          code: error.statusCode === 400 ? 'INVALID_REFERENCE' : 'PAYOUT_NOT_RETRYABLE',
+          message: error.message,
+        },
+      });
+    }
+    console.error('Landlord payout verification retry failed:', error);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
+      success: false,
+      error: {
+        code: statusCode === 502 ? 'CHAPA_VERIFICATION_FAILED' : 'PAYOUT_VERIFICATION_ERROR',
+        message: statusCode === 502
+          ? error.message || 'Chapa could not verify this payout.'
+          : 'An internal error occurred while verifying the payout. Check backend logs.',
+        providerResponse: error.providerResponse || null,
+        payout: error.payout ? {
+          payoutReference: error.payout.payoutReference,
+          transferReference: getPayoutTransferReference(error.payout),
+          payoutStatus: error.payout.status,
+          payoutMode: error.payout.mode,
+          payoutFailureReason: error.payout.failureReason || '',
+        } : null,
+      },
+    });
   }
 };
 
@@ -435,6 +531,7 @@ module.exports = {
   createLandlordBankAccount,
   getMyBankAccount,
   getMyBankTransactions,
+  retryMyPayoutVerification,
   getMyDemoBalance,
   getMyDemoTransactions,
   getAllDemoAccounts,

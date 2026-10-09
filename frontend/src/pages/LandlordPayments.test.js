@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LandlordPayments from './LandlordPayments';
 
@@ -32,6 +32,27 @@ const makePayment = (reference, externalTransferStatus, payoutStatus) => ({
   },
 });
 
+const expectRentPaymentTableColumns = async () => {
+  const table = await screen.findByRole('table');
+  expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+    'Tenant',
+    'Property',
+    'Amount',
+    'Period',
+    'Date',
+    'Payment Status',
+    'Provider',
+    'Chapa Transaction Reference',
+    'Verified',
+    'Landlord Credit',
+  ]);
+  within(table).getAllByRole('row').slice(1).forEach((row) => {
+    expect(within(row).getAllByRole('cell')).toHaveLength(10);
+  });
+  expect(within(table).queryByText(/External Bank Transfer|NOT EXECUTED|PENDING|EXECUTED|Sandbox simulation:|Chapa submission:|Chapa verification:/))
+    .not.toBeInTheDocument();
+};
+
 beforeEach(() => {
   localStorage.setItem('token', 'test-token');
   axios.get.mockReset().mockResolvedValue({
@@ -43,34 +64,32 @@ beforeEach(() => {
   });
 });
 
-test('Rent Payments displays confirmed payout statuses and Chapa references', async () => {
+test('Rent Payments keeps payment and landlord credit details without external transfer column', async () => {
   render(
     <MemoryRouter>
       <LandlordPayments />
     </MemoryRouter>
   );
 
-  expect(await screen.findByText('PENDING')).toBeInTheDocument();
-  expect(screen.getByText('EXECUTED')).toBeInTheDocument();
-  expect(screen.getByText('FAILED')).toBeInTheDocument();
-  expect(screen.getByText('Payout reference: PO-executed')).toBeInTheDocument();
-  expect(screen.getByText('Chapa transfer reference: PO-executed')).toBeInTheDocument();
-  expect(screen.queryByText('Payout reference: PO-pending')).not.toBeInTheDocument();
-  expect(screen.queryByText('Chapa transfer reference: PO-pending')).not.toBeInTheDocument();
-  expect(screen.queryByText('Payout reference: PO-failed')).not.toBeInTheDocument();
-  expect(screen.queryByText('Chapa transfer reference: PO-failed')).not.toBeInTheDocument();
+  await expectRentPaymentTableColumns();
+  expect(screen.getAllByText('Tenant Example')).toHaveLength(3);
+  expect(screen.getAllByText('Rental Home')).toHaveLength(3);
+  expect(screen.getAllByText('ETB 3,000')).toHaveLength(3);
+  expect(screen.getAllByText('Paid')).toHaveLength(3);
+  expect(screen.getAllByText('October 2026')).toHaveLength(3);
+  expect(screen.getAllByText('chapa')).toHaveLength(3);
+  expect(screen.getAllByText('Not verified')).toHaveLength(3);
   expect(screen.getAllByText('CREDITED')).toHaveLength(3);
   expect(screen.getByText(/EXECUTED only after Chapa confirms a live transfer/i)).toBeInTheDocument();
 });
 
-test('Rent Payments displays a backend reason when no payout was submitted', async () => {
-  const reason = 'Payment mode was not recorded; no landlord payout was submitted.';
+test('Rent Payments hides external transfer status and reasons without changing payment data', async () => {
   axios.get.mockResolvedValueOnce({
     data: [{
       ...makePayment('legacy', 'NOT_EXECUTED', null),
       payout: {
         status: 'NOT_SUBMITTED',
-        failureReason: reason,
+        failureReason: 'Payment mode was not recorded; no landlord payout was submitted.',
       },
     }],
   });
@@ -80,11 +99,13 @@ test('Rent Payments displays a backend reason when no payout was submitted', asy
     </MemoryRouter>
   );
 
-  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
-  expect(screen.getByText(reason)).toBeInTheDocument();
+  await expectRentPaymentTableColumns();
+  expect(screen.getByText('Tenant Example')).toBeInTheDocument();
+  expect(screen.getByText('Not verified')).toBeInTheDocument();
+  expect(screen.getByText('CREDITED')).toBeInTheDocument();
 });
 
-test('Rent Payments hides payout references for sandbox simulations marked not executed', async () => {
+test('Rent Payments hides sandbox transfer details while keeping payment information', async () => {
   axios.get.mockResolvedValueOnce({
     data: [{
       ...makePayment('sandbox', 'NOT_EXECUTED', 'SIMULATED'),
@@ -103,7 +124,7 @@ test('Rent Payments hides payout references for sandbox simulations marked not e
     </MemoryRouter>
   );
 
-  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
-  expect(screen.queryByText('Payout reference: PO-sandbox')).not.toBeInTheDocument();
-  expect(screen.queryByText('Chapa transfer reference: PO-sandbox')).not.toBeInTheDocument();
+  await expectRentPaymentTableColumns();
+  expect(screen.getByText('Not verified')).toBeInTheDocument();
+  expect(screen.getByText('CREDITED')).toBeInTheDocument();
 });

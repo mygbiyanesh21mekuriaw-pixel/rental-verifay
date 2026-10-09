@@ -15,6 +15,23 @@ const {
   isSandboxTransferMode,
 } = require('../utils/payoutProvider');
 
+const LEGACY_PAYOUT_MISMATCH_REASON =
+  'Stored payout details do not match the verified rent payment. No further transfer request will be made.';
+
+const getReferenceId = (reference) => {
+  if (reference === null || reference === undefined) return '';
+  if (typeof reference === 'object') {
+    if (typeof reference.toHexString === 'function') return reference.toHexString();
+    if (reference._id !== undefined && reference._id !== reference) {
+      return getReferenceId(reference._id);
+    }
+    if (reference.id !== undefined && reference.id !== reference) {
+      return getReferenceId(reference.id);
+    }
+  }
+  return String(reference).trim();
+};
+
 const toExternalTransferStatus = (status, mode) => {
   if (mode !== 'live' || status === 'SIMULATED') return 'NOT_EXECUTED';
   if (status === 'PAID') return 'EXECUTED';
@@ -55,26 +72,124 @@ const getPayoutEligibilityFailure = (payment, { checkTransferConfiguration = fal
   return '';
 };
 
+const getChapaTransferReference = (payout) => String(
+  payout?.providerReference ||
+  payout?.providerRequestResponse?.reference ||
+  payout?.providerRequestResponse?.tx_ref ||
+  payout?.providerRequestResponse?.data?.reference ||
+  payout?.providerRequestResponse?.data?.tx_ref ||
+  payout?.providerRequestResponse?.data?.data?.reference ||
+  ''
+).trim();
+
+const getPayoutTransferReference = (payout) =>
+  getChapaTransferReference(payout) || String(payout?.payoutReference || '').trim();
+
+const hasSubmittedPayout = (payout) => Boolean(
+  payout?.transferAttemptedAt ||
+  payout?.providerReference ||
+  payout?.providerRequestResponse?.reference ||
+  payout?.providerRequestResponse?.tx_ref ||
+  payout?.providerRequestResponse?.data?.reference ||
+  payout?.providerRequestResponse?.data?.tx_ref ||
+  payout?.providerRequestResponse?.data?.data?.reference ||
+  ['success', 'successful'].includes(
+    String(payout?.providerRequestResponse?.apiStatus || '').trim().toLowerCase()
+  )
+);
+
 const getVerifiedProviderReference = (payout) => {
-  const providerReference = String(payout?.providerReference || '').trim();
+  const providerReference = String(
+    payout?.providerVerificationResponse?.reference || ''
+  ).trim();
   const verifiedReference = String(
     payout?.providerVerificationResponse?.reference || ''
   ).trim();
-  const payoutReference = String(payout?.payoutReference || '').trim();
+  const transferReference = getPayoutTransferReference(payout);
   return providerReference &&
     providerReference === verifiedReference &&
-    providerReference === payoutReference
+    providerReference === transferReference
     ? providerReference
     : null;
 };
 
+const getPayoutMismatchFields = (payout, payment) => {
+  const mismatches = [];
+  const compareReference = (label, left, right) => {
+    const leftId = getReferenceId(left);
+    const rightId = getReferenceId(right);
+    if (!leftId || !rightId || leftId !== rightId) mismatches.push(label);
+  };
+  const paymentAmount = Number(payment?.amount);
+  const payoutAmount = Number(payout?.amount);
+
+  compareReference('payment ID', payout?.payment, payment?._id);
+  compareReference('tenant ID', payout?.tenant, payment?.tenant);
+  compareReference('landlord ID', payout?.landlord, payment?.landlord);
+  compareReference('property ID', payout?.property, payment?.property);
+  if (String(payout?.paymentReference || '').trim() !== String(payment?.paymentReference || '').trim()) {
+    mismatches.push('payment reference');
+  }
+  if (
+    !Number.isFinite(paymentAmount) ||
+    !Number.isFinite(payoutAmount) ||
+    payoutAmount.toFixed(2) !== paymentAmount.toFixed(2)
+  ) {
+    mismatches.push('amount');
+  }
+  if (
+    String(payout?.currency || 'ETB').trim().toUpperCase() !==
+    String(payment?.currency || 'ETB').trim().toUpperCase()
+  ) {
+    mismatches.push('currency');
+  }
+  if (String(payout?.mode || '').trim().toLowerCase() !== String(payment?.paymentMode || '').trim().toLowerCase()) {
+    mismatches.push('payment mode');
+  }
+  if (
+    payout?.paymentPeriod &&
+    String(payout.paymentPeriod).trim() !== String(payment?.paymentPeriod || '').trim()
+  ) {
+    mismatches.push('payment period');
+  }
+  return mismatches;
+};
+
+const recoverUnsubmittedLegacyMismatch = async (payout) => {
+  if (
+    payout?.status !== 'FAILED' ||
+    payout.failureReason !== LEGACY_PAYOUT_MISMATCH_REASON ||
+    hasSubmittedPayout(payout)
+  ) {
+    return payout;
+  }
+
+  const recovered = await Payout.findOneAndUpdate(
+    {
+      _id: payout._id,
+      status: 'FAILED',
+      failureReason: LEGACY_PAYOUT_MISMATCH_REASON,
+      transferAttemptedAt: null,
+      providerReference: null,
+      providerRequestResponse: null,
+    },
+    { $set: { status: 'PENDING', failureReason: '' } },
+    { new: true, runValidators: true }
+  );
+  return recovered || await Payout.findById(payout._id);
+};
+
 const setPayoutStatus = async (payout, status, fields = {}) => {
   const updatedPayout = await Payout.findOneAndUpdate(
-    { _id: payout._id },
+    { _id: payout._id, status: { $nin: ['PAID', 'FAILED', 'REVERTED', 'SIMULATED'] } },
     { $set: { status, ...fields } },
     { new: true, runValidators: true }
   );
   if (!updatedPayout) {
+    const currentPayout = await Payout.findById(payout._id);
+    if (currentPayout && ['PAID', 'FAILED', 'REVERTED', 'SIMULATED'].includes(currentPayout.status)) {
+      return currentPayout;
+    }
     throw new Error(`Unable to persist payout status for ${payout.payoutReference}.`);
   }
   await LandlordCredit.updateOne(
@@ -89,6 +204,81 @@ const setPayoutStatus = async (payout, status, fields = {}) => {
     }
   );
   return updatedPayout;
+};
+
+const retryPayoutVerification = async (payoutReference, landlordId) => {
+  const requestedReference = String(payoutReference || '').trim();
+  if (!requestedReference) {
+    const error = new Error('A payout or Chapa transfer reference is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const payout = await Payout.findOne({
+    landlord: landlordId,
+    $or: [
+      { payoutReference: requestedReference },
+      { providerReference: requestedReference },
+      { 'providerRequestResponse.reference': requestedReference },
+      { 'providerRequestResponse.tx_ref': requestedReference },
+      { 'providerRequestResponse.data.reference': requestedReference },
+      { 'providerRequestResponse.data.tx_ref': requestedReference },
+      { 'providerRequestResponse.data.data.reference': requestedReference },
+    ],
+  });
+  if (!payout) return null;
+
+  if (['PAID', 'FAILED', 'REVERTED', 'SIMULATED'].includes(payout.status)) {
+    return payout;
+  }
+  if (
+    !['PENDING', 'PROCESSING'].includes(payout.status) ||
+    (payout.status === 'PENDING' &&
+      !payout.transferAttemptedAt &&
+      !payout.providerReference &&
+      !['success', 'successful'].includes(
+        String(payout.providerRequestResponse?.apiStatus || '').trim().toLowerCase()
+      ))
+  ) {
+    const error = new Error('This payout has no prior transfer attempt to verify. No new transfer was submitted.');
+    error.statusCode = 409;
+    throw error;
+  }
+  if (payout.mode !== (isSandboxTransferMode() ? 'sandbox' : 'live')) {
+    const error = new Error('Payout mode does not match the configured Chapa mode. Verification was not requested.');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  try {
+    const transferReference = getPayoutTransferReference(payout);
+    const verification = await verifyChapaTransfer(
+      transferReference,
+      { amount: payout.amount, currency: payout.currency }
+    );
+    const updatedPayout = await updateFromProviderVerification(payout, verification);
+    if (
+      verification?.responseDetails?.httpStatus >= 400 ||
+      String(verification?.responseDetails?.apiStatus || '').trim().toLowerCase() !== 'success'
+    ) {
+      const error = new Error(
+        verification?.message || 'Chapa did not return a successful verification response.'
+      );
+      error.statusCode = 502;
+      error.providerResponse = verification.responseDetails || null;
+      error.payout = updatedPayout;
+      throw error;
+    }
+    return updatedPayout;
+  } catch (error) {
+    console.error(`[PAYOUT] Transfer verification failed for ${payout.payoutReference}:`, error.message);
+    const updatedPayout = await setPayoutStatus(payout, 'PROCESSING', {
+      failureReason: `Chapa transfer verification failed: ${error.message}. No new transfer was submitted; retry verification to check this reference again.`,
+    });
+    if (!error.statusCode) error.statusCode = 502;
+    error.payout = updatedPayout;
+    throw error;
+  }
 };
 
 const reserveLandlordBalance = async (payout) => {
@@ -201,8 +391,12 @@ const updateFromProviderVerification = async (payout, verification) => {
     ...(verification?.providerReference
       ? { providerReference: verification.providerReference }
       : {}),
-    providerVerificationResponse: verification?.responseDetails || null,
-    lastVerifiedAt: verifiedAt,
+    ...(verification?.responseDetails
+      ? {
+        providerVerificationResponse: verification.responseDetails,
+        lastVerifiedAt: verifiedAt,
+      }
+      : {}),
     sandboxTransferStatus: sandboxMode
       ? (status === 'PAID' ? 'SUCCEEDED' : terminalFailure ? 'FAILED' : 'PROCESSING')
       : undefined,
@@ -249,6 +443,7 @@ const processLandlordPayout = async (payment) => {
             currency: payment.currency || 'ETB',
             mode: paymentMode,
             paymentReference: payment.paymentReference,
+            ...(payment.paymentPeriod ? { paymentPeriod: payment.paymentPeriod } : {}),
             payoutReference: createPayoutReference(),
             status: 'PENDING',
           },
@@ -262,6 +457,10 @@ const processLandlordPayout = async (payment) => {
     }
   }
   if (!payout) throw new Error('Unable to create or load the landlord payout record.');
+  if (payout.status === 'FAILED' && payout.failureReason === LEGACY_PAYOUT_MISMATCH_REASON) {
+    payout = await recoverUnsubmittedLegacyMismatch(payout);
+    if (!payout) throw new Error('Unable to reload the existing payout during safe recovery.');
+  }
   const sandboxMode = payout.mode === 'sandbox';
 
   if (['PAID', 'FAILED', 'REVERTED', 'SIMULATED'].includes(payout.status)) {
@@ -273,24 +472,18 @@ const processLandlordPayout = async (payment) => {
     return payout;
   }
 
-  const paymentAmount = Number(payment.amount);
-  if (
-    String(payout.paymentReference) !== String(payment.paymentReference) ||
-    String(payout.landlord) !== String(payment.landlord) ||
-    !Number.isFinite(paymentAmount) ||
-    Number(payout.amount) !== paymentAmount ||
-    String(payout.currency || 'ETB') !== String(payment.currency || 'ETB') ||
-    payout.mode !== paymentMode
-  ) {
+  const payoutMismatches = getPayoutMismatchFields(payout, payment);
+  if (payoutMismatches.length) {
     return setPayoutStatus(payout, payout.status === 'PROCESSING' ? 'PROCESSING' : 'FAILED', {
-      failureReason: 'Stored payout details do not match the verified rent payment. No further transfer request will be made.',
+      failureReason: `Stored payout fields do not match the verified rent payment (${payoutMismatches.join(', ')} mismatch). No transfer request was made.`,
     });
   }
 
-  if (payout.status === 'PROCESSING') {
+  if (payout.status === 'PROCESSING' ||
+    (payout.status === 'PENDING' && hasSubmittedPayout(payout))) {
     try {
       const verification = await verifyChapaTransfer(
-        payout.payoutReference,
+        getPayoutTransferReference(payout),
         { amount: payout.amount, currency: payout.currency }
       );
       return updateFromProviderVerification(payout, verification);
@@ -418,7 +611,7 @@ const processLandlordPayout = async (payment) => {
     if (currentPayout?.status === 'PROCESSING') {
       try {
         const verification = await verifyChapaTransfer(
-          currentPayout.payoutReference,
+          getPayoutTransferReference(currentPayout),
           { amount: currentPayout.amount, currency: currentPayout.currency }
         );
         return updateFromProviderVerification(currentPayout, verification);
@@ -470,6 +663,9 @@ const processLandlordPayout = async (payment) => {
   }
 
   const submittedPayout = await setPayoutStatus(claimedPayout, 'PROCESSING', {
+    ...(transfer?.providerReference
+      ? { providerReference: transfer.providerReference }
+      : {}),
     providerRequestResponse: transfer?.responseDetails || null,
     failureReason: '',
   });
@@ -478,7 +674,7 @@ const processLandlordPayout = async (payment) => {
   );
   try {
     const verification = await verifyChapaTransfer(
-      submittedPayout.payoutReference,
+      getPayoutTransferReference(submittedPayout),
       { amount: submittedPayout.amount, currency: submittedPayout.currency }
     );
     return updateFromProviderVerification(submittedPayout, verification);
@@ -492,7 +688,12 @@ const processLandlordPayout = async (payment) => {
 
 module.exports = {
   getPayoutEligibilityFailure,
+  getPayoutTransferReference,
+  getChapaTransferReference,
   getVerifiedProviderReference,
+  getPayoutMismatchFields,
+  hasSubmittedPayout,
   processLandlordPayout,
+  retryPayoutVerification,
   toExternalTransferStatus,
 };

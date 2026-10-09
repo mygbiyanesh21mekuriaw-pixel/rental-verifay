@@ -28,8 +28,13 @@ test('renders only the public navigation before login', async () => {
   const [navbar] = await screen.findAllByRole('navigation');
 
   expect(
-    await screen.findByRole('heading', {
+    screen.queryByRole('heading', {
       name: 'House Rental',
+    })
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('heading', {
+      name: 'Verified properties',
     })
   ).toBeInTheDocument();
 
@@ -43,7 +48,7 @@ test('renders only the public navigation before login', async () => {
   );
 
   expect(
-    within(navbar).getByText('House Rental')
+    within(navbar).getByText('House Rental Management System')
   ).toBeInTheDocument();
 
   expect(
@@ -124,6 +129,24 @@ test('renders only the public navigation before login', async () => {
       name: /login|register/i,
     })
   ).not.toBeInTheDocument();
+});
+
+test('keeps the full logo and brand visible after restoring an authenticated session', async () => {
+  const landlord = {
+    _id: 'landlord-id',
+    name: 'Landlord Example',
+    role: 'landlord',
+  };
+  localStorage.setItem('token', 'saved-token');
+  localStorage.setItem('user', JSON.stringify(landlord));
+  axios.get.mockResolvedValue({ data: { user: landlord } });
+
+  renderApp();
+
+  const [navbar] = await screen.findAllByRole('navigation');
+  expect(within(navbar).getByRole('img', { name: /mekdela amba university logo/i }))
+    .toHaveAttribute('src', '/mekdela-amba-logo.jpeg');
+  expect(within(navbar).getByText('House Rental Management System')).toBeInTheDocument();
 });
 
 test('toggles the mobile navigation and closes it after navigation', async () => {

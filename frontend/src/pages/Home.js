@@ -9,14 +9,8 @@ const Home = () => {
   return (
     <div className="public-page home-page">
       <div className="home-container">
-        <section className="home-hero" aria-labelledby="home-title">
-          <span className="home-eyebrow">A better way to find your next home</span>
-          <h1 className="home-title" id="home-title">House Rental
-          </h1>
-          <p className="home-subtitle">Find and rent verified properties with confidence.
-          </p>
-
-          <div className="home-buttons">
+        <section className="home-hero" aria-label="Featured home overview">
+          <div className="home-buttons home-buttons-hidden" aria-hidden="true">
             {user?.role === 'tenant' ? (
               <Link to="/search" className="home-btn home-btn-primary">Browse properties
               </Link>

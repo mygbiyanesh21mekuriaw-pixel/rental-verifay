@@ -1158,6 +1158,68 @@
   border-color: #e2e8f0;
 }
 
+.admin-user-delete-feedback {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.admin-user-delete-feedback-success {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.admin-user-delete-feedback-error {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.admin-user-delete-btn {
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #dc2626;
+  box-shadow: none;
+}
+
+.admin-card-actions .admin-btn.admin-user-delete-btn:not(.admin-btn-approve):not(.admin-btn-reject) {
+  background: transparent;
+  color: #dc2626;
+  box-shadow: none;
+}
+
+.admin-card-actions .admin-btn.admin-user-delete-btn:not(.admin-btn-approve):not(.admin-btn-reject):hover:not(:disabled) {
+  background: transparent;
+  color: #b91c1c;
+  box-shadow: none;
+  transform: scale(1.08);
+}
+
+.admin-card-actions .admin-btn.admin-user-delete-btn:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+.admin-card-actions .admin-btn.admin-user-delete-btn::before {
+  content: none;
+}
+
+.admin-card-actions .admin-btn.admin-user-delete-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.admin-user-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .admin-detail-empty-state {
   padding: 34px 20px;
   text-align: center;

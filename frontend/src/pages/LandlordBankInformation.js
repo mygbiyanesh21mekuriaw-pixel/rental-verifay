@@ -393,13 +393,13 @@ const LandlordBankInformation = () => {
                   <thead>
                     <tr>
                       <th>Date</th>
+                      <th>Period</th>
                       <th>Description</th>
                       <th>Tenant</th>
                       <th>Property</th>
                       <th>Amount</th>
                       <th>Credit/Debit</th>
                       <th>Landlord Credit</th>
-                      <th>External Transfer</th>
                       <th>Reference</th>
                     </tr>
                   </thead>
@@ -407,6 +407,7 @@ const LandlordBankInformation = () => {
                     {transactions.map((transaction) => (
                       <tr key={transaction.id}>
                         <td>{transaction.date ? new Date(transaction.date).toLocaleDateString() : '—'}</td>
+                        <td>{transaction.paymentPeriod || '—'}</td>
                         <td>{transaction.description}</td>
                         <td>{transaction.tenant}</td>
                         <td>{transaction.property}</td>
@@ -415,102 +416,28 @@ const LandlordBankInformation = () => {
                         <td>{transaction.status}</td>
                         <td>
                           <div className="bank-account-transfer-status">
-                            <span className={`bank-account-transfer-badge bank-account-transfer-badge-${String(transaction.externalTransferStatus || 'NOT_EXECUTED').toLowerCase().replace(/_/g, '-')}`}>
-                              {String(transaction.externalTransferStatus || 'NOT_EXECUTED').replace(/_/g, ' ')}
-                            </span>
-                            {transaction.payoutMode === 'sandbox' ? (
+                            {transaction.paymentReference && (
                               <small className="bank-account-transfer-detail">
-                                Sandbox only
-                                {transaction.payoutFailureReason?.startsWith('Sandbox payout was not submitted.')
-                                  ? ' — not submitted'
-                                  : transaction.sandboxTransferStatus
-                                  ? ` — ${transaction.sandboxTransferStatus === 'PROCESSING' &&
-                                    /payout remains unconfirmed/i.test(transaction.payoutFailureReason || '')
-                                    ? 'verification incomplete'
-                                    : transaction.sandboxTransferStatus.toLowerCase()}`
-                                  : transaction.payoutStatus
-                                    ? ` — ${transaction.payoutStatus.toLowerCase()} simulation`
-                                    : ''}
-                                ; no real bank transfer was made.
-                              </small>
-                            ) : (
-                              <>
-                                {transaction.payoutStatus && (
-                                  <small className="bank-account-transfer-detail">
-                                    Payout status: {transaction.payoutStatus.toLowerCase()}
-                                  </small>
-                                )}
-                                {transaction.providerRequestResponse && (
-                                  <small className="bank-account-transfer-detail">
-                                    Chapa submission: {transaction.providerRequestResponse.apiStatus || 'unknown'}
-                                    {transaction.providerRequestResponse.httpStatus
-                                      ? ` (HTTP ${transaction.providerRequestResponse.httpStatus})`
-                                      : ''}
-                                    {transaction.providerRequestResponse.message
-                                      ? ` — ${transaction.providerRequestResponse.message}`
-                                      : ''}
-                                  </small>
-                                )}
-                                {transaction.providerVerificationResponse && (
-                                  <small className="bank-account-transfer-detail">
-                                    Chapa verification: {transaction.providerVerificationResponse.status || 'unknown'}
-                                    {transaction.providerVerificationResponse.httpStatus
-                                      ? ` (HTTP ${transaction.providerVerificationResponse.httpStatus})`
-                                      : ''}
-                                    {transaction.providerVerificationResponse.message
-                                      ? ` — ${transaction.providerVerificationResponse.message}`
-                                      : ''}
-                                  </small>
-                                )}
-                                {transaction.payoutFailureReason && (
-                                  <small className="bank-account-transfer-detail">{transaction.payoutFailureReason}</small>
-                                )}
-                              </>
-                            )}
-                            {transaction.payoutMode === 'sandbox' &&
-                              (['FAILED', 'PROCESSING'].includes(transaction.sandboxTransferStatus) ||
-                                (transaction.payoutStatus === 'PENDING' && transaction.payoutFailureReason)) && (
-                              <>
-                                {transaction.providerRequestResponse && (
-                                  <small className="bank-account-transfer-detail">
-                                    Chapa submission: {transaction.providerRequestResponse.apiStatus || 'unknown'}
-                                    {transaction.providerRequestResponse.httpStatus
-                                      ? ` (HTTP ${transaction.providerRequestResponse.httpStatus})`
-                                      : ''}
-                                    {transaction.providerRequestResponse.message
-                                      ? ` — ${transaction.providerRequestResponse.message}`
-                                      : ''}
-                                  </small>
-                                )}
-                                {transaction.providerVerificationResponse && (
-                                  <small className="bank-account-transfer-detail">
-                                    Chapa verification: {transaction.providerVerificationResponse.status || 'unknown'}
-                                    {transaction.providerVerificationResponse.httpStatus
-                                      ? ` (HTTP ${transaction.providerVerificationResponse.httpStatus})`
-                                      : ''}
-                                    {transaction.providerVerificationResponse.message
-                                      ? ` — ${transaction.providerVerificationResponse.message}`
-                                      : ''}
-                                  </small>
-                                )}
-                                {transaction.payoutFailureReason && (
-                                  <small className="bank-account-transfer-detail">{transaction.payoutFailureReason}</small>
-                                )}
-                              </>
-                            )}
-                            {transaction.externalTransferStatus === 'EXECUTED' && transaction.payoutReference && (
-                              <small className="bank-account-transfer-detail">
-                                Payout reference: {transaction.payoutReference}
+                                Rent payment: {transaction.paymentReference}
                               </small>
                             )}
-                            {transaction.externalTransferStatus === 'EXECUTED' && transaction.providerReference && (
+                            {transaction.providerTransactionReference && (
                               <small className="bank-account-transfer-detail">
-                                Chapa transfer reference: {transaction.providerReference}
+                                Chapa payment: {transaction.providerTransactionReference}
+                              </small>
+                            )}
+                            {transaction.payoutReference && (
+                              <small className="bank-account-transfer-detail">
+                                Payout: {transaction.payoutReference}
+                              </small>
+                            )}
+                            {transaction.chapaTransferReference && (
+                              <small className="bank-account-transfer-detail">
+                                Chapa transfer: {transaction.chapaTransferReference}
                               </small>
                             )}
                           </div>
                         </td>
-                        <td>{transaction.providerTransactionReference || transaction.paymentReference}</td>
                       </tr>
                     ))}
                   </tbody>

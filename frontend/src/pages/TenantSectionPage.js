@@ -321,7 +321,7 @@ const TenantSectionPage = ({ type }) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const rentedPropertyId = searchParams.get('propertyId');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm] = useState('');
   const [items, setItems] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -392,7 +392,7 @@ const TenantSectionPage = ({ type }) => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, type, user.id]);
+  }, [rentedPropertyId, searchTerm, type, user.id]);
 
   const handleFavoriteChange = (propertyId, isFavorite) => {
     setFavoriteIds((currentIds) => {

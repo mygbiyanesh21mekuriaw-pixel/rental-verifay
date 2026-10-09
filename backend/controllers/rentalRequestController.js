@@ -50,12 +50,23 @@ const getAdminRentalRequests = async (req, res) => {
     if (propertyIds.length === 0) return res.json([]);
 
     const requests = await RentRequest.find({ property: { $in: propertyIds } })
-      .populate('property', 'title location region zone wereda city subCity kebele houseNumber images propertyImages image verificationDocument')
+      .populate('property', 'title location region zone wereda city subCity kebele houseNumber images propertyImages image verificationDocument verificationDocumentAsset')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
 
-    res.json(requests);
+    const safeRequests = requests.map((request) => {
+      const safeRequest = request.toObject();
+      if (safeRequest.property) {
+        safeRequest.property.hasVerificationDocument = Boolean(
+          request.property.verificationDocument || request.property.verificationDocumentAsset?.publicId,
+        );
+        delete safeRequest.property.verificationDocument;
+        delete safeRequest.property.verificationDocumentAsset;
+      }
+      return safeRequest;
+    });
+    res.json(safeRequests);
   } catch (error) {
     console.error('Error fetching admin rental requests:', error);
     res.status(500).json({ message: 'Unable to load rental requests' });
@@ -358,6 +369,10 @@ const landlordRespondToRequest = async (req, res) => {
     const { id } = req.params;
     const { status, message } = req.body;
     const landlordId = req.user.id;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be approved or rejected' });
+    }
 
     const request = await RentRequest.findById(id)
       .populate('tenant', 'name email phone');

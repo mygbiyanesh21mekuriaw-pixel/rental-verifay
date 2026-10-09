@@ -141,6 +141,16 @@ main {
   background: #493ed6;
 }
 
+.navbar-authenticated .navbar-link-bank-information {
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.navbar-authenticated .navbar-link-bank-information.active {
+  background: #493ed6;
+}
+
 .navbar-authenticated .navbar-notification-link {
   width: auto;
   height: auto;
@@ -935,18 +945,17 @@ body {
     gap: 0;
   }
 
-  .navbar-authenticated .navbar-logo-image,
-  .navbar-authenticated .navbar-name-desktop {
-    display: none !important;
-  }
-
-  .navbar-authenticated .navbar-name-mobile {
-    display: inline !important;
-    white-space: nowrap;
+  .navbar-authenticated .navbar-logo-image {
+    display: block !important;
+    flex: 0 0 36px;
+    width: 36px;
+    height: 36px;
   }
 
   .navbar-authenticated .navbar-logo-text {
-    font-size: 15px !important;
+    font-size: clamp(12px, 3.8vw, 15px) !important;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
   }
 
   .navbar-authenticated .navbar-hamburger {
@@ -1223,14 +1232,6 @@ body {
     line-height: 1.2;
   }
 
-  .navbar-home-name-desktop {
-    display: none;
-  }
-
-  .navbar-home-name-mobile {
-    display: inline;
-  }
-
   .navbar-home:not(.navbar-authenticated) .navbar-hamburger {
     display: inline-flex;
     flex: 0 0 44px;
@@ -1278,10 +1279,10 @@ body {
 
 .app:has(.home-page) .navbar-home .navbar-container {
   width: 100%;
-  max-width: 1440px;
   min-height: 74px;
-  margin: 0 auto;
-  padding: 10px clamp(20px, 5vw, 72px);
+  margin: 0;
+  padding: 10px 24px;
+  justify-content: flex-start;
   flex-wrap: nowrap;
   gap: 24px;
 }
@@ -1289,6 +1290,7 @@ body {
 .app:has(.home-page) .navbar-home .navbar-logo {
   flex: 0 1 auto;
   min-width: 0;
+  margin-right: auto;
   gap: 12px;
 }
 
@@ -1495,10 +1497,12 @@ body {
   .app:has(.home-page) .navbar-home .navbar-container {
     flex-wrap: wrap;
     gap: 8px;
+    padding: 8px 20px;
   }
 
   .app:has(.home-page) .navbar-home .navbar-logo {
-    flex: 1 1 0;
+    flex: 0 1 auto;
+    margin-right: auto;
   }
 
   .app:has(.home-page) .navbar-home .navbar-logo-image {
@@ -1651,9 +1655,14 @@ body {
 .app:has(.navbar-public) .navbar-public .navbar-link:last-child {
   margin-left: 4px;
   padding-inline: 18px;
-  background: #e98b3a;
+  background: rgba(255, 255, 255, 0.03);
   color: #fff;
   font-weight: 700;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-link-register:hover,
+.app:has(.navbar-public) .navbar-public .navbar-link-register.active {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .app:has(.navbar-public) .navbar-public .navbar-hamburger {
@@ -1738,6 +1747,39 @@ body {
     width: 100%;
     margin: 0;
     justify-content: flex-start;
+  }
+}
+
+.app:has(.home-page) .navbar-home.navbar-public .navbar-container {
+  max-width: none;
+  margin: 0;
+  padding: 10px 24px !important;
+  justify-content: flex-start;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-container {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 10px 24px !important;
+  justify-content: flex-start;
+}
+
+.app:has(.home-page) .navbar-home.navbar-public .navbar-logo {
+  flex: 0 1 auto;
+  margin-right: auto;
+}
+
+.app:has(.navbar-public) .navbar-public .navbar-logo {
+  flex: 0 1 auto;
+  margin-right: auto;
+}
+
+@media (max-width: 1023px) {
+  .app:has(.navbar-public) .navbar-public .navbar-container {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 20px !important;
   }
 }
 
@@ -1875,6 +1917,7 @@ body {
   color: #fff;
   font-size: 16px;
   font-weight: 800;
+  line-height: 1.15;
 }
 
 .navbar-topbar-brand-copy span,
@@ -2247,13 +2290,21 @@ body {
   .navbar-authenticated .navbar-links {
     display: none !important;
     flex: 1 0 100%;
-    max-height: min(65vh, 520px);
+    max-height: min(calc(100vh - 130px), 560px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 10px 0 4px !important;
     border-top: 1px solid rgba(255, 255, 255, 0.16);
   }
 
   .navbar-authenticated .navbar-links.is-open {
     display: flex !important;
+  }
+
+  .navbar-authenticated .navbar-link-bank-information {
+    min-height: 48px;
   }
 
   .navbar-authenticated .navbar-user-info {
@@ -2281,8 +2332,17 @@ body {
 }
 
 @media (max-width: 560px) {
+  .navbar-topbar-brand {
+    flex: 1 1 auto;
+  }
+
+  .navbar-topbar-brand-copy {
+    min-width: 0;
+  }
+
   .navbar-topbar-brand-copy strong {
-    font-size: 14px;
+    font-size: clamp(11px, 3.4vw, 14px);
+    overflow-wrap: anywhere;
   }
 
   .navbar-topbar-brand-copy span {

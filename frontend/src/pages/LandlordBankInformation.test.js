@@ -35,6 +35,7 @@ const rentCredit = {
   property: 'Rental Home',
   amount: 2000,
   currency: 'ETB',
+  paymentPeriod: '2026-10',
   direction: 'CREDIT',
   status: 'CREDITED',
   externalTransferStatus: 'PENDING',
@@ -57,6 +58,27 @@ const rentCredit = {
   date: '2026-10-07T10:00:00.000Z',
   paymentReference: 'RP-payment-1',
   providerTransactionReference: 'CHAPA-transaction-1',
+};
+
+const expectTransactionsTableColumns = async () => {
+  const table = await screen.findByRole('table');
+  expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+    'Date',
+    'Period',
+    'Description',
+    'Tenant',
+    'Property',
+    'Amount',
+    'Credit/Debit',
+    'Landlord Credit',
+    'Reference',
+  ]);
+  within(table).getAllByRole('row').slice(1).forEach((row) => {
+    expect(within(row).getAllByRole('cell')).toHaveLength(9);
+  });
+  expect(within(table).queryByText('External Transfer')).not.toBeInTheDocument();
+  expect(within(table).queryByText(/NOT EXECUTED|PENDING|EXECUTED|Sandbox only|Chapa submission:|Chapa verification:/))
+    .not.toBeInTheDocument();
 };
 
 beforeEach(() => {
@@ -273,17 +295,48 @@ test('shows persistent internal balance and credited rent transaction history', 
   expect(await screen.findAllByText('ETB 2,000')).toHaveLength(2);
   expect(screen.getByRole('heading', { name: 'Account Transactions' })).toBeInTheDocument();
   expect(screen.getByText('Rent payment credit')).toBeInTheDocument();
+  expect(screen.getByText('2026-10')).toBeInTheDocument();
   expect(screen.getByText('Tenant Example')).toBeInTheDocument();
   expect(screen.getByText('Rental Home')).toBeInTheDocument();
-  expect(screen.getByText('CHAPA-transaction-1')).toBeInTheDocument();
+  expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
+  expect(screen.getByText('Rent payment: RP-payment-1')).toBeInTheDocument();
+  expect(screen.getByText('Chapa payment: CHAPA-transaction-1')).toBeInTheDocument();
   expect(screen.getByText('CREDITED')).toBeInTheDocument();
-  expect(screen.getByText('PENDING')).toBeInTheDocument();
-  expect(screen.getByText('Payout status: processing')).toBeInTheDocument();
+  await expectTransactionsTableColumns();
   expect(screen.queryByText('Payout reference: PO-test-123')).not.toBeInTheDocument();
   expect(screen.queryByText('Chapa transfer reference: PO-test-123')).not.toBeInTheDocument();
-  expect(screen.getByText(/Chapa submission: success \(HTTP 200\).*Transfer accepted/)).toBeInTheDocument();
-  expect(screen.getByText(/Chapa verification: pending \(HTTP 200\).*Transfer is pending/)).toBeInTheDocument();
-  expect(screen.getByText('Chapa transfer is still pending confirmation.')).toBeInTheDocument();
+});
+
+test('hides external transfer status and retry controls while retaining transaction data', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({
+        data: {
+          balance: 2000,
+          currency: 'ETB',
+          transactions: [{
+            ...rentCredit,
+            payoutStatus: 'PROCESSING',
+            payoutMode: 'sandbox',
+            externalTransferStatus: 'NOT_EXECUTED',
+            sandboxTransferStatus: 'PROCESSING',
+            transferAttemptedAt: '2026-10-07T10:00:00.000Z',
+            payoutFailureReason: 'Chapa test-mode verification amount was omitted; the payout remains unconfirmed.',
+          }],
+        },
+      });
+    }
+    return Promise.resolve({ data: { success: true, account } });
+  });
+  render(<LandlordBankInformation />);
+
+  await expectTransactionsTableColumns();
+  expect(screen.getByText('CREDITED')).toBeInTheDocument();
+  expect(screen.getByText('Rent payment: RP-payment-1')).toBeInTheDocument();
+  expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Retry verification' })).not.toBeInTheDocument();
+  expect(axios.post).not.toHaveBeenCalled();
 });
 
 test('keeps external-transfer status separate from reasons and clarifies sandbox results are not bank transfers', async () => {
@@ -309,10 +362,8 @@ test('keeps external-transfer status separate from reasons and clarifies sandbox
   });
   render(<LandlordBankInformation />);
 
-  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
-  expect(screen.getByText('Sandbox only — paid simulation; no real bank transfer was made.')).toBeInTheDocument();
-  expect(screen.queryByText('Payout status: paid')).not.toBeInTheDocument();
-  expect(screen.queryByText('Sandbox verification reported success.')).not.toBeInTheDocument();
+  await expectTransactionsTableColumns();
+  expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
 });
 
 test('shows Chapa response details for a failed sandbox simulation without treating it as a real payout failure', async () => {
@@ -343,12 +394,8 @@ test('shows Chapa response details for a failed sandbox simulation without treat
   });
   render(<LandlordBankInformation />);
 
-  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
-  expect(screen.getByText('Sandbox only — failed; no real bank transfer was made.')).toBeInTheDocument();
-  expect(screen.getByText('Chapa submission: error (HTTP 400) — Invalid sandbox destination account.')).toBeInTheDocument();
-  expect(screen.getByText('Invalid sandbox destination account.')).toBeInTheDocument();
-  expect(screen.queryByText('Payout status: simulated')).not.toBeInTheDocument();
-  expect(screen.queryByText('FAILED', { selector: 'span' })).not.toBeInTheDocument();
+  await expectTransactionsTableColumns();
+  expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
 });
 
 test('shows why an unconfirmed sandbox transfer remains processing', async () => {
@@ -385,11 +432,8 @@ test('shows why an unconfirmed sandbox transfer remains processing', async () =>
   });
   render(<LandlordBankInformation />);
 
-  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
-  expect(screen.getByText('Sandbox only — verification incomplete; no real bank transfer was made.')).toBeInTheDocument();
-  expect(screen.getByText(/Chapa submission: success \(HTTP 200\).*Transfer queued successfully in Test Mode/)).toBeInTheDocument();
-  expect(screen.getByText(/Chapa verification: success \(HTTP 200\).*Transfer details \(Test Mode\)/)).toBeInTheDocument();
-  expect(screen.getByText(/reference was omitted, amount was omitted, and currency was omitted/)).toBeInTheDocument();
+  await expectTransactionsTableColumns();
+  expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
 });
 
 test('shows when a sandbox payout was not submitted because no test destination is configured', async () => {
@@ -417,13 +461,11 @@ test('shows when a sandbox payout was not submitted because no test destination 
   });
   render(<LandlordBankInformation />);
 
-  expect(await screen.findByText('NOT EXECUTED')).toBeInTheDocument();
-  expect(screen.getByText('Sandbox only — not submitted; no real bank transfer was made.')).toBeInTheDocument();
-  expect(screen.getByText(/Configure CHAPA_TRANSFER_TEST_ACCOUNT_NUMBER with a test destination supplied by Chapa/)).toBeInTheDocument();
-  expect(screen.queryByText(/Chapa submission:/)).not.toBeInTheDocument();
+  await expectTransactionsTableColumns();
+  expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
 });
 
-test('shows payout references only for executed transfers and keeps the payment reference separate', async () => {
+test('shows saved payout and payment references independently of transfer execution status', async () => {
   axios.get.mockImplementation((url) => {
     if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
     if (url.endsWith('/my-account/transactions')) {
@@ -443,9 +485,10 @@ test('shows payout references only for executed transfers and keeps the payment 
   });
   render(<LandlordBankInformation />);
 
-  expect(await screen.findByText('Payout reference: PO-test-123')).toBeInTheDocument();
-  expect(screen.getByText('Chapa transfer reference: PO-test-123')).toBeInTheDocument();
-  expect(screen.getByText('CHAPA-transaction-1')).toBeInTheDocument();
+  await expectTransactionsTableColumns();
+  expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
+  expect(screen.getByText('Rent payment: RP-payment-1')).toBeInTheDocument();
+  expect(screen.getByText('Chapa payment: CHAPA-transaction-1')).toBeInTheDocument();
 });
 
 test('does not offer demo-bank codes when Chapa payout banks are unavailable', async () => {

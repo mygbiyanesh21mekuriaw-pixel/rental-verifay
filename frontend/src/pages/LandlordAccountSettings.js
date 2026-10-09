@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 const LandlordAccountSettings = () => {
   const { user, updateUser } = useAuth();
+  const accountRole = user?.role === 'tenant' ? 'TENANT' : 'LANDLORD';
   const [email, setEmail] = useState(user?.email || '');
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [emailMessage, setEmailMessage] = useState('');
@@ -63,7 +64,7 @@ const LandlordAccountSettings = () => {
     <section className="landlord-account-page">
       <header className="landlord-account-heading landlord-account-settings-heading">
         <div>
-          <p>LANDLORD</p>
+          <p>{accountRole}</p>
           <h1>Account Settings</h1>
           <span>Update your sign-in email and password.</span>
         </div>

@@ -14,6 +14,7 @@ const PayoutSchema = new mongoose.Schema({
   currency: { type: String, enum: ['ETB'], default: 'ETB' },
   mode: { type: String, enum: ['sandbox', 'live'], required: true },
   paymentReference: { type: String, required: true, trim: true },
+  paymentPeriod: { type: String, trim: true, default: undefined },
   payoutReference: { type: String, required: true, unique: true, trim: true },
   providerReference: { type: String, trim: true, unique: true, sparse: true },
   destinationBankCode: { type: String, trim: true, default: '' },

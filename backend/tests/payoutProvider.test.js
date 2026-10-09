@@ -413,7 +413,7 @@ test('verification does not expose a provider reference when Chapa returns anoth
           status: 'success',
           data: {
             reference: 'PO-another-transfer',
-            status: 'successful',
+            status: 'success',
             amount: '3000.00',
             currency: 'ETB',
           },
@@ -433,3 +433,146 @@ test('verification does not expose a provider reference when Chapa returns anoth
     global.fetch = originalFetch;
   }
 });
+
+test('incomplete and mismatched verification details remain unconfirmed', async () => {
+  const originalFetch = global.fetch;
+  const basePayload = {
+    status: 'success',
+    data: {
+      reference: 'PO-incomplete-123',
+      status: 'success',
+      amount: '4000.00',
+      currency: 'ETB',
+    },
+  };
+  try {
+    await withEnvironment({
+      PAYMENT_PROVIDER: 'chapa',
+      PAYMENT_MODE: 'live',
+      PAYMENT_SANDBOX: 'false',
+      CHAPA_SECRET_KEY: 'test-only-secret',
+      CHAPA_BASE_URL: 'https://chapa.example.test',
+    }, async () => {
+      const cases = [
+        ['reference', (payload) => { delete payload.data.reference; }, /reference was omitted/i],
+        ['amount', (payload) => { delete payload.data.amount; }, /amount was omitted/i],
+        ['currency', (payload) => { delete payload.data.currency; }, /currency was omitted/i],
+        ['amount mismatch', (payload) => { payload.data.amount = '3999.99'; }, /amount does not match/i],
+        ['amount precision mismatch', (payload) => { payload.data.amount = '4000.001'; }, /amount does not match/i],
+        ['currency mismatch', (payload) => { payload.data.currency = 'USD'; }, /currency does not match/i],
+      ];
+
+      for (const [label, alterPayload, message] of cases) {
+        const payload = structuredClone(basePayload);
+        alterPayload(payload);
+        global.fetch = async () => ({
+          ok: true,
+          status: 200,
+          json: async () => payload,
+        });
+        const result = await verifyChapaTransfer('PO-incomplete-123', {
+          amount: 4000,
+          currency: 'ETB',
+        });
+
+        assert.equal(result.ok, false, label);
+        assert.equal(result.status, 'PROCESSING', label);
+        assert.match(result.message, message, label);
+      }
+    });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('pending and failed transfer statuses are never reported as successful payouts', async () => {
+  const originalFetch = global.fetch;
+  try {
+    await withEnvironment({
+      PAYMENT_PROVIDER: 'chapa',
+      PAYMENT_MODE: 'live',
+      PAYMENT_SANDBOX: 'false',
+      CHAPA_SECRET_KEY: 'test-only-secret',
+      CHAPA_BASE_URL: 'https://chapa.example.test',
+    }, async () => {
+      for (const [providerStatus, expectedStatus] of [
+        ['pending', 'PROCESSING'],
+        ['processing', 'PENDING'],
+        ['completed', 'PENDING'],
+        ['failed', 'FAILED'],
+      ]) {
+        global.fetch = async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'success',
+            data: {
+              reference: 'PO-status-123',
+              status: providerStatus,
+              amount: '4000.00',
+              currency: 'ETB',
+            },
+          }),
+        });
+        const result = await verifyChapaTransfer('PO-status-123', {
+          amount: 4000,
+          currency: 'ETB',
+        });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.status, expectedStatus);
+      }
+    });
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('parses a nested Chapa transfer verification response without changing its values', async () => {
+      const originalFetch = global.fetch;
+      try {
+        await withEnvironment({
+          PAYMENT_PROVIDER: 'chapa',
+          PAYMENT_MODE: 'live',
+          PAYMENT_SANDBOX: 'false',
+          CHAPA_SECRET_KEY: 'test-only-secret',
+          CHAPA_BASE_URL: 'https://chapa.example.test',
+        }, async () => {
+          global.fetch = async (url, options) => {
+            assert.equal(
+              url,
+              'https://chapa.example.test/v1/transfers/verify/APQfhhNqwnvoZ'
+            );
+            assert.equal(options.headers.Authorization, 'Bearer test-only-secret');
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                status: 'success',
+                message: 'Transfer verified',
+                data: {
+                  data: {
+                    reference: 'APQfhhNqwnvoZ',
+                    status: 'success',
+                    amount: '4000.00',
+                    currency: 'ETB',
+                  },
+                },
+              }),
+            };
+          };
+
+          const result = await verifyChapaTransfer('APQfhhNqwnvoZ', {
+            amount: 4000,
+            currency: 'ETB',
+          });
+          assert.equal(result.ok, true);
+          assert.equal(result.status, 'PAID');
+          assert.equal(result.responseDetails.reference, 'APQfhhNqwnvoZ');
+          assert.equal(result.responseDetails.amount, '4000.00');
+          assert.equal(result.responseDetails.currency, 'ETB');
+        });
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });

@@ -87,7 +87,7 @@ const PropertyDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, location.state, requestId, user?.id, user?.role]);
+  }, [id, location.state, requestId, user?.role]);
 
   // =====    =====
   const checkIfFavorite = useCallback(async () => {
@@ -274,7 +274,8 @@ const PropertyDetail = () => {
         <div className="property-info">
           {user?.role !== 'tenant' && (
             <PropertyOwnershipProof
-              src={property?.verificationDocument}
+              propertyId={property?._id}
+              hasProof={property?.hasVerificationDocument}
               title={property?.title}
               imageClassName="property-image-thumbnail"
             />

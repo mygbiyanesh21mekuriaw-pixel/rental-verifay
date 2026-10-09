@@ -235,6 +235,7 @@ function App() {
             <Route path="/tenant/rented-property" element={<PrivateRoute allowedRoles={['tenant']}><TenantSectionPage type="rented" /></PrivateRoute>} />
             <Route path="/tenant/search" element={<PrivateRoute allowedRoles={['tenant']}><TenantSearch /></PrivateRoute>} />
             <Route path="/tenant/notifications" element={<PrivateRoute allowedRoles={['tenant']}><TenantNotifications /></PrivateRoute>} />
+            <Route path="/tenant/account-settings" element={<PrivateRoute allowedRoles={['tenant']}><LandlordAccountSettings /></PrivateRoute>} />
             <Route path="/tenant/rental-requests/:requestId" element={<PrivateRoute allowedRoles={['tenant']}><TenantRentalRequestDetail /></PrivateRoute>} />
             <Route path="/tenant/messages" element={<PrivateRoute allowedRoles={['tenant']}><TenantMessages /></PrivateRoute>} />
             <Route path="/tenant/rent-payment/:propertyId" element={<PrivateRoute allowedRoles={['tenant']}><TenantRentPayment /></PrivateRoute>} />
@@ -367,7 +368,6 @@ function App() {
 }
 
 export default App;
-
 
 
 

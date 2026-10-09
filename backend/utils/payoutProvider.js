@@ -127,78 +127,16 @@ const normalizeTransferStatus = (status) => {
 
     .toLowerCase();
 
-  if (
-
-    [
-
-      'success',
-
-      'successful',
-
-      'paid',
-
-      'completed',
-
-    ].includes(normalized)
-
-  ) {
-
+  if (normalized === 'success') {
     return 'PAID';
-
   }
 
-  if (
-
-    [
-
-      'failed',
-
-      'declined',
-
-      'rejected',
-
-    ].includes(normalized)
-
-  ) {
-
+  if (normalized === 'failed') {
     return 'FAILED';
-
   }
 
-  if (
-
-    [
-
-      'reverted',
-
-      'reversed',
-
-    ].includes(normalized)
-
-  ) {
-
-    return 'REVERTED';
-
-  }
-
-  if (
-
-    [
-
-      'pending',
-
-      'processing',
-
-      'queued',
-
-      'initiated',
-
-    ].includes(normalized)
-
-  ) {
-
+  if (normalized === 'pending') {
     return 'PROCESSING';
-
   }
 
   return 'PENDING';
@@ -239,18 +177,55 @@ const normalizeChapaBank = (bank) => {
 
 };
 
+const getTransferResponseData = (payload) => {
+  let data = payload;
+  while (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+    data = data.data;
+  }
+  return data && typeof data === 'object' ? data : {};
+};
+
+const getTransferApiStatus = (payload) => {
+  if (payload?.status) return String(payload.status).trim();
+
+  let response = payload;
+  while (response?.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+    response = response.data;
+    if (response.status && response.data && typeof response.data === 'object') {
+      return String(response.status).trim();
+    }
+  }
+  return '';
+};
+
+const getResponseReference = (payload) => {
+  const data = getTransferResponseData(payload);
+  return String(data.reference || data.tx_ref || payload?.reference || '').trim();
+};
+
 const summarizeTransferResponse = (response, payload) => {
-  const data = payload?.data || {};
+  const data = getTransferResponseData(payload);
   return {
     httpStatus: response?.status ?? null,
-    apiStatus: String(payload?.status || '').trim(),
+    apiStatus: getTransferApiStatus(payload),
     message: String(payload?.message || payload?.error || '').trim(),
-    reference: String(data.reference || data.tx_ref || payload?.reference || '').trim(),
+    reference: getResponseReference(payload),
     transferId: data.id === undefined || data.id === null ? '' : String(data.id),
     status: String(data.status || payload?.status || '').trim(),
-    amount: data.amount === undefined ? null : String(data.amount),
+    amount: data.amount === undefined || data.amount === null ? null : String(data.amount),
     currency: String(data.currency || '').trim(),
   };
+};
+
+const toTransferMinorUnits = (amount) => {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(String(amount ?? '').trim());
+  if (!match) return null;
+
+  const units = Number(match[1]);
+  const minorUnits = units * 100 + Number((match[2] || '').padEnd(2, '0'));
+  return Number.isSafeInteger(units) && Number.isSafeInteger(minorUnits)
+    ? minorUnits
+    : null;
 };
 
 const initiateChapaTransfer = async ({
@@ -380,23 +355,13 @@ const initiateChapaTransfer = async ({
 
   );
 
-  const data =
-
-    payload?.data || {};
-  const providerStatus = String(payload?.status || '').trim().toLowerCase();
-  const accepted = response.ok && ['success', 'successful'].includes(providerStatus);
-  const explicitlyRejected = ['error', 'failed'].includes(providerStatus) ||
+  const data = getTransferResponseData(payload);
+  const providerStatus = getTransferApiStatus(payload).toLowerCase();
+  const accepted = response.ok && providerStatus === 'success';
+  const explicitlyRejected = providerStatus === 'failed' ||
     (!response.ok && response.status >= 400 && response.status < 500);
 
-  const providerReference =
-
-    data.reference ||
-
-    data.tx_ref ||
-
-    payload?.reference ||
-
-    '';
+  const providerReference = getResponseReference(payload);
 
   return {
 
@@ -476,27 +441,22 @@ const verifyChapaTransfer = async (reference, expectedTransfer = {}) => {
 
   );
 
-  const data =
-    payload?.data || {};
+  const data = getTransferResponseData(payload);
 
-  const returnedReference = String(
-    data.reference ||
-    data.tx_ref ||
-    ''
-  ).trim();
+  const returnedReference = getResponseReference(payload);
   const requestedReference = String(reference).trim();
   const apiConfirmed = response.ok &&
-    ['success', 'successful'].includes(String(payload?.status || '').toLowerCase());
+    getTransferApiStatus(payload).toLowerCase() === 'success';
   const referenceConfirmed = Boolean(
     returnedReference &&
     returnedReference === requestedReference
   );
-  const returnedAmount = Number(data.amount);
-  const expectedAmount = Number(expectedTransfer.amount);
+  const returnedAmount = toTransferMinorUnits(data.amount);
+  const expectedAmount = toTransferMinorUnits(expectedTransfer.amount);
   const amountConfirmed = data.amount !== undefined &&
-    Number.isFinite(returnedAmount) &&
-    Number.isFinite(expectedAmount) &&
-    returnedAmount.toFixed(2) === expectedAmount.toFixed(2);
+    returnedAmount !== null &&
+    expectedAmount !== null &&
+    returnedAmount === expectedAmount;
   const currencyConfirmed = Boolean(data.currency) &&
     Boolean(expectedTransfer.currency) &&
     String(data.currency || '').trim().toUpperCase() ===
@@ -507,10 +467,18 @@ const verifyChapaTransfer = async (reference, expectedTransfer = {}) => {
   if (!returnedReference) verificationIssues.push('reference was omitted');
   else if (!referenceConfirmed) verificationIssues.push('reference does not match the payout');
   if (!amountConfirmed) {
-    verificationIssues.push(data.amount === undefined ? 'amount was omitted' : 'amount does not match the payout');
+    verificationIssues.push(
+      data.amount === undefined || data.amount === null || String(data.amount).trim() === ''
+        ? 'amount was omitted'
+        : 'amount does not match the payout'
+    );
   }
   if (!currencyConfirmed) {
-    verificationIssues.push(data.currency ? 'currency does not match the payout' : 'currency was omitted');
+    verificationIssues.push(
+      data.currency && String(data.currency).trim()
+        ? 'currency does not match the payout'
+        : 'currency was omitted'
+    );
   }
   const providerMessage = payload?.message || payload?.error || '';
   const isTestModeResponse = /test mode/i.test(providerMessage);

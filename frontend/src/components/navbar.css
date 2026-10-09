@@ -10,6 +10,74 @@
   border-bottom: 3px solid #667eea;
 }
 
+.navbar-public {
+  background: linear-gradient(135deg, rgba(12, 31, 48, 0.96), rgba(25, 42, 59, 0.95));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 24px rgba(4, 15, 25, 0.22);
+}
+
+.navbar-public .navbar-container {
+  max-width: 100%;
+  padding: 18px 26px;
+  min-height: 88px;
+}
+
+.navbar-public .navbar-logo {
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.navbar-public .navbar-logo-image {
+  width: 54px;
+  height: 54px;
+  border-radius: 10px;
+}
+
+.navbar-public .navbar-logo-text {
+  background: none;
+  color: #fff;
+  font-size: clamp(1.3rem, 2vw, 2.2rem);
+  line-height: 1.1;
+  font-weight: 800;
+  -webkit-text-fill-color: #fff;
+}
+
+.navbar-public .navbar-links {
+  margin-left: auto;
+  gap: 10px;
+}
+
+.navbar-public .navbar-link {
+  color: rgba(255, 255, 255, 0.92);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.navbar-public .navbar-link:hover,
+.navbar-public .navbar-link.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  transform: none;
+}
+
+.navbar-public .navbar-link-login {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.navbar-public .navbar-link-register {
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: none;
+}
+
+.navbar-public .navbar-link-register:hover,
+.navbar-public .navbar-link-register.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
 .navbar-container {
   max-width: 1200px;
   margin: 0 auto;

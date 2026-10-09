@@ -120,6 +120,12 @@ const PropertySchema = new mongoose.Schema({
     type: String, // የባለቤትነት ማስረጃ (Title Deed) URL
     default: '',
   },
+  verificationDocumentAsset: {
+    publicId: { type: String },
+    resourceType: { type: String, enum: ['image', 'raw'] },
+    format: { type: String },
+    deliveryType: { type: String, enum: ['authenticated'] },
+  },
   createdAt: {
     type: Date,
     default: Date.now,

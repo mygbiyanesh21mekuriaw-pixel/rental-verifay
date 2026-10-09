@@ -168,12 +168,12 @@ const verifyPaymentRelationships = async (payment) => {
 const createPayment = async (req, res) => {
   try {
     const { propertyId, paymentPeriod } = req.body;
+    if (req.user.role !== 'tenant') return res.status(403).json({ message: 'Only tenants can pay rent' });
     if (!propertyId || !String(paymentPeriod || '').trim()) {
       return res.status(400).json({ message: 'Property and payment period are required' });
     }
 
     const property = await Property.findById(propertyId);
-    if (req.user.role !== 'tenant') return res.status(403).json({ message: 'Only tenants can pay rent' });
     if (!property || property.availabilityStatus !== 'rented' || String(property.rentedBy) !== String(req.user.id)) {
       return res.status(403).json({ message: 'You can only pay rent for a property rented in your name' });
     }
@@ -516,6 +516,10 @@ const chapaCallback = async (req, res) => {
 };
 
 const getTenantPaymentContext = async (req, res) => {
+  if (req.user.role !== 'tenant') {
+    return res.status(403).json({ message: 'Only tenants can view rent payment details' });
+  }
+
   try {
     const property = await Property.findOne({ _id: req.params.propertyId, rentedBy: req.user.id, availabilityStatus: 'rented' }).populate('landlord', 'name email phone');
     if (!property) return res.status(403).json({ message: 'You can only view payments for your rented property' });

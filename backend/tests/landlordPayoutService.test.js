@@ -7,6 +7,8 @@ const { encryptBankAccountNumber } = require('../utils/bankAccountCrypto');
 const {
   getPayoutEligibilityFailure,
   processLandlordPayout,
+  retryPayoutVerification,
+  getPayoutMismatchFields,
   getVerifiedProviderReference,
   toExternalTransferStatus,
 } = require('../services/landlordPayoutService');
@@ -18,6 +20,7 @@ const confirmedPayment = {
   property: 'property-id',
   amount: 3000,
   currency: 'ETB',
+  paymentPeriod: '2026-10',
   paymentMode: 'live',
   paymentReference: 'RP-payment-id',
   provider: 'chapa',
@@ -53,6 +56,32 @@ test('only a matching payout reference from Chapa verification is exposed as the
   }), null);
 });
 
+test('normalizes populated payment relationships to IDs before matching an existing payout', () => {
+  const payout = {
+    payment: 'payment-id',
+    tenant: 'tenant-id',
+    landlord: 'landlord-id',
+    property: 'property-id',
+    amount: 3000,
+    currency: 'ETB',
+    mode: 'live',
+    paymentReference: 'RP-payment-id',
+    paymentPeriod: '2026-10',
+  };
+  const populatedPayment = {
+    ...confirmedPayment,
+    tenant: { _id: 'tenant-id', name: 'Tenant Example' },
+    landlord: { _id: 'landlord-id', name: 'Landlord Example' },
+    property: { _id: 'property-id', title: 'Rental Home' },
+  };
+
+  assert.deepEqual(getPayoutMismatchFields(payout, populatedPayment), []);
+  assert.deepEqual(getPayoutMismatchFields(payout, {
+    ...populatedPayment,
+    landlord: { _id: 'another-landlord-id' },
+  }), ['landlord ID']);
+});
+
 test('explains payments which cannot be submitted because their mode is absent or mismatched', async () => {
   await withPayoutStore(async () => {
     assert.match(
@@ -73,7 +102,14 @@ test('explains payments which cannot be submitted because their mode is absent o
 
 const withPayoutStore = async (
   run,
-  { mode = 'live', testStatus = 'success', existingPayoutReference = '' } = {}
+  {
+    mode = 'live',
+    testStatus = 'success',
+    existingPayoutReference = '',
+    existingPayoutStatus = 'PENDING',
+    existingProviderReference = '',
+    existingPayoutOverrides = {},
+  } = {}
 ) => {
   const originals = {
     env: Object.fromEntries(
@@ -121,10 +157,23 @@ const withPayoutStore = async (
     currency: confirmedPayment.currency,
     mode,
     paymentReference: confirmedPayment.paymentReference,
+    paymentPeriod: confirmedPayment.paymentPeriod,
     payoutReference: existingPayoutReference,
-    status: 'PENDING',
+    status: existingPayoutStatus,
+    ...(existingProviderReference ? { providerReference: existingProviderReference } : {}),
+    ...(existingPayoutStatus === 'PROCESSING'
+      ? { transferAttemptedAt: new Date('2026-10-07T10:00:00.000Z') }
+      : {}),
+    ...(existingPayoutStatus === 'PAID'
+      ? {
+        providerReference: existingPayoutReference,
+        providerVerificationResponse: { reference: existingPayoutReference },
+      }
+      : {}),
+    ...existingPayoutOverrides,
   } : null;
-  let verificationStatus = 'successful';
+  let verificationStatus = 'success';
+  let verificationReference = 'requested';
   let transferApiStatus = 'success';
   let transferRequestThrows = false;
   let transferFailureMessage = '';
@@ -224,10 +273,12 @@ const withPayoutStore = async (
         json: async () => ({
           status: 'success',
           data: {
-            reference,
             status: verificationStatus,
-            amount: verificationAmount,
-            currency: verificationCurrency,
+            ...(verificationReference === undefined
+              ? {}
+              : { reference: verificationReference === 'requested' ? reference : verificationReference }),
+            ...(verificationAmount === undefined ? {} : { amount: verificationAmount }),
+            ...(verificationCurrency === undefined ? {} : { currency: verificationCurrency }),
           },
         }),
       };
@@ -246,6 +297,7 @@ const withPayoutStore = async (
       setTransferFailureMessage: (message) => { transferFailureMessage = message; },
       setVerificationAmount: (amount) => { verificationAmount = amount; },
       setVerificationCurrency: (currency) => { verificationCurrency = currency; },
+      setVerificationReference: (reference) => { verificationReference = reference; },
       getTransferRequests: () => transferRequests,
       getSubmittedAccountNumber: () => submittedAccountNumber,
       getSubmittedTransferBody: () => submittedTransferBody,
@@ -409,7 +461,7 @@ test('sandbox pending transfer is verified on retry without duplicate submission
     assert.equal(store.credit.sandboxTransferStatus, 'PROCESSING');
     assert.equal(store.getTransferRequests(), 1);
 
-    store.setVerificationStatus('successful');
+    store.setVerificationStatus('success');
     const resolved = await processLandlordPayout({
       ...confirmedPayment,
       paymentMode: 'sandbox',
@@ -422,7 +474,7 @@ test('sandbox pending transfer is verified on retry without duplicate submission
 
 test('an explicit Chapa payout rejection is recorded as FAILED with the provider message', async () => {
   await withPayoutStore(async (store) => {
-    store.setTransferApiStatus('error');
+    store.setTransferApiStatus('failed');
     const result = await processLandlordPayout(confirmedPayment);
 
     assert.equal(result.status, 'FAILED');
@@ -457,7 +509,7 @@ test('unknown transfer outcome stays pending and is verified without a duplicate
     assert.equal(store.getTransferRequests(), 1);
 
     store.setTransferRequestThrows(false);
-    store.setVerificationStatus('successful');
+    store.setVerificationStatus('success');
     const resolved = await processLandlordPayout(confirmedPayment);
     assert.equal(resolved.status, 'PAID');
     assert.equal(store.credit.externalTransferStatus, 'EXECUTED');
@@ -475,7 +527,7 @@ test('pending Chapa transfer is verified on retry without submitting a duplicate
     assert.equal(store.landlord.internalBalance, 0);
     assert.equal(store.getTransferRequests(), 1);
 
-    store.setVerificationStatus('successful');
+    store.setVerificationStatus('success');
     const confirmed = await processLandlordPayout(confirmedPayment);
     assert.equal(confirmed.status, 'PAID');
     assert.equal(store.credit.externalTransferStatus, 'EXECUTED');
@@ -508,3 +560,158 @@ test('provider-confirmed failed transfer releases the reserved landlord balance'
     assert.equal(store.getTransferRequests(), 1);
   });
 });
+
+test('sandbox verification with omitted details stays unconfirmed and retries the same reference only', async () => {
+  await withPayoutStore(async (store) => {
+    store.setVerificationReference(undefined);
+    store.setVerificationAmount(undefined);
+    store.setVerificationCurrency(undefined);
+
+    const firstCheck = await processLandlordPayout({
+      ...confirmedPayment,
+      paymentMode: 'sandbox',
+    });
+    assert.equal(firstCheck.status, 'PROCESSING');
+    assert.equal(firstCheck.sandboxTransferStatus, 'PROCESSING');
+    assert.equal(store.credit.externalTransferStatus, 'NOT_EXECUTED');
+    assert.match(firstCheck.failureReason, /reference was omitted.*amount was omitted.*currency was omitted/i);
+    assert.equal(store.getTransferRequests(), 1);
+
+    store.setVerificationReference('requested');
+    store.setVerificationAmount('3000.00');
+    store.setVerificationCurrency('ETB');
+    const retry = await retryPayoutVerification(firstCheck.payoutReference, 'landlord-id');
+
+    assert.equal(retry.status, 'SIMULATED');
+    assert.equal(retry.sandboxTransferStatus, 'SUCCEEDED');
+    assert.equal(store.credit.externalTransferStatus, 'NOT_EXECUTED');
+    assert.equal(store.getTransferRequests(), 1);
+    assert.deepEqual(store.getVerifiedTransferReferences(), ['PO-test-123', 'PO-test-123']);
+  }, { mode: 'sandbox', testStatus: 'success' });
+});
+
+test('verification retry does not call Chapa for an already-confirmed payout', async () => {
+  await withPayoutStore(async (store) => {
+    const confirmedPayout = await retryPayoutVerification('PO-already-paid', 'landlord-id');
+
+    assert.equal(confirmedPayout.status, 'PAID');
+    assert.equal(store.getVerifiedTransferReferences().length, 0);
+    assert.equal(store.getTransferRequests(), 0);
+  }, { existingPayoutReference: 'PO-already-paid', existingPayoutStatus: 'PAID' });
+});
+
+test('verification retry refuses a payout with no transfer attempt', async () => {
+  await withPayoutStore(async (store) => {
+    await assert.rejects(
+      retryPayoutVerification('PO-not-submitted', 'landlord-id'),
+      /no prior transfer attempt to verify/i
+    );
+    assert.equal(store.getVerifiedTransferReferences().length, 0);
+    assert.equal(store.getTransferRequests(), 0);
+  }, { existingPayoutReference: 'PO-not-submitted' });
+});
+
+test('verification retry accepts the saved Chapa reference and never submits a second transfer', async () => {
+  await withPayoutStore(async (store) => {
+    const payout = await retryPayoutVerification('APQfhhNqwnvoZ', 'landlord-id');
+
+    assert.equal(payout.status, 'PAID');
+    assert.equal(payout.providerReference, 'APQfhhNqwnvoZ');
+    assert.deepEqual(store.getVerifiedTransferReferences(), ['APQfhhNqwnvoZ']);
+    assert.equal(store.getTransferRequests(), 0);
+  }, {
+    existingPayoutReference: 'PO-existing',
+    existingPayoutStatus: 'PROCESSING',
+    existingProviderReference: 'APQfhhNqwnvoZ',
+  });
+});
+
+test('a pending record with saved submission evidence is verified instead of submitted again', async () => {
+  await withPayoutStore(async (store) => {
+    const result = await processLandlordPayout(confirmedPayment);
+
+    assert.equal(result.status, 'PAID');
+    assert.deepEqual(store.getVerifiedTransferReferences(), ['APQfhhNqwnvoZ']);
+    assert.equal(store.getTransferRequests(), 0);
+  }, {
+    existingPayoutReference: 'PO-existing',
+    existingProviderReference: 'APQfhhNqwnvoZ',
+  });
+});
+
+test('previous populated-landlord false mismatch recovers only when no transfer was attempted', async () => {
+    await withPayoutStore(async (store) => {
+      const corrected = await processLandlordPayout({
+        ...confirmedPayment,
+        paymentMode: 'sandbox',
+        landlord: { _id: confirmedPayment.landlord, name: 'Landlord Example' },
+        property: { _id: confirmedPayment.property, title: 'Rental Home' },
+      });
+
+      assert.equal(corrected.status, 'SIMULATED');
+      assert.equal(corrected.paymentReference, confirmedPayment.paymentReference);
+      assert.equal(corrected.paymentPeriod, confirmedPayment.paymentPeriod);
+      assert.equal(store.getTransferRequests(), 1);
+      assert.equal(store.credit.status, 'CREDITED');
+      assert.equal(store.credit.externalTransferStatus, 'NOT_EXECUTED');
+      assert.equal(store.landlord.internalBalance, 3000);
+    }, {
+      mode: 'sandbox',
+      existingPayoutReference: 'PO-safe-recovery',
+      existingPayoutStatus: 'FAILED',
+      existingPayoutOverrides: {
+        failureReason: 'Stored payout details do not match the verified rent payment. No further transfer request will be made.',
+      },
+    });
+  });
+
+  test('real payout field mismatches are identified and block transfer submission', async () => {
+    const mismatches = [
+      ['payment ID', { payment: 'another-payment-id' }],
+      ['tenant ID', { tenant: 'another-tenant-id' }],
+      ['landlord ID', { landlord: 'another-landlord-id' }],
+      ['property ID', { property: 'another-property-id' }],
+      ['payment reference', { paymentReference: 'RP-another-payment' }],
+      ['amount', { amount: 2999 }],
+      ['currency', { currency: 'USD' }],
+      ['payment mode', { mode: 'sandbox' }],
+      ['payment period', { paymentPeriod: '2026-09' }],
+    ];
+
+    for (const [field, existingPayoutOverrides] of mismatches) {
+      await withPayoutStore(async (store) => {
+        const result = await processLandlordPayout(confirmedPayment);
+
+        assert.equal(result.status, 'FAILED', field);
+        assert.match(result.failureReason, new RegExp(field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+        assert.equal(store.getTransferRequests(), 0, field);
+        assert.equal(store.credit.status, 'CREDITED', field);
+        assert.equal(store.landlord.internalBalance, 3000, field);
+      }, {
+        existingPayoutReference: `PO-mismatch-${field.replace(/\s/g, '-')}`,
+        existingPayoutOverrides,
+      });
+    }
+  });
+
+  test('a legacy payout mismatch with evidence of a prior transfer is never reopened or resubmitted', async () => {
+    await withPayoutStore(async (store) => {
+      const result = await processLandlordPayout({
+        ...confirmedPayment,
+        paymentMode: 'sandbox',
+        landlord: { _id: confirmedPayment.landlord, name: 'Landlord Example' },
+      });
+
+      assert.equal(result.status, 'FAILED');
+      assert.equal(store.getTransferRequests(), 0);
+      assert.equal(store.getVerifiedTransferReferences().length, 0);
+    }, {
+      mode: 'sandbox',
+      existingPayoutReference: 'PO-prior-attempt',
+      existingPayoutStatus: 'FAILED',
+      existingProviderReference: 'CHAPA-existing-transfer',
+      existingPayoutOverrides: {
+        failureReason: 'Stored payout details do not match the verified rent payment. No further transfer request will be made.',
+      },
+    });
+  });

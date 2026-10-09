@@ -1,20 +1,180 @@
+const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
+const fs = require('fs');
+const path = require('path');
 const { createSystemLog } = require('./systemLogController');
 const {
   hasCloudinaryCredentials,
   uploadBuffer,
+  uploadPrivateProof,
   saveLocalUpload,
   uploadFilesToUrls,
 } = require('../utils/uploadMedia');
+const cloudinary = require('../config/cloudinary');
+const { downloadPrivateProof, validateCloudinaryAsset } = require('../services/privateOwnershipProof');
 const {
   normalizeAdminAreaObject,
   propertyMatchesAdminAreas,
   buildAdminAreaQuery,
 } = require('../utils/adminArea');
+
+const canViewVerificationDocument = (user, property) => {
+  if (!user) return false;
+
+  const landlordId = property.landlord?._id || property.landlord;
+  if (user.role === 'landlord' && String(landlordId) === String(user.id)) return true;
+  if (user.role !== 'admin') return false;
+  if (user.adminType === 'platform') return true;
+
+  const adminAreas = (user.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+  return adminAreas.length > 0 && propertyMatchesAdminAreas(property, adminAreas);
+};
+
+const propertyResponse = (property, user) => {
+  const result = typeof property.toObject === 'function' ? property.toObject() : { ...property };
+  const canViewProof = canViewVerificationDocument(user, property);
+  result.hasVerificationDocument = Boolean(
+    canViewProof && (property.verificationDocument || property.verificationDocumentAsset?.publicId),
+  );
+  delete result.verificationDocument;
+  delete result.verificationDocumentAsset;
+  return result;
+};
+
+const getCloudinaryAssetFromLegacyUrl = (documentUrl) => {
+  if (typeof documentUrl !== 'string' || !documentUrl) return null;
+  let url;
+  try {
+    url = new URL(documentUrl);
+  } catch (error) {
+    return null;
+  }
+
+  const cloudName = cloudinary.config().cloud_name;
+  if (!cloudName || url.protocol !== 'https:' || url.hostname !== 'res.cloudinary.com') return null;
+  const segments = url.pathname.split('/').filter(Boolean);
+  if (segments[0] !== cloudName || !['image', 'raw'].includes(segments[1])) return null;
+
+  const resourceType = segments[1];
+  const deliveryType = segments[2];
+  if (!['upload', 'private', 'authenticated'].includes(deliveryType)) return null;
+  const assetPath = segments.slice(3);
+  if (assetPath[0]?.startsWith('v') && /^v\d+$/.test(assetPath[0])) assetPath.shift();
+  const filename = assetPath.pop();
+  if (!filename) return null;
+  const extensionIndex = filename.lastIndexOf('.');
+  const format = extensionIndex > 0 ? filename.slice(extensionIndex + 1) : '';
+  assetPath.push(extensionIndex > 0 ? filename.slice(0, extensionIndex) : filename);
+  const publicId = assetPath.join('/');
+  if (!/^[A-Za-z0-9_/-]+$/.test(publicId) || publicId.includes('..')) return null;
+  return { publicId, resourceType, format, deliveryType };
+};
+
+const getOwnershipProof = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+    const property = await Property.findById(req.params.id)
+      .select('_id landlord region zone wereda city subCity verificationDocument verificationDocumentAsset');
+    if (!property) return res.status(404).json({ message: 'Property not found' });
+    if (!canViewVerificationDocument(req.user, property)) {
+      return res.status(404).json({ message: 'Ownership proof not found' });
+    }
+
+    if (property.verificationDocumentAsset?.publicId) {
+      const asset = property.verificationDocumentAsset.toObject
+        ? property.verificationDocumentAsset.toObject()
+        : property.verificationDocumentAsset;
+      validateCloudinaryAsset(asset);
+      const { buffer, contentType } = await downloadPrivateProof(asset);
+      res.set({
+        'Cache-Control': 'private, no-store',
+        'Content-Disposition': 'inline',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return res.type(contentType).send(buffer);
+    }
+
+    const cloudinaryAsset = getCloudinaryAssetFromLegacyUrl(property.verificationDocument);
+    if (cloudinaryAsset) {
+      if (cloudinaryAsset.deliveryType !== 'authenticated') {
+        return res.status(409).json({
+          message: 'This existing ownership proof must be migrated to authenticated Cloudinary delivery before it can be viewed.',
+          code: 'OWNERSHIP_PROOF_MIGRATION_REQUIRED',
+        });
+      }
+      const { buffer, contentType } = await downloadPrivateProof(cloudinaryAsset);
+      res.set({
+        'Cache-Control': 'private, no-store',
+        'Content-Disposition': 'inline',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return res.type(contentType).send(buffer);
+    }
+
+    if (typeof property.verificationDocument === 'string' && property.verificationDocument) {
+      let localUrl;
+      let decodedPath;
+      try {
+        localUrl = new URL(property.verificationDocument);
+        decodedPath = decodeURIComponent(localUrl.pathname);
+      } catch (error) {
+        return res.status(404).json({ message: 'Ownership proof not found' });
+      }
+      const uploadsPrefix = '/uploads/';
+      if (!decodedPath.startsWith(uploadsPrefix)) {
+        return res.status(404).json({ message: 'Ownership proof not found' });
+      }
+      const filename = path.basename(decodedPath);
+      if (!filename || filename !== decodedPath.slice(uploadsPrefix.length)) {
+        return res.status(404).json({ message: 'Ownership proof not found' });
+      }
+      const uploadsDirectory = path.resolve(__dirname, '..', 'uploads');
+      const localPath = path.resolve(uploadsDirectory, filename);
+      if (!localPath.startsWith(`${uploadsDirectory}${path.sep}`)) {
+        return res.status(404).json({ message: 'Ownership proof not found' });
+      }
+      const fileInfo = await fs.promises.lstat(localPath).catch((error) => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      });
+      if (!fileInfo || !fileInfo.isFile()) {
+        return res.status(404).json({ message: 'Ownership proof not found' });
+      }
+      if (fileInfo.size > 10 * 1024 * 1024) {
+        return res.status(413).json({ message: 'Ownership proof exceeds the allowed file size' });
+      }
+      const buffer = await fs.promises.readFile(localPath);
+      if (!buffer) return res.status(404).json({ message: 'Ownership proof not found' });
+      res.set({
+        'Cache-Control': 'private, no-store',
+        'Content-Disposition': 'inline',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      const contentTypeByExtension = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.webp': 'image/webp',
+        '.pdf': 'application/pdf',
+      };
+      const contentType = contentTypeByExtension[path.extname(filename).toLowerCase()] || 'application/octet-stream';
+      return res.type(contentType).send(buffer);
+    }
+
+    return res.status(404).json({ message: 'Ownership proof not found' });
+  } catch (error) {
+    console.error('Ownership proof delivery failed:', error.message);
+    return res.status(error.statusCode || 503).json({
+      message: error.statusCode ? error.message : 'Unable to securely retrieve ownership proof',
+    });
+  }
+};
 
 // አዲስ ንብረት መፍጠር (Landlord ብቻ)
 const normalizeCoordinate = (value, fieldName) => {
@@ -84,10 +244,10 @@ const createProperty = async (req, res) => {
 
     // የባለቤትነት ማስረጃ ወደ Cloudinary ይላኩ
     const document = req.files.document[0];
-    const documentResourceType = document.mimetype === 'application/pdf' ? 'raw' : 'image';
-    const documentUrl = hasCloudinaryCredentials
-      ? (await uploadBuffer(document.buffer, documentResourceType)).secure_url
-      : saveLocalUpload(document, req);
+    const privateDocumentAsset = hasCloudinaryCredentials
+      ? await uploadPrivateProof(document.buffer)
+      : null;
+    const documentUrl = privateDocumentAsset ? '' : saveLocalUpload(document, req);
 
     const latitudeValue = normalizeCoordinate(latitude, 'Latitude');
     const longitudeValue = normalizeCoordinate(longitude, 'Longitude');
@@ -119,6 +279,7 @@ const createProperty = async (req, res) => {
       bedrooms,
       images: imageUrls,
       verificationDocument: documentUrl,
+      verificationDocumentAsset: privateDocumentAsset || undefined,
       isVerified: false,
       verificationStatus: 'pending',
     });
@@ -139,7 +300,8 @@ const createProperty = async (req, res) => {
     const verificationRequest = new VerificationRequest({
       property: property._id,
       landlord: landlord._id,
-      documentUrl: documentUrl,
+      documentUrl: documentUrl || '',
+      documentAsset: privateDocumentAsset || undefined,
       status: 'pending',
     });
 
@@ -157,7 +319,7 @@ const createProperty = async (req, res) => {
 
     res.status(201).json({
       message: 'Property created successfully. Awaiting verification.',
-      property,
+      property: propertyResponse(property, req.user),
     });
   } catch (error) {
     console.error('Property creation error:', error);
@@ -223,13 +385,17 @@ const getAllProperties = async (req, res) => {
       filter.landlord = req.user.id;
     } else if (req.user?.role === 'admin') {
       const admin = await User.findById(req.user.id).select('adminType adminAreas').lean();
-      const isAreaAdmin = admin?.adminType === 'area';
+      const isAreaAdmin = admin?.adminType === 'area'
+        || (!admin?.adminType && (admin?.adminAreas || []).length > 0);
       if (isAreaAdmin) {
         const adminAreas = (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
         if (adminAreas.length === 0) {
           filter = { _id: null };
         } else {
-          filter = { ...filter, ...buildAdminAreaQuery(adminAreas) };
+          filter = {
+            ...filter,
+            $and: [...(filter.$and || []), buildAdminAreaQuery(adminAreas)],
+          };
         }
       } else {
         filter = {};
@@ -379,13 +545,7 @@ const getAllProperties = async (req, res) => {
       });
     }
 
-    const responseProperties = properties.map((property) => {
-      const responseProperty = property.toObject();
-      if (!req.user || req.user.role === 'tenant') {
-        delete responseProperty.verificationDocument;
-      }
-      return responseProperty;
-    });
+    const responseProperties = properties.map((property) => propertyResponse(property, req.user));
 
     res.json(responseProperties);
   } catch (error) {
@@ -410,8 +570,7 @@ const getPropertyById = async (req, res) => {
       if (!property.isVerified || property.verificationStatus !== 'approved') {
         return res.status(403).json({ message: 'This property is not verified yet' });
       }
-      const publicProperty = property.toObject();
-      delete publicProperty.verificationDocument;
+      const publicProperty = propertyResponse(property, null);
       return res.json(publicProperty);
     }
 
@@ -437,9 +596,21 @@ const getPropertyById = async (req, res) => {
       }
     }
 
+    if (req.user.role === 'landlord') {
+      const ownsProperty = String(property.landlord?._id || property.landlord) === String(req.user.id);
+      const isPubliclyAvailable = property.isVerified
+        && property.verificationStatus === 'approved'
+        && property.availabilityStatus !== 'rented';
+      if (!ownsProperty && !isPubliclyAvailable) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+    }
+
     if (req.user.role === 'admin') {
       const admin = await User.findById(req.user.id).select('adminAreas adminType').lean();
-      if (admin?.adminType === 'area') {
+      const isAreaAdmin = admin?.adminType === 'area'
+        || (!admin?.adminType && (admin?.adminAreas || []).length > 0);
+      if (isAreaAdmin) {
         const adminAreas = (admin?.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
         if (adminAreas.length === 0 || !propertyMatchesAdminAreas(property, adminAreas)) {
           return res.status(403).json({ message: 'This property is outside your assigned admin area' });
@@ -447,11 +618,7 @@ const getPropertyById = async (req, res) => {
       }
     }
 
-    const responseProperty = property.toObject();
-    if (req.user.role === 'tenant') {
-      delete responseProperty.verificationDocument;
-    }
-    res.json(responseProperty);
+    res.json(propertyResponse(property, req.user));
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Server error' });
   }
@@ -467,7 +634,8 @@ const updateProperty = async (req, res) => {
     }
 
     // የራሱ ንብረት መሆኑን ያረጋግጡ
-    if (property.landlord.toString() !== req.user.id && req.user.role !== 'admin') {
+    const isPlatformAdmin = req.user.role === 'admin' && req.user.adminType === 'platform';
+    if (property.landlord.toString() !== req.user.id && !isPlatformAdmin) {
       return res.status(403).json({ message: 'Not authorized to update this property' });
     }
 
@@ -487,10 +655,11 @@ const updateProperty = async (req, res) => {
 
     if (req.files && req.files.document && req.files.document.length > 0) {
       const document = req.files.document[0];
-      const documentResourceType = document.mimetype === 'application/pdf' ? 'raw' : 'image';
-      property.verificationDocument = hasCloudinaryCredentials
-        ? (await uploadBuffer(document.buffer, documentResourceType)).secure_url
-        : saveLocalUpload(document, req);
+      const privateDocumentAsset = hasCloudinaryCredentials
+        ? await uploadPrivateProof(document.buffer)
+        : null;
+      property.verificationDocument = privateDocumentAsset ? '' : saveLocalUpload(document, req);
+      property.verificationDocumentAsset = privateDocumentAsset || undefined;
     }
 
     if (latitude !== undefined) {
@@ -535,7 +704,10 @@ const updateProperty = async (req, res) => {
       read: false,
     });
 
-    res.json({ message: 'Property updated successfully. Needs re-verification.', property });
+    res.json({
+      message: 'Property updated successfully. Needs re-verification.',
+      property: propertyResponse(property, req.user),
+    });
   } catch (error) {
     console.error('Update property error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -552,7 +724,8 @@ const deleteProperty = async (req, res) => {
     }
 
     // የራሱ ንብረት መሆኑን ያረጋግጡ
-    if (property.landlord.toString() !== req.user.id && req.user.role !== 'admin') {
+    const isPlatformAdmin = req.user.role === 'admin' && req.user.adminType === 'platform';
+    if (property.landlord.toString() !== req.user.id && !isPlatformAdmin) {
       return res.status(403).json({ message: 'Not authorized to delete this property' });
     }
 
@@ -579,6 +752,7 @@ module.exports = {
   createProperty,
   getAllProperties,
   getPropertyById,
+  getOwnershipProof,
   updateProperty,
   deleteProperty,
 };

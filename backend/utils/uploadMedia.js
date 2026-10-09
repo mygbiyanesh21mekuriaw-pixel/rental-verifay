@@ -17,6 +17,27 @@ const uploadBuffer = (buffer, resourceType = 'auto') => new Promise((resolve, re
   stream.end(buffer);
 });
 
+const uploadPrivateProof = async (buffer) => {
+  const result = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { resource_type: 'image', type: 'authenticated' },
+      (error, uploadedAsset) => (error ? reject(error) : resolve(uploadedAsset))
+    );
+    stream.end(buffer);
+  });
+
+  if (!result?.public_id || result.resource_type !== 'image' || result.type !== 'authenticated') {
+    throw new Error('Cloudinary did not confirm authenticated delivery for the ownership proof');
+  }
+
+  return {
+    publicId: result.public_id,
+    resourceType: result.resource_type,
+    format: result.format,
+    deliveryType: result.type,
+  };
+};
+
 const saveLocalUpload = (file, req) => {
   const uploadsDirectory = path.join(__dirname, '..', 'uploads');
   fs.mkdirSync(uploadsDirectory, { recursive: true });
@@ -45,6 +66,7 @@ const uploadFilesToUrls = async (files, req, resourceType = 'image') => {
 module.exports = {
   hasCloudinaryCredentials,
   uploadBuffer,
+  uploadPrivateProof,
   saveLocalUpload,
   uploadFilesToUrls,
 };

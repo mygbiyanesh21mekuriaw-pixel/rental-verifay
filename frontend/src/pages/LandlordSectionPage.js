@@ -181,7 +181,8 @@ const LandlordSectionPage = ({ type }) => {
                 <p style={styles.cardLocation}>Tenant: {property.rentedBy.name}</p>
               )}
               <PropertyOwnershipProof
-                src={property.verificationDocument}
+                propertyId={property._id}
+                hasProof={property.hasVerificationDocument}
                 title={property.title}
                 style={styles.documentSection}
                 imageStyle={styles.documentImage}

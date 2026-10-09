@@ -1,8 +1,25 @@
 const Notification = require('../models/Notification');
 const Property = require('../models/Property');
 const RentalRequest = require('../models/RentalRequest');
+const { normalizeAdminAreaObject, buildAdminAreaQuery } = require('../utils/adminArea');
 
 const getUserId = (user) => user.id || user._id;
+
+const getAdminPropertyIds = async (user) => {
+  if (user.adminType !== 'area') return null;
+
+  const adminAreas = (user.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+  if (adminAreas.length === 0) return [];
+
+  const properties = await Property.find(buildAdminAreaQuery(adminAreas)).select('_id').lean();
+  return properties.map((property) => property._id);
+};
+
+const getAdminNotificationFilter = (propertyIds, extra = {}) => ({
+  recipientRole: 'admin',
+  ...extra,
+  ...(propertyIds === null ? {} : { property: { $in: propertyIds } }),
+});
 
 const createLandlordNotification = async (
   landlordId,
@@ -106,7 +123,12 @@ const getLandlordNotifications = async (req, res) => {
  */
 const getAdminNotifications = async (req, res) => {
   try {
+    const adminPropertyIds = await getAdminPropertyIds(req.user);
+    const propertyScope = adminPropertyIds === null
+      ? {}
+      : { _id: { $in: adminPropertyIds } };
     const pendingProperties = await Property.find({
+      ...propertyScope,
       isVerified: false,
       verificationStatus: 'pending',
     }).select('_id title').lean();
@@ -138,7 +160,10 @@ const getAdminNotifications = async (req, res) => {
       }
     }
 
-    const pendingRequests = await RentalRequest.find({ status: 'pending' })
+    const pendingRequests = await RentalRequest.find({
+      status: 'pending',
+      ...(adminPropertyIds === null ? {} : { property: { $in: adminPropertyIds } }),
+    })
       .populate('property', 'title')
       .select('_id property tenantName')
       .lean();
@@ -170,17 +195,15 @@ const getAdminNotifications = async (req, res) => {
       }
     }
 
-    const notifications = await Notification.find({
-      recipientRole: 'admin',
-    })
+    const notificationFilter = getAdminNotificationFilter(adminPropertyIds);
+    const notifications = await Notification.find(notificationFilter)
       .populate('property', 'title')
       .populate('rentalRequest')
       .sort({ createdAt: -1 });
 
-    const unreadCount = await Notification.countDocuments({
-      recipientRole: 'admin',
-      read: false,
-    });
+    const unreadCount = await Notification.countDocuments(
+      getAdminNotificationFilter(adminPropertyIds, { read: false }),
+    );
 
     res.status(200).json({
       success: true,
@@ -214,7 +237,8 @@ const getUnreadCount = async (req, res) => {
       filter.landlord = getUserId(req.user);
       filter.recipientRole = 'landlord';
     } else if (req.user.role === 'admin') {
-      filter.recipientRole = 'admin';
+      const adminPropertyIds = await getAdminPropertyIds(req.user);
+      Object.assign(filter, getAdminNotificationFilter(adminPropertyIds));
     } else {
       return res.status(403).json({
         success: false,
@@ -244,7 +268,15 @@ const getUnreadCount = async (req, res) => {
  */
 const markNotificationAsRead = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id);
+    const adminPropertyIds = req.user.role === 'admin'
+      ? await getAdminPropertyIds(req.user)
+      : null;
+    const notification = req.user.role === 'admin'
+      ? await Notification.findOne({
+        _id: req.params.id,
+        ...getAdminNotificationFilter(adminPropertyIds),
+      })
+      : await Notification.findById(req.params.id);
 
     if (!notification) {
       return res.status(404).json({
@@ -332,7 +364,8 @@ const markAllNotificationsAsRead = async (req, res) => {
       filter.landlord = getUserId(req.user);
       filter.recipientRole = 'landlord';
     } else if (req.user.role === 'admin') {
-      filter.recipientRole = 'admin';
+      const adminPropertyIds = await getAdminPropertyIds(req.user);
+      Object.assign(filter, getAdminNotificationFilter(adminPropertyIds));
     } else {
       return res.status(403).json({
         success: false,
@@ -370,7 +403,15 @@ const markAllNotificationsAsRead = async (req, res) => {
  */
 const deleteNotification = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id);
+    const adminPropertyIds = req.user.role === 'admin'
+      ? await getAdminPropertyIds(req.user)
+      : null;
+    const notification = req.user.role === 'admin'
+      ? await Notification.findOne({
+        _id: req.params.id,
+        ...getAdminNotificationFilter(adminPropertyIds),
+      })
+      : await Notification.findById(req.params.id);
 
     if (!notification) {
       return res.status(404).json({
