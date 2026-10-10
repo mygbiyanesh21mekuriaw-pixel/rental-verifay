@@ -43,7 +43,7 @@ const AdminDashboard = () => {
   }, [user]);
 
   return (
-    <div className="admin-container admin-dashboard-home">
+    <div className={`admin-container admin-dashboard-home${user?.adminType === 'area' ? ' admin-dashboard-area' : ''}`}>
       <div className="admin-header admin-dashboard-header">
         <div className="admin-title-wrapper">
           <div>

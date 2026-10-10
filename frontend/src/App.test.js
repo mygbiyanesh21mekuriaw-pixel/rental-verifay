@@ -28,15 +28,18 @@ test('renders only the public navigation before login', async () => {
   const [navbar] = await screen.findAllByRole('navigation');
 
   expect(
-    screen.queryByRole('heading', {
+    screen.getByRole('heading', {
       name: 'House Rental',
     })
-  ).not.toBeInTheDocument();
-  expect(
-    screen.getByRole('heading', {
-      name: 'Verified properties',
-    })
   ).toBeInTheDocument();
+  expect(
+    screen.getByText('A better way to find your next home')
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('Find and rent verified properties with confidence.')
+  ).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Find Properties' })).toHaveAttribute('href', '/search');
+  expect(screen.getByRole('link', { name: 'Learn More' })).toHaveAttribute('href', '/about');
 
   expect(
     within(navbar).getByRole('img', {
@@ -101,10 +104,29 @@ test('renders only the public navigation before login', async () => {
 
   const footer = screen.getByRole('contentinfo');
 
+  expect(
+    within(footer).getByText('Project Information')
+  ).toBeInTheDocument();
+  expect(
+    within(footer).getByText('House Rental Management System')
+  ).toBeInTheDocument();
+  expect(
+    within(footer).getByText('Student Academic Project')
+  ).toBeInTheDocument();
+  expect(
+    within(footer).getByText('Mekdela Amba University')
+  ).toBeInTheDocument();
+  expect(
+    within(footer).getByText('College of Computing and Informatics')
+  ).toBeInTheDocument();
+
   const footerNavigation =
     within(footer).getByRole('navigation', {
       name: /footer navigation/i,
     });
+  expect(
+    within(footerNavigation).getByText('Quick Links')
+  ).toBeInTheDocument();
 
   expect(
     within(footerNavigation).getByRole('link', {
@@ -129,6 +151,15 @@ test('renders only the public navigation before login', async () => {
       name: /login|register/i,
     })
   ).not.toBeInTheDocument();
+
+  expect(
+    within(footer).getByRole('link', {
+      name: 'admin@gmail.com',
+    })
+  ).toHaveAttribute('href', 'mailto:admin@gmail.com');
+  expect(
+    within(footer).getByText('© 2026 House Rental Management System. All Rights Reserved.')
+  ).toBeInTheDocument();
 });
 
 test('keeps the full logo and brand visible after restoring an authenticated session', async () => {
@@ -147,6 +178,23 @@ test('keeps the full logo and brand visible after restoring an authenticated ses
   expect(within(navbar).getByRole('img', { name: /mekdela amba university logo/i }))
     .toHaveAttribute('src', '/mekdela-amba-logo.jpeg');
   expect(within(navbar).getByText('House Rental Management System')).toBeInTheDocument();
+});
+
+test('hides the footer on an authenticated dashboard', async () => {
+  const landlord = {
+    _id: 'landlord-id',
+    name: 'Landlord Example',
+    role: 'landlord',
+  };
+  window.history.pushState({}, '', '/landlord-dashboard');
+  localStorage.setItem('token', 'saved-token');
+  localStorage.setItem('user', JSON.stringify(landlord));
+  axios.get.mockResolvedValue({ data: { user: landlord } });
+
+  renderApp();
+
+  await screen.findAllByRole('navigation');
+  expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
 });
 
 test('toggles the mobile navigation and closes it after navigation', async () => {

@@ -1,150 +1,44 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React from 'react';
 import './contactUs.css';
 
-const Contact = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: '',
-  });
-  const [submitted, setSubmitted] = useState(false);
-  const [adminEmail, setAdminEmail] = useState('');
-  const [formError, setFormError] = useState('');
-  const [sending, setSending] = useState(false);
+const Contact = () => (
+  <div className="public-page">
+    <div className="public-content">
+      <main className="contact-container">
+        <header className="contact-hero">
+          <h1 className="contact-title">Contact Us</h1>
+          <p className="contact-subtitle">
+            We welcome your questions and feedback about our student project.
+          </p>
+        </header>
 
-  useEffect(() => {
-    let active = true;
-    axios.get(`${process.env.REACT_APP_API_URL}/api/contact/details`)
-      .then((response) => {
-        if (active) setAdminEmail(response.data?.email || '');
-      })
-      .catch(() => {
-        if (active) setAdminEmail('');
-      });
+        <div className="contact-content">
+          <section className="contact-info-card" aria-labelledby="contact-location">
+            <h2 id="contact-location">Location</h2>
+            <p>Mekdela Amba University (MAU), Ethiopia</p>
+          </section>
 
-    return () => { active = false; };
-  }, []);
+          <section className="contact-info-card" aria-labelledby="contact-email">
+            <h2 id="contact-email">Email</h2>
+            <p><a href="mailto:admin@gmail.com">admin@gmail.com</a></p>
+          </section>
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+          <section className="contact-info-card" aria-labelledby="contact-business-hours">
+            <h2 id="contact-business-hours">Business Hours</h2>
+            <p>Student Project — Online Support</p>
+          </section>
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setFormError('');
-    setSending(true);
-    try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/api/contact`, formData);
-      setSubmitted(true);
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    } catch (error) {
-      setFormError(error.response?.data?.message || 'Unable to send your message right now. Please try again.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div className="public-page">
-      <div className="public-content">
-        <div className="contact-container">
-      <div className="contact-hero">
-        <h1 className="contact-title">Contact Us</h1>
-        <p className="contact-subtitle">Contact us with any questions or feedback.
-        </p>
-      </div>
-
-      <div className="contact-content">
-        <div className="contact-info">
-          <div className="contact-info-card">
-            <span className="contact-info-icon"></span>
-            <h3>Address</h3>
-            <p>Addis Ababa, Ethiopia</p>
-          </div>
-          {adminEmail && <div className="contact-info-card">
-            <span className="contact-info-icon"></span>
-            <h3>Email</h3>
-            <p><a href={`mailto:${adminEmail}`}>{adminEmail}</a></p>
-          </div>}
-          <div className="contact-info-card">
-            <span className="contact-info-icon"></span>
-            <h3>Business hours</h3>
-            <p>Monday - Saturday: 8:00 - 18:00</p>
-          </div>
+          <section className="contact-info-card contact-project-card" aria-labelledby="contact-project">
+            <h2 id="contact-project">Project Information</h2>
+            <p>
+              RentalVerify is an academic student project developed to demonstrate a rental
+              property verification and management system.
+            </p>
+          </section>
         </div>
-
-        <div className="contact-form-container">
-          <h2>Send us a message</h2>
-          {submitted ? (
-            <div className="contact-success">Your message was sent to the Platform Admin.
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="contact-form">
-              {formError && <p className="contact-error" role="alert">{formError}</p>}
-              <div className="contact-form-group">
-                <label className="contact-form-label">Full name</label>
-                <input
-                  type="text"
-                  name="name"
-                  className="contact-form-input"
-                  placeholder="Enter your full name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div className="contact-form-group">
-                <label className="contact-form-label">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  className="contact-form-input"
-                  placeholder="your@email.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div className="contact-form-group">
-                <label className="contact-form-label">Subject</label>
-                <input
-                  type="text"
-                  name="subject"
-                  className="contact-form-input"
-                  placeholder="Message subject"
-                  value={formData.subject}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <div className="contact-form-group">
-                <label className="contact-form-label">Message</label>
-                <textarea
-                  name="message"
-                  className="contact-form-input contact-form-textarea"
-                  placeholder="Write your message..."
-                  value={formData.message}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-              <button type="submit" className="contact-form-btn" disabled={sending}>
-                {sending ? 'Sending...' : 'Send message'}
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-        </div>
-      </div>
+      </main>
     </div>
-  );
-};
+  </div>
+);
 
 export default Contact;
-

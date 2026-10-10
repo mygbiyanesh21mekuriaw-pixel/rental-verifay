@@ -86,6 +86,12 @@ The frontend uses environment-specific API URLs:
 
 If the backend URL changes, update the appropriate environment file and rebuild or redeploy the frontend. Frontend environment variables are public; never store API secrets in them.
 
+### Property image and ownership-proof uploads
+
+Property images and proof-of-ownership files are uploaded by the backend to Cloudinary. Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` as backend-only environment variables in Render, using credentials from the same Cloudinary account. Never add these credentials to Vercel, a `REACT_APP_*` variable, or source control. Set `REACT_APP_API_URL` in Vercel to the deployed backend URL and rebuild the frontend after changing it.
+
+For local development, put the Cloudinary values in the ignored `backend/.env`. When credentials are absent locally, uploads retain the existing local-storage development fallback. In production, missing Cloudinary credentials stop uploads with a configuration error rather than saving files to ephemeral local storage. If Cloudinary rejects credentials, replace them with the current account values and redeploy the backend.
+
 ## Tests and Production Build
 
 Run frontend commands from `frontend/`:

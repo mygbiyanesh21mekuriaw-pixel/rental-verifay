@@ -9,7 +9,7 @@ const path = require('path');
 const { createSystemLog } = require('./systemLogController');
 const {
   hasCloudinaryCredentials,
-  uploadBuffer,
+  assertUploadConfiguration,
   uploadPrivateProof,
   saveLocalUpload,
   uploadFilesToUrls,
@@ -229,18 +229,8 @@ const createProperty = async (req, res) => {
       return res.status(400).json({ message: 'At least one property image is required' });
     }
 
-    // ምስሎችን ወደ Cloudinary ይላኩ
-    const imageUrls = [];
-    if (req.files.images) {
-      for (const file of req.files.images) {
-        if (hasCloudinaryCredentials) {
-          const result = await uploadBuffer(file.buffer, 'image');
-          imageUrls.push(result.secure_url);
-        } else {
-          imageUrls.push(saveLocalUpload(file, req));
-        }
-      }
-    }
+    assertUploadConfiguration();
+    const imageUrls = await uploadFilesToUrls(req.files.images, req, 'image');
 
     // የባለቤትነት ማስረጃ ወደ Cloudinary ይላኩ
     const document = req.files.document[0];
@@ -322,6 +312,10 @@ const createProperty = async (req, res) => {
       property: propertyResponse(property, req.user),
     });
   } catch (error) {
+    if (error.code === 'CLOUDINARY_CONFIGURATION_ERROR' || error.code === 'CLOUDINARY_UPLOAD_ERROR') {
+      console.error('Property creation Cloudinary upload failed:', error.message);
+      return res.status(error.statusCode).json({ message: error.message, code: error.code });
+    }
     console.error('Property creation error:', error);
     res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Server error', error: error.message });
   }
@@ -655,6 +649,7 @@ const updateProperty = async (req, res) => {
 
     if (req.files && req.files.document && req.files.document.length > 0) {
       const document = req.files.document[0];
+      assertUploadConfiguration();
       const privateDocumentAsset = hasCloudinaryCredentials
         ? await uploadPrivateProof(document.buffer)
         : null;
@@ -709,6 +704,10 @@ const updateProperty = async (req, res) => {
       property: propertyResponse(property, req.user),
     });
   } catch (error) {
+    if (error.code === 'CLOUDINARY_CONFIGURATION_ERROR' || error.code === 'CLOUDINARY_UPLOAD_ERROR') {
+      console.error('Property update Cloudinary upload failed:', error.message);
+      return res.status(error.statusCode).json({ message: error.message, code: error.code });
+    }
     console.error('Update property error:', error);
     res.status(500).json({ message: 'Server error' });
   }

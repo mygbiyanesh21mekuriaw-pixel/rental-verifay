@@ -153,25 +153,25 @@ const AppFooter = () => {
     <footer className="app-footer">
       <div className="app-footer-content">
         <div className="app-footer-brand">
-          <strong>House Rental</strong>
+          <span className="app-footer-heading">Project Information</span>
+          <strong>House Rental Management System</strong>
           <span>Student Academic Project</span>
           <span>Mekdela Amba University</span>
           <span>College of Computing and Informatics</span>
         </div>
         <nav className="app-footer-links" aria-label="Footer navigation">
-          <span className="app-footer-heading">Quick links</span>
+          <span className="app-footer-heading">Quick Links</span>
           <Link to="/">Home</Link>
           <Link to="/about">About Us</Link>
           <Link to="/contact">Contact Us</Link>
         </nav>
         <div className="app-footer-contact">
           <span className="app-footer-heading">Contact</span>
-          <a href="mailto:info@rentalverify.com">info@rentalverify.com</a>
+          <a href="mailto:admin@gmail.com">admin@gmail.com</a>
         </div>
       </div>
       <div className="app-footer-bottom">
-        <span> {new Date().getFullYear()} House Rental</span>
-        <span>All Rights Reserved.</span>
+        <span>© 2026 House Rental Management System. All Rights Reserved.</span>
       </div>
     </footer>
   );
@@ -368,6 +368,5 @@ function App() {
 }
 
 export default App;
-
 
 

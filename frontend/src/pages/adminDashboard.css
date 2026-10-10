@@ -13,6 +13,19 @@
   overflow: hidden;
 }
 
+.admin-container.admin-dashboard-area {
+  background: transparent;
+}
+
+.admin-container.admin-section-area {
+  background: transparent !important;
+}
+
+.admin-container.admin-section-area .admin-detail-section {
+  background: transparent !important;
+  backdrop-filter: none;
+}
+
 /* =====   ===== */
 .admin-container::before,
 .admin-container::after {

@@ -41,6 +41,9 @@ const AdminSectionPage = ({ type }) => {
   const config = sectionConfig[type];
   const isAdminManagementPage = type === 'adminManagement';
   const isUserListPage = type === 'allUsers';
+  const isAreaAdminPropertySection = currentUser?.role === 'admin'
+    && currentUser?.adminType === 'area'
+    && ['allProperties', 'pending', 'awaitingVerification', 'rejected', 'verified', 'rentalRequests'].includes(type);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -287,7 +290,7 @@ const AdminSectionPage = ({ type }) => {
   if (!config) return null;
 
   return (
-    <div className="admin-container admin-section-page">
+    <div className={`admin-container admin-section-page${isAreaAdminPropertySection ? ' admin-section-area' : ''}`}>
       <div className="admin-header">
         <div className="admin-title-wrapper">
           <div>
