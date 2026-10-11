@@ -41,11 +41,42 @@
   outline-offset: 3px;
 }
 
+.back-to-previous-page {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.back-to-previous-page:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.back-to-previous-page:focus-visible {
+  outline: 3px solid rgba(3, 105, 161, 0.3);
+  outline-offset: 3px;
+}
+
 @media (max-width: 560px) {
   .back-to-dashboard {
     width: 100%;
     justify-content: center;
     margin-top: 8px;
+  }
+
+  .back-to-previous-page {
+    max-width: 100%;
   }
 }
 

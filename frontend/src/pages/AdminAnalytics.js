@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import BackToDashboard from '../components/BackToDashboard';
 import './adminDashboard.css';
 
 const chartPalette = ['#7c3aed', '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#14b8a6'];
@@ -171,28 +172,41 @@ const AdminAnalytics = () => {
   }, [analytics]);
 
   if (loading) {
-    return <div className="admin-container"><div className="admin-empty-text">Loading analytics...</div></div>;
+    return (
+      <div className="admin-container">
+        <BackToDashboard dashboardRoute="/admin-dashboard" />
+        <div className="admin-empty-text">Loading analytics...</div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="admin-container"><div className="admin-empty-text"> {error}</div></div>;
+    return (
+      <div className="admin-container">
+        <BackToDashboard dashboardRoute="/admin-dashboard" />
+        <div className="admin-empty-text"> {error}</div>
+      </div>
+    );
   }
 
   if (!analytics) {
-    return <div className="admin-container"><div className="admin-empty-text">No analytics data available.</div></div>;
+    return (
+      <div className="admin-container">
+        <BackToDashboard dashboardRoute="/admin-dashboard" />
+        <div className="admin-empty-text">No analytics data available.</div>
+      </div>
+    );
   }
 
   return (
     <div className="admin-container">
+      <BackToDashboard dashboardRoute="/admin-dashboard" />
       <div className="admin-header">
         <div className="admin-title-wrapper">
           <div>
             <h1 className="admin-title"><span className="admin-title-icon"></span><span className="admin-title-gradient">Admin Analytics</span></h1>
             <p className="admin-subtitle">Platform insights from the live database</p>
           </div>
-          <button type="button" className="admin-logout-btn" onClick={() =>window.location.href = '/admin-dashboard'}>
-            <span className="admin-logout-icon"></span>Back to dashboard
-          </button>
         </div>
       </div>
 
@@ -242,5 +256,4 @@ const AdminAnalytics = () => {
 };
 
 export default AdminAnalytics;
-
 

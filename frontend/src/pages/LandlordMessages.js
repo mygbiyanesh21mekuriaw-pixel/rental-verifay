@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import BackToPreviousPage from '../components/BackToPreviousPage';
 import './TenantDashboard.css';
 
 const LandlordMessages = () => {
@@ -51,6 +52,7 @@ const LandlordMessages = () => {
 
   return (
     <div className="tenant-container tenant-section-page">
+      {propertyId && <BackToPreviousPage />}
       <div className="tenant-header">
         <h1 className="tenant-title">Messages</h1>
       </div>
@@ -91,5 +93,4 @@ const LandlordMessages = () => {
 };
 
 export default LandlordMessages;
-
 

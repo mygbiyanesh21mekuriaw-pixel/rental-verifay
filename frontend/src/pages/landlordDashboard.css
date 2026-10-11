@@ -1138,6 +1138,13 @@
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
   }
 
+  .landlord-mobile-header .language-switcher select {
+    max-width: 82px;
+    padding-right: 16px;
+    padding-left: 6px;
+    font-size: 10px;
+  }
+
   .landlord-menu-toggle,
   .landlord-mobile-logout {
     display: inline-flex;

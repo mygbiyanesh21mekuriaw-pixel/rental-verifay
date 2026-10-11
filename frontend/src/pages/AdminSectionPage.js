@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaTrash } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import BackToDashboard from '../components/BackToDashboard';
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
 import { getPropertyImages } from '../utils/propertyMedia';
@@ -37,6 +38,7 @@ const getAdminAreaValue = (adminAreas) => {
 
 const AdminSectionPage = ({ type }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: currentUser } = useAuth();
   const config = sectionConfig[type];
   const isAdminManagementPage = type === 'adminManagement';
@@ -67,6 +69,11 @@ const AdminSectionPage = ({ type }) => {
   const [rentalRequestFeedback, setRentalRequestFeedback] = useState('');
   const isPlatformAdmin = currentUser?.role === 'admin'
     && (!currentUser.adminType || currentUser.adminType === 'platform');
+  const showPlatformAdminBackLink = isPlatformAdmin
+    && ['allUsers', 'paymentPeriod', 'adminManagement'].includes(type);
+  const showAreaAdminBackLink = currentUser?.role === 'admin'
+    && currentUser?.adminType === 'area'
+    && ['verified', 'rejected', 'pending', 'allProperties', 'rentalRequests'].includes(type);
   const canManageVerification = currentUser?.role === 'admin'
     && currentUser?.adminType === 'area'
     && (type === 'pending' || type === 'awaitingVerification');
@@ -291,6 +298,15 @@ const AdminSectionPage = ({ type }) => {
 
   return (
     <div className={`admin-container admin-section-page${isAreaAdminPropertySection ? ' admin-section-area' : ''}`}>
+      {showPlatformAdminBackLink && (
+        <BackToDashboard dashboardRoute="/admin-dashboard" />
+      )}
+      {showAreaAdminBackLink && (
+        <BackToDashboard
+          dashboardRoute="/admin-dashboard"
+          label="← Back to Dashboard"
+        />
+      )}
       <div className="admin-header">
         <div className="admin-title-wrapper">
           <div>
@@ -299,12 +315,14 @@ const AdminSectionPage = ({ type }) => {
             </h1>
             <p className="admin-subtitle">Admin management</p>
           </div>
-          <button
-            type="button"
-            className="admin-close-btn admin-back-dashboard"
-            onClick={() =>navigate('/admin-dashboard')}
-          >Back to Admin Dashboard
-          </button>
+          {!showPlatformAdminBackLink && !showAreaAdminBackLink && (
+            <button
+              type="button"
+              className="admin-close-btn admin-back-dashboard"
+              onClick={() =>navigate('/admin-dashboard')}
+            >Back to Admin Dashboard
+            </button>
+          )}
         </div>
       </div>
 
@@ -476,7 +494,7 @@ const AdminSectionPage = ({ type }) => {
           >
             <div className="admin-request-modal-header">
               <h2 id="rental-request-details-title" className="admin-card-title">Rental Request Details</h2>
-              <button type="button" className="admin-card-link" onClick={() =>setSelectedRentalRequest(null)}>Close</button>
+              <button type="button" className="admin-card-link" onClick={() =>setSelectedRentalRequest(null)}>← Back to Previous</button>
             </div>
             <PropertyImage
               src={getPropertyImages(selectedRentalRequest.property)}
@@ -629,7 +647,14 @@ const AdminSectionPage = ({ type }) => {
                     </div>
                   )}
                   {type !== 'awaitingVerification' && property._id && (
-                    <Link to={`/property/${property._id}`} className="admin-card-link">View details</Link>
+                    <Link
+                      to={`/property/${property._id}`}
+                      state={{
+                        from: `${location.pathname}${location.search}`,
+                        fromState: location.state,
+                      }}
+                      className="admin-card-link"
+                    >View details</Link>
                   )}
                 </div>
               ))}

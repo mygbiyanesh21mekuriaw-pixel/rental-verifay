@@ -2242,6 +2242,14 @@ body {
     height: 36px;
   }
 
+  .navbar-topbar .language-switcher select {
+    min-height: 36px;
+    max-width: 92px;
+    padding-right: 20px;
+    padding-left: 7px;
+    font-size: 11px;
+  }
+
   .navbar-topbar .profile-photo-control-label {
     display: none;
   }
@@ -2351,6 +2359,13 @@ body {
 
   .navbar-topbar .navbar-top-logout-btn span {
     display: none;
+  }
+
+  .navbar-topbar .language-switcher select {
+    max-width: 80px;
+    padding-right: 17px;
+    padding-left: 5px;
+    font-size: 10px;
   }
 
   .app:has(.navbar-authenticated) .app-main {

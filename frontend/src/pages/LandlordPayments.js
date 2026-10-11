@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
+import BackToPreviousPage from '../components/BackToPreviousPage';
 import './rentPayment.css';
 
 const formatStatus = (status) => {
@@ -36,6 +37,7 @@ const LandlordPayments = () => {
 
   return (
     <div className="payment-page">
+      {propertyId && <BackToPreviousPage />}
       <div className="payment-page-header">
         <div><p className="payment-eyebrow">Landlord finance</p><h1>Rent Payments</h1><p>{propertyId ? 'Payments for this rented property.' : 'Payments received for your properties.'}</p></div>
       </div>

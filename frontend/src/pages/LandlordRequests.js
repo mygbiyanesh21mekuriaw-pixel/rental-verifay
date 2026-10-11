@@ -75,5 +75,3 @@ const LandlordRequests = () => {
 };
 
 export default LandlordRequests;
-
-

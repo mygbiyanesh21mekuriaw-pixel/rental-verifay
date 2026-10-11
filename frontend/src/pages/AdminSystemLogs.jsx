@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import BackToDashboard from '../components/BackToDashboard';
 import './AdminSystemLogs.css';
 
 const ACTION_OPTIONS = [
@@ -141,6 +142,7 @@ const AdminSystemLogs = () => {
 
   return (
     <div className="system-logs-page max-w-7xl mx-auto px-4 py-8">
+      <BackToDashboard dashboardRoute="/admin-dashboard" />
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">
           <span></span>

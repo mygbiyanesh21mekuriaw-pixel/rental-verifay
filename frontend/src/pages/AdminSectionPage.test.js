@@ -1,7 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import AdminSectionPage from './AdminSectionPage';
 import { useAuth } from '../context/AuthContext';
 
@@ -37,12 +37,100 @@ const renderUsersPage = () => render(
   </MemoryRouter>
 );
 
+const CurrentPath = () => {
+  const location = useLocation();
+  return <div data-testid="current-path">{location.pathname}</div>;
+};
+
 beforeEach(() => {
   localStorage.setItem('token', 'platform-token');
   axios.get.mockReset().mockResolvedValue({ data: users });
   axios.delete.mockReset().mockResolvedValue({ data: { message: 'User deleted successfully' } });
   useAuth.mockReturnValue({ user: platformAdmin });
   window.confirm = jest.fn(() => true);
+});
+
+test.each([
+  ['allUsers', 'all-users'],
+  ['adminManagement', 'admin-management'],
+  ['paymentPeriod', 'payment-period'],
+])(
+  'platform admin %s page links back to the dashboard',
+  async (type, path) => {
+    render(
+      <MemoryRouter initialEntries={[`/admin-dashboard/${path}`]}>
+        <Routes>
+          <Route path="/admin-dashboard" element={<CurrentPath />} />
+          <Route path={`/admin-dashboard/${path}`} element={<AdminSectionPage type={type} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const backLink = await screen.findByRole('link', { name: /back to dashboard/i });
+    expect(backLink).toHaveAttribute('href', '/admin-dashboard');
+    fireEvent.click(backLink);
+
+    expect(screen.getByTestId('current-path')).toHaveTextContent('/admin-dashboard');
+  },
+);
+
+test.each([
+  ['verified', 'verified'],
+  ['rejected', 'rejected'],
+  ['pending', 'pending'],
+  ['allProperties', 'all-properties'],
+  ['rentalRequests', 'rental-requests'],
+])(
+  'area admin %s page links back to the dashboard',
+  async (type, path) => {
+    const areaAdmin = { _id: 'area-admin-id', role: 'admin', adminType: 'area' };
+    useAuth.mockReturnValue({ user: areaAdmin });
+
+    render(
+      <MemoryRouter initialEntries={[`/admin-dashboard/${path}`]}>
+        <Routes>
+          <Route path="/admin-dashboard" element={<CurrentPath />} />
+          <Route path={`/admin-dashboard/${path}`} element={<AdminSectionPage type={type} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const backLink = await screen.findByRole('link', { name: '← Back to Dashboard' });
+    expect(backLink).toHaveAttribute('href', '/admin-dashboard');
+    fireEvent.click(backLink);
+
+    expect(screen.getByTestId('current-path')).toHaveTextContent('/admin-dashboard');
+  },
+);
+
+test('area admin can return from rental request details to the requests list', async () => {
+  const areaAdmin = { _id: 'area-admin-id', role: 'admin', adminType: 'area' };
+  const rentalRequest = {
+    _id: 'request-id',
+    property: { _id: 'property-id', title: 'Rental Property' },
+    tenant: { name: 'Tenant Example' },
+    status: 'pending',
+  };
+  useAuth.mockReturnValue({ user: areaAdmin });
+  axios.get.mockImplementation((url) => (
+    url.includes('/api/rental-requests/admin-requests')
+      ? Promise.resolve({ data: [rentalRequest] })
+      : Promise.resolve({ data: rentalRequest.property })
+  ));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="rentalRequests" />
+    </MemoryRouter>,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: 'View Details' }));
+  expect(await screen.findByRole('dialog', { name: 'Rental Request Details' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '← Back to Previous' }));
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.getByText('Rental Property')).toBeInTheDocument();
 });
 
 test('platform admin can delete another user after confirmation', async () => {

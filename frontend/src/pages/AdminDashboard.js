@@ -51,7 +51,7 @@ const AdminDashboard = () => {
               <span className="admin-title-icon"></span>
               <span className="admin-title-gradient">Admin Dashboard</span>
             </h1>
-            <p className="admin-subtitle admin-dashboard-welcome">Welcome to the Admin Dashboard, <strong>{user?.name}</strong> ({adminLabel})!</p>
+            <p className="admin-subtitle admin-dashboard-welcome">Welcome to the Admin Dashboard, <strong>{user?.name}</strong>{adminLabel === 'Area Admin' ? ` (${adminLabel})` : ''}!</p>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import BackToDashboard from '../components/BackToDashboard';
 
 const LandlordAccountSettings = () => {
   const { user, updateUser } = useAuth();
@@ -62,6 +63,9 @@ const LandlordAccountSettings = () => {
 
   return (
     <section className="landlord-account-page">
+      {user?.role === 'tenant' && (
+        <BackToDashboard label="← Back to Dashboard" />
+      )}
       <header className="landlord-account-heading landlord-account-settings-heading">
         <div>
           <p>{accountRole}</p>

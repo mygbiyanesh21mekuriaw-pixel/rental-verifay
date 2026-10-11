@@ -15,6 +15,19 @@ const PropertyDetail = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const adminPropertyListRoutes = [
+    '/admin-dashboard/pending',
+    '/admin-dashboard/verified',
+    '/admin-dashboard/all-properties',
+  ];
+  const previousAdminPropertyRoute = typeof location.state?.from === 'string'
+    && adminPropertyListRoutes.some((route) => (
+      location.state.from === route || location.state.from.startsWith(`${route}?`)
+    ))
+    ? location.state.from
+    : null;
+  const isAreaAdmin = user?.role === 'admin' && user?.adminType === 'area';
+  const backButtonLabel = isAreaAdmin ? '← Back to Previous' : 'Back to search';
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,6 +50,30 @@ const PropertyDetail = () => {
   // =====   =====
   const [showContact, setShowContact] = useState(false);
   const [adminActionLoading, setAdminActionLoading] = useState(false);
+
+  const returnFromPropertyDetails = () => {
+    if (!isAreaAdmin) {
+      navigate('/search');
+      return;
+    }
+
+    if (previousAdminPropertyRoute) {
+      if (typeof window.history.state?.idx === 'number' && window.history.state.idx > 0) {
+        navigate(-1);
+        return;
+      }
+
+      navigate(previousAdminPropertyRoute, { state: location.state?.fromState });
+      return;
+    }
+
+    const fallbackRoute = property?.verificationStatus === 'pending'
+      ? '/admin-dashboard/pending'
+      : property?.isVerified && property?.verificationStatus === 'approved'
+        ? '/admin-dashboard/verified'
+        : '/admin-dashboard/all-properties';
+    navigate(fallbackRoute);
+  };
 
   // fetchProperty   useCallback 
   const fetchProperty = useCallback(async () => {
@@ -228,8 +265,8 @@ const PropertyDetail = () => {
       <div className="property-error">
         <div className="property-error-icon"></div>
         <h2 className="property-error-title">{error}</h2>
-        <p className="property-error-desc">Return to the search page</p>
-        <button onClick={() =>navigate('/search')} className="property-back-btn">Back to search
+        <p className="property-error-desc">{isAreaAdmin ? 'Return to the previous page' : 'Return to the search page'}</p>
+        <button onClick={returnFromPropertyDetails} className="property-back-btn">{backButtonLabel}
         </button>
       </div>
     );
@@ -238,7 +275,7 @@ const PropertyDetail = () => {
   return (
     <div className="property-container">
       {/* =====   ===== */}
-      <button onClick={() =>navigate('/search')} className="property-back-btn">Back to search
+      <button onClick={returnFromPropertyDetails} className="property-back-btn">{backButtonLabel}
       </button>
 
       {/* =====   ===== */}
@@ -470,7 +507,7 @@ const PropertyDetail = () => {
                   <div className="property-modal-actions">
                     <button
                       type="button"
-                      className="property-modal-btn property-modal-btn-cancel"
+                      className="property-modal-btn property-modal-btn-submit"
                       onClick={() =>setShowRentModal(false)}
                     >Cancel
                     </button>

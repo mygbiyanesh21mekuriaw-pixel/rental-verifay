@@ -44,6 +44,7 @@ import AdminSystemLogs from './pages/AdminSystemLogs';
 
 //  (Components)
 import Navbar from './components/Navbar';
+import { LanguageProvider } from './context/LanguageContext';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -177,7 +178,7 @@ const AppFooter = () => {
   );
 };
 
-function App() {
+function AppContent() {
   return (
     <div className="app">
       <Router>
@@ -360,13 +361,18 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
-
         <AppFooter />
       </Router>
     </div>
   );
 }
 
+function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  );
+}
+
 export default App;
-
-

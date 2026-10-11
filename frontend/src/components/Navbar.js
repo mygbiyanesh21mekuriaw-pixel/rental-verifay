@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import ProfilePhotoControl from './ProfilePhotoControl';
 import ProfileAvatar from './ProfileAvatar';
+import LanguageSwitcher from './LanguageSwitcher';
 import './navbar.css';
 
 import {
@@ -434,6 +435,7 @@ const Navbar = () => {
               </span>
             )}
           </Link>
+          <LanguageSwitcher className="language-switcher-topbar" />
           <button
             type="button"
             onClick={handleLogout}
@@ -608,6 +610,10 @@ const Navbar = () => {
                   <span>Register</span>
                 </Link>
               </>
+            )}
+
+            {!user && (
+              <LanguageSwitcher className="language-switcher-public" />
             )}
 
             {/* ======================================

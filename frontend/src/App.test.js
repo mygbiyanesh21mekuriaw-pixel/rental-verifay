@@ -162,6 +162,39 @@ test('renders only the public navigation before login', async () => {
   ).toBeInTheDocument();
 });
 
+test('switches language immediately and keeps it when navigating to another page', async () => {
+  renderApp();
+
+  fireEvent.click(await screen.findByRole('link', { name: 'About Us' }));
+  expect(await screen.findByRole('heading', { name: 'Our Mission' }))
+    .toBeInTheDocument();
+
+  const languageSelectors = await screen.findAllByRole('combobox', {
+    name: 'Language / ቋንቋ',
+  });
+  fireEvent.change(languageSelectors[0], { target: { value: 'am' } });
+
+  expect(localStorage.getItem('rentalverify-language')).toBe('am');
+  expect(
+    await screen.findByRole('heading', { name: 'ተልዕኳችን' })
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('link', { name: 'ያግኙን' }));
+  expect(await screen.findByRole('heading', { name: 'ያግኙን' }))
+    .toBeInTheDocument();
+  expect(
+    screen.getAllByRole('combobox', { name: 'Language / ቋንቋ' })[0]
+  ).toHaveValue('am');
+
+  fireEvent.change(
+    screen.getAllByRole('combobox', { name: 'Language / ቋንቋ' })[0],
+    { target: { value: 'en' } }
+  );
+  expect(await screen.findByRole('heading', { name: 'Contact Us' }))
+    .toBeInTheDocument();
+  expect(localStorage.getItem('rentalverify-language')).toBe('en');
+});
+
 test('keeps the full logo and brand visible after restoring an authenticated session', async () => {
   const landlord = {
     _id: 'landlord-id',
@@ -196,6 +229,37 @@ test('hides the footer on an authenticated dashboard', async () => {
   await screen.findAllByRole('navigation');
   expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
 });
+
+test.each([
+  ['/tenant-dashboard', 'tenant', undefined, 'Tenant Dashboard', 'የተከራይ ዳሽቦርድ'],
+  ['/landlord-dashboard', 'landlord', undefined, 'Landlord Dashboard', 'የባለቤት ዳሽቦርድ'],
+  ['/admin-dashboard', 'admin', 'area', 'Admin Dashboard', 'የአስተዳዳሪ ዳሽቦርድ'],
+  ['/admin-dashboard', 'admin', 'platform', 'Admin Dashboard', 'የአስተዳዳሪ ዳሽቦርድ'],
+])(
+  'restores the saved language on the %s dashboard',
+  async (path, role, adminType, englishHeading, amharicHeading) => {
+    const user = {
+      id: `${role}-1`,
+      role,
+      adminType,
+      name: `${role} test`,
+    };
+    localStorage.setItem('token', `${role}-token`);
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('rentalverify-language', 'am');
+    window.history.pushState({}, '', path);
+    axios.get.mockResolvedValue({ data: { user } });
+
+    renderApp();
+
+    expect(await screen.findByRole('heading', { name: amharicHeading }))
+      .toBeInTheDocument();
+    expect(screen.getAllByRole('combobox', { name: 'Language / ቋንቋ' })[0])
+      .toHaveValue('am');
+    expect(screen.queryByRole('heading', { name: englishHeading }))
+      .not.toBeInTheDocument();
+  }
+);
 
 test('toggles the mobile navigation and closes it after navigation', async () => {
   renderApp();
@@ -300,6 +364,10 @@ test('shows landlord dashboard actions for the main sections', async () => {
   );
 
   renderApp();
+
+  expect(
+    await screen.findAllByRole('combobox', { name: 'Language / ቋንቋ' })
+  ).not.toHaveLength(0);
 
   expect(
     await screen.findByRole('heading', {

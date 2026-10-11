@@ -130,12 +130,15 @@ const LandlordSectionPage = ({ type }) => {
   };
 
   const handleMessage = (property) => {
-    navigate(`/landlord/messages?propertyId=${property._id}`);
+    navigate(`/landlord/messages?propertyId=${property._id}`, {
+      state: { from: `${location.pathname}${location.search}` },
+    });
   };
 
   const handleUpdate = (property) => {
-    // Navigate to edit property page (to be implemented)
-    navigate(`/landlord/edit-property/${property._id}`);
+    navigate(`/landlord/edit-property/${property._id}`, {
+      state: { from: `${location.pathname}${location.search}` },
+    });
   };
 
   if (!config) {
@@ -239,7 +242,9 @@ const LandlordSectionPage = ({ type }) => {
                 </button>
                 {type === 'rented' && (
                   <button
-                    onClick={() =>navigate(`/landlord/rent-payments?propertyId=${property._id}`)}
+                    onClick={() => navigate(`/landlord/rent-payments?propertyId=${property._id}`, {
+                      state: { from: `${location.pathname}${location.search}` },
+                    })}
                     style={styles.paymentBtn}
                     title="View rent payments"
                   >Rent Payments

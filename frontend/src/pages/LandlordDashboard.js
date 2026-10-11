@@ -27,6 +27,9 @@ import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
 import PropertyImage from '../components/PropertyImage';
 import { getPropertyImages } from '../utils/propertyMedia';
 import ProfileAvatar from '../components/ProfileAvatar';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import BackToPreviousPage from '../components/BackToPreviousPage';
+import LandlordBackToDashboard from '../components/LandlordBackToDashboard';
 import './landlordDashboard.css';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -157,6 +160,20 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const user = suppliedUser || authUser;
+  const showBackToDashboard = [
+    '/landlord/add-property',
+    '/landlord/my-properties',
+    '/landlord/verified-properties',
+    '/landlord/rental-requests',
+    '/landlord/rented-properties',
+    '/landlord/under-review',
+    '/landlord/under-review-properties',
+    '/landlord/rejected',
+    '/landlord/rejected-properties',
+    '/landlord/rent-payments',
+    '/landlord/bank-information',
+    '/landlord/account-settings',
+  ].includes(location.pathname);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -181,6 +198,7 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
           {menuOpen ? <FaTimes aria-hidden="true" /> : <FaBars aria-hidden="true" />}
         </button>
         <span className="landlord-mobile-title">House Rental</span>
+        <LanguageSwitcher className="language-switcher-landlord" />
         <Link to="/landlord/profile" className="landlord-mobile-profile-link" aria-label="Profile">
           <ProfileAvatar user={user} className="landlord-mobile-profile-avatar" />
           <span>Profile</span>
@@ -204,7 +222,10 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
         onNavigate={() =>setMenuOpen(false)}
       />
       <main className="landlord-layout-main min-h-screen py-5 lg:py-8">
-        <div>{children}</div>
+        <div>
+          {showBackToDashboard && <LandlordBackToDashboard />}
+          {children}
+        </div>
       </main>
     </div>
   );
@@ -663,6 +684,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
 
       {showForm && (
         <div className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          {isEditMode && <BackToPreviousPage />}
           <div className="landlord-property-form-header">
             <h3 className="landlord-property-form-title">
               {isEditMode ? 'Update property' : 'Add a new property'}
