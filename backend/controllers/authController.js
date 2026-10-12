@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const SystemSettings = require('../models/SystemSettings');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -11,6 +12,7 @@ const { uploadFilesToUrls } = require('../utils/uploadMedia');
 const registrationNamePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
 const registrationEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const registrationPhonePattern = /^(?:0[79]\d{8}|\+251[79]\d{8})$/;
+const usernamePattern = /^[a-z0-9._-]{3,30}$/;
 
 const normalizeLoginEmail = (email) => {
   const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -37,6 +39,7 @@ const serializeUser = (user) => {
     id: user._id ? user._id.toString() : user.id,
     name: user.name,
     email: user.email,
+    username: user.username || undefined,
     phone: user.phone || '',
     profilePhoto: user.profilePhoto || '',
     role: user.role,
@@ -70,13 +73,16 @@ const serializeUser = (user) => {
 // አዲስ ተጠቃሚ መመዝገብ
 const register = async (req, res) => {
   try {
-    const { name, email, password, phone, profilePhoto, role } = req.body;
+    const { name, email, username, password, phone, profilePhoto, role } = req.body;
     const normalizedName = String(name || '').trim();
     const normalizedEmail = normalizeAccountEmail(email);
+    const normalizedUsername = username === undefined || username === null || username === ''
+      ? undefined
+      : String(username).trim().toLowerCase();
     const normalizedPhone = String(phone || '').trim();
 
-    if (!normalizedName || !normalizedEmail || !password || !normalizedPhone || !role) {
-      return res.status(400).json({ message: 'Name, email, phone, password and role are required.' });
+    if (!normalizedName || !normalizedEmail || !normalizedUsername || !password || !normalizedPhone || !role) {
+      return res.status(400).json({ message: 'Name, email, username, phone, password and role are required.' });
     }
 
     if (!registrationNamePattern.test(normalizedName)) {
@@ -84,6 +90,9 @@ const register = async (req, res) => {
     }
     if (!registrationEmailPattern.test(normalizedEmail)) {
       return res.status(400).json({ message: 'Enter a valid email address.' });
+    }
+    if (!usernamePattern.test(normalizedUsername)) {
+      return res.status(400).json({ message: 'Username must be 3-30 characters and use letters, numbers, periods, underscores, or hyphens.' });
     }
     if (!registrationPhonePattern.test(normalizedPhone)) {
       return res.status(400).json({ message: 'Use 09XXXXXXXX, 07XXXXXXXX, +2519XXXXXXXX, or +2517XXXXXXXX.' });
@@ -102,6 +111,12 @@ const register = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
+    const escapedUsername = normalizedUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (await User.findOne({
+      username: { $regex: `^${escapedUsername}$`, $options: 'i' },
+    })) {
+      return res.status(409).json({ message: 'That username is already in use.' });
+    }
 
     // ይለፍ ቃሉን በሃሽ ያድርጉ
     const salt = await bcrypt.genSalt(10);
@@ -111,6 +126,7 @@ const register = async (req, res) => {
     const user = new User({
       name: normalizedName,
       email: normalizedEmail,
+      username: normalizedUsername,
       password: hashedPassword,
       phone: normalizedPhone,
       profilePhoto: profilePhoto?.trim() || '',
@@ -141,6 +157,9 @@ const register = async (req, res) => {
       user: serializeUser(user),
     });
   } catch (error) {
+    if (error?.code === 11000 && error?.keyPattern?.username) {
+      return res.status(409).json({ message: 'That username is already in use.' });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -148,12 +167,27 @@ const register = async (req, res) => {
 // ተጠቃሚ መግቢያ
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const normalizedEmail = normalizeLoginEmail(email);
+    const rawEmail = req.body?.email;
+    const email = typeof rawEmail === 'string' ? normalizeLoginEmail(rawEmail) : '';
+    const password = req.body?.password;
+    if (!email || typeof password !== 'string' || password.length === 0) {
+      return res.status(400).json({ message: 'Email and password are required.' });
+    }
+    if (email.length > 254 || password.length > 1024) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+    if (!registrationEmailPattern.test(email)) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
 
-    // ተጠቃሚውን ያግኙ
-    const user = await User.findOne({ email: normalizedEmail })
+    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matchingUsers = await User.find({
+      email: { $regex: `^${escapedEmail}$`, $options: 'i' },
+    })
+      .limit(2)
       .select('+bankAccountNumber');
+    const user = matchingUsers.length === 1 ? matchingUsers[0] : null;
+
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -217,8 +251,16 @@ const getMe = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(serializeUser(user));
+    const settings = await SystemSettings.findOne({ key: 'global' }).lean();
+    res.json({
+      ...serializeUser(user),
+      systemPreferences: {
+        defaultAppearance: settings?.defaultAppearance || 'system',
+        notifications: settings?.notifications || { inAppEnabled: true, emailEnabled: true },
+      },
+    });
   } catch (error) {
+    console.error('Unable to load user or system preferences:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

@@ -10,6 +10,14 @@ const UserSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  username: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    minlength: 3,
+    maxlength: 30,
+    match: /^[a-z0-9._-]+$/,
+  },
   password: {
     type: String,
     required: true,
@@ -76,5 +84,7 @@ const UserSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+UserSchema.index({ username: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('User', UserSchema);

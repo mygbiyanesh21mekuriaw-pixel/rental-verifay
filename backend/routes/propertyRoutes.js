@@ -15,6 +15,7 @@ const {
   landlordCreateOnly,
   landlordOwnerOrPlatformAdmin,
 } = require('../middleware/auth');
+const { propertySubmissionsEnabled } = require('../middleware/systemAccess');
 const { upload, handleMulterError } = require('../middleware/upload');
 
 // ሁሉም ሰው የተረጋገጡ ንብረቶችን ማየት ይችላል
@@ -23,7 +24,7 @@ router.get('/:id/ownership-proof', auth, getOwnershipProof);
 router.get('/:id', optionalAuth, getPropertyById);
 
 // Landlord ብቻ ንብረት መፍጠር፣ ማዘመን፣ መሰረዝ ይችላል
-router.post('/', auth, landlordCreateOnly, upload.fields([
+router.post('/', auth, landlordCreateOnly, propertySubmissionsEnabled, upload.fields([
   { name: 'images', maxCount: 5 },
   { name: 'document', maxCount: 1 },
 ]), handleMulterError, createProperty);

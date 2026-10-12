@@ -9,14 +9,58 @@ const User = require('../models/User');
 const SystemSettings = require('../models/SystemSettings');
 
 const userId = '507f1f77bcf86cd799439011';
+let maintenanceEnabled = false;
+let submissionsEnabled = true;
 const defaults = {
   key: 'global',
-  defaultLanguage: 'en',
   defaultAppearance: 'system',
   notifications: { inAppEnabled: true, emailEnabled: true },
+  general: {
+    websiteName: 'House Rental Management System',
+    websiteLogoDataUri: '',
+    contactEmail: '',
+    contactPhone: '',
+    contactAddress: '',
+  },
+  properties: { submissionsEnabled: true, requireAdminReview: true },
+  maintenance: {
+    enabled: false,
+    message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
+  },
 };
 
-const authenticatedRequest = async ({ method = 'GET', role = 'admin', adminType = 'platform', body, token = true } = {}) => {
+test.beforeEach(() => {
+  maintenanceEnabled = false;
+  submissionsEnabled = true;
+  SystemSettings.findOne = () => {
+    let projection = '';
+    return {
+      select(fields) {
+        projection = fields;
+        return this;
+      },
+      lean: async () => projection.includes('maintenance')
+        ? {
+          maintenance: {
+            enabled: maintenanceEnabled,
+            message: 'RentalVerify is in maintenance.',
+          },
+        }
+        : projection.includes('submissionsEnabled')
+          ? { properties: { submissionsEnabled } }
+        : null,
+    };
+  };
+});
+
+const authenticatedRequest = async ({
+  method = 'GET',
+  role = 'admin',
+  adminType = 'platform',
+  body,
+  token = true,
+  path = '/api/admin/system-settings',
+} = {}) => {
   const databaseUser = { _id: userId, role, adminType, adminAreas: role === 'admin' && adminType === 'area' ? ['area-1'] : [] };
   const originalFindById = User.findById;
   User.findById = () => ({
@@ -39,7 +83,7 @@ const authenticatedRequest = async ({ method = 'GET', role = 'admin', adminType 
       headers.Authorization = `Bearer ${jwt.sign({ id: userId }, process.env.JWT_SECRET)}`;
     }
     if (body) headers['Content-Type'] = 'application/json';
-    return await fetch(`http://127.0.0.1:${server.address().port}/api/admin/system-settings`, {
+    return await fetch(`http://127.0.0.1:${server.address().port}${path}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
@@ -57,7 +101,10 @@ test('the main Express app GET endpoint creates and returns defaults when no rec
   const originalCreate = SystemSettings.create;
   let storedSettings = null;
   let createCalls = 0;
-  SystemSettings.findOne = () => ({ lean: async () => storedSettings });
+  SystemSettings.findOne = () => ({
+    select() { return this; },
+    lean: async () => storedSettings,
+  });
   SystemSettings.create = async (record) => {
     createCalls += 1;
     storedSettings = { ...defaults, ...record };
@@ -68,9 +115,20 @@ test('the main Express app GET endpoint creates and returns defaults when no rec
     const response = await authenticatedRequest();
     assert.equal(response.status, 200);
     assert.deepEqual((await response.json()).settings, {
-      defaultLanguage: 'en',
       defaultAppearance: 'system',
       notifications: { inAppEnabled: true, emailEnabled: true },
+      general: {
+        websiteName: 'House Rental Management System',
+        websiteLogoDataUri: '',
+        contactEmail: '',
+        contactPhone: '',
+        contactAddress: '',
+      },
+      properties: { submissionsEnabled: true, requireAdminReview: true },
+      maintenance: {
+        enabled: false,
+        message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
+      },
     });
     assert.equal(createCalls, 1);
   } finally {
@@ -84,25 +142,54 @@ test('the main Express app PUT endpoint persists settings and GET returns saved 
   const originalFindOneAndUpdate = SystemSettings.findOneAndUpdate;
   let storedSettings = null;
   const nextSettings = {
-    defaultLanguage: 'ti',
     defaultAppearance: 'dark',
     notifications: { inAppEnabled: false, emailEnabled: true },
+    general: {
+      websiteName: 'RentalVerify',
+      contactEmail: 'hello@example.com',
+      contactPhone: '+251 911 123456',
+      contactAddress: 'Addis Ababa',
+    },
+    properties: { submissionsEnabled: false, requireAdminReview: false },
+    maintenance: { enabled: false, message: defaults.maintenance.message },
   };
-  SystemSettings.findOne = () => ({ lean: async () => storedSettings });
+  SystemSettings.findOne = () => ({
+    select() { return this; },
+    lean: async () => storedSettings,
+  });
   SystemSettings.findOneAndUpdate = async (filter, update) => {
     assert.deepEqual(filter, { key: 'global' });
-    storedSettings = { key: 'global', ...update.$set };
+    storedSettings = structuredClone(storedSettings || defaults);
+    for (const [path, value] of Object.entries(update.$set)) {
+      const parts = path.split('.');
+      let target = storedSettings;
+      while (parts.length > 1) {
+        const part = parts.shift();
+        target[part] ||= {};
+        target = target[part];
+      }
+      target[parts[0]] = value;
+    }
     return storedSettings;
   };
 
   try {
     const putResponse = await authenticatedRequest({ method: 'PUT', body: nextSettings });
     assert.equal(putResponse.status, 200);
-    assert.deepEqual((await putResponse.json()).settings, nextSettings);
+    const expectedSettings = {
+      ...defaults,
+      ...nextSettings,
+      general: { ...defaults.general, ...nextSettings.general },
+      properties: { ...defaults.properties, ...nextSettings.properties },
+      notifications: { ...defaults.notifications, ...nextSettings.notifications },
+      maintenance: { ...defaults.maintenance, ...nextSettings.maintenance },
+    };
+    delete expectedSettings.key;
+    assert.deepEqual((await putResponse.json()).settings, expectedSettings);
 
     const getResponse = await authenticatedRequest();
     assert.equal(getResponse.status, 200);
-    assert.deepEqual((await getResponse.json()).settings, nextSettings);
+    assert.deepEqual((await getResponse.json()).settings, expectedSettings);
   } finally {
     SystemSettings.findOne = originalFindOne;
     SystemSettings.findOneAndUpdate = originalFindOneAndUpdate;
@@ -130,4 +217,49 @@ test('the main Express app denies settings access to tenant, landlord, and area 
     });
     assert.equal(putResponse.status, 403, `${role}/${adminType || 'none'} PUT status`);
   }
+});
+
+test('maintenance mode blocks normal API use but leaves the status endpoint and Platform Admin access available', async () => {
+  maintenanceEnabled = true;
+
+  const statusServer = app.listen(0);
+  try {
+    await new Promise((resolve) => statusServer.once('listening', resolve));
+    const statusResponse = await fetch(`http://127.0.0.1:${statusServer.address().port}/api/system/status`);
+    assert.equal(statusResponse.status, 200);
+    assert.equal((await statusResponse.json()).maintenance.enabled, true);
+  } finally {
+    await new Promise((resolve, reject) => {
+      statusServer.close((error) => error ? reject(error) : resolve());
+    });
+  }
+
+  const platformAdminResponse = await authenticatedRequest({ path: '/api/chapa/test' });
+  assert.equal(platformAdminResponse.status, 200);
+
+  const settingsResponse = await authenticatedRequest({
+    role: 'tenant',
+    path: '/api/admin/system-settings',
+  });
+  assert.equal(settingsResponse.status, 403);
+
+  const normalUserResponse = await authenticatedRequest({
+    role: 'tenant',
+    path: '/api/chapa/test',
+  });
+  assert.equal(normalUserResponse.status, 503);
+  assert.equal((await normalUserResponse.json()).maintenanceMode, true);
+});
+
+test('disabled property submissions are rejected before property upload processing', async () => {
+  submissionsEnabled = false;
+  const response = await authenticatedRequest({
+    method: 'POST',
+    role: 'landlord',
+    body: {},
+    path: '/api/properties',
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).message, 'New property submissions are currently disabled.');
 });

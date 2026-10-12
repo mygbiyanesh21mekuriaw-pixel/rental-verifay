@@ -5,6 +5,20 @@ import { AuthProvider } from './context/AuthContext';
 
 jest.mock('axios');
 jest.mock('./pages/TenantSearch', () => () => null);
+jest.mock('./context/SystemStatusContext', () => ({
+  SystemStatusProvider: ({ children }) => children,
+  useSystemStatus: () => ({
+    status: mockSystemStatus,
+    loading: false,
+    error: '',
+    refreshStatus: jest.fn(),
+  }),
+  useOptionalSystemStatus: () => ({
+    status: mockSystemStatus,
+  }),
+}));
+
+let mockSystemStatus;
 
 const renderApp = () =>
   render(
@@ -16,10 +30,16 @@ const renderApp = () =>
 beforeEach(() => {
   localStorage.clear();
   window.history.pushState({}, '', '/');
-
-  axios.get.mockResolvedValue({
-    data: [],
-  });
+  mockSystemStatus = {
+    maintenance: { enabled: false, message: 'Scheduled maintenance.' },
+    branding: {
+      websiteName: 'House Rental Management System',
+      websiteLogoDataUri: '',
+      contactEmail: '',
+      contactPhone: '',
+      contactAddress: '',
+    },
+  };
 });
 
 test('renders only the public navigation before login', async () => {
@@ -43,7 +63,7 @@ test('renders only the public navigation before login', async () => {
 
   expect(
     within(navbar).getByRole('img', {
-      name: /mekdela amba university logo/i,
+      name: /house rental management system logo/i,
     })
   ).toHaveAttribute(
     'src',
@@ -165,7 +185,7 @@ test('renders only the public navigation before login', async () => {
 test('switches language immediately and keeps it when navigating to another page', async () => {
   renderApp();
 
-  fireEvent.click(await screen.findByRole('link', { name: 'About Us' }));
+  fireEvent.click(screen.getAllByRole('link', { name: 'About Us' })[0]);
   expect(await screen.findByRole('heading', { name: 'Our Mission' }))
     .toBeInTheDocument();
 
@@ -179,15 +199,15 @@ test('switches language immediately and keeps it when navigating to another page
     await screen.findByRole('heading', { name: 'ተልዕኳችን' })
   ).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('link', { name: 'ያግኙን' }));
+  fireEvent.click(screen.getAllByRole('link', { name: 'ያግኙን' })[0]);
   expect(await screen.findByRole('heading', { name: 'ያግኙን' }))
     .toBeInTheDocument();
   expect(
-    screen.getAllByRole('combobox', { name: 'Language / ቋንቋ' })[0]
+    screen.getAllByRole('combobox')[0]
   ).toHaveValue('am');
 
   fireEvent.change(
-    screen.getAllByRole('combobox', { name: 'Language / ቋንቋ' })[0],
+    screen.getAllByRole('combobox')[0],
     { target: { value: 'en' } }
   );
   expect(await screen.findByRole('heading', { name: 'Contact Us' }))
@@ -208,7 +228,7 @@ test('keeps the full logo and brand visible after restoring an authenticated ses
   renderApp();
 
   const [navbar] = await screen.findAllByRole('navigation');
-  expect(within(navbar).getByRole('img', { name: /mekdela amba university logo/i }))
+  expect(within(navbar).getByRole('img', { name: /house rental management system logo/i }))
     .toHaveAttribute('src', '/mekdela-amba-logo.jpeg');
   expect(within(navbar).getByText('House Rental Management System')).toBeInTheDocument();
 });
@@ -230,6 +250,31 @@ test('hides the footer on an authenticated dashboard', async () => {
   expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
 });
 
+test('maintenance mode blocks public app pages but keeps Platform Admin sign-in available', async () => {
+  mockSystemStatus.maintenance.enabled = true;
+  window.history.pushState({}, '', '/');
+
+  renderApp();
+
+  expect(await screen.findByRole('heading', { name: 'Under maintenance' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Platform Admin sign in' })).toHaveAttribute('href', '/login');
+  expect(screen.queryByText('A better way to find your next home')).not.toBeInTheDocument();
+});
+
+test('signed-in ordinary users can sign out during maintenance to allow a Platform Admin to sign in', async () => {
+  mockSystemStatus.maintenance.enabled = true;
+  const tenant = { _id: 'tenant-id', name: 'Tenant Example', role: 'tenant' };
+  localStorage.setItem('token', 'tenant-token');
+  localStorage.setItem('user', JSON.stringify(tenant));
+  axios.get.mockResolvedValue({ data: { user: tenant } });
+
+  renderApp();
+
+  expect(await screen.findByRole('button', { name: 'Sign out to use another account' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out to use another account' }));
+  expect(await screen.findByRole('link', { name: 'Platform Admin sign in' })).toBeInTheDocument();
+});
+
 test.each([
   ['/tenant-dashboard', 'tenant', undefined, 'Tenant Dashboard', 'የተከራይ ዳሽቦርድ'],
   ['/landlord-dashboard', 'landlord', undefined, 'Landlord Dashboard', 'የባለቤት ዳሽቦርድ'],
@@ -243,6 +288,7 @@ test.each([
       role,
       adminType,
       name: `${role} test`,
+      systemPreferences: { defaultLanguage: 'en', defaultAppearance: 'system' },
     };
     localStorage.setItem('token', `${role}-token`);
     localStorage.setItem('user', JSON.stringify(user));
@@ -254,8 +300,9 @@ test.each([
 
     expect(await screen.findByRole('heading', { name: amharicHeading }))
       .toBeInTheDocument();
-    expect(screen.getAllByRole('combobox', { name: 'Language / ቋንቋ' })[0])
+    expect(screen.getAllByRole('combobox')[0])
       .toHaveValue('am');
+    expect(localStorage.getItem('rentalverify-language')).toBe('am');
     expect(screen.queryByRole('heading', { name: englishHeading }))
       .not.toBeInTheDocument();
   }

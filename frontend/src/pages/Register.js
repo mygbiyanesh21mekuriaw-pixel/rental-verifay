@@ -9,6 +9,7 @@ const dashboardPaths = {
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const usernamePattern = /^[a-z0-9._-]{3,30}$/i;
 const namePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
 const phonePattern = /^(?:0[79]\d{8}|\+251[79]\d{8})$/;
 
@@ -27,7 +28,7 @@ const EyeOffIcon = () => (
   </svg>
 );
 
-const validateRegisterForm = ({ name, email, phone, password, confirmPassword, role }) => {
+const validateRegisterForm = ({ name, email, username, phone, password, confirmPassword, role }) => {
   const nextErrors = {};
   const trimmedName = String(name || '').trim();
   const trimmedEmail = String(email || '').trim();
@@ -40,6 +41,13 @@ const validateRegisterForm = ({ name, email, phone, password, confirmPassword, r
     nextErrors.email = 'Email is required';
   } else if (!emailPattern.test(trimmedEmail)) {
     nextErrors.email = 'Please enter a valid email address';
+  }
+
+  const trimmedUsername = String(username || '').trim();
+  if (!trimmedUsername) {
+    nextErrors.username = 'Username is required';
+  } else if (!usernamePattern.test(trimmedUsername)) {
+    nextErrors.username = 'Use 3-30 letters, numbers, periods, underscores, or hyphens';
   }
 
   const trimmedPhone = String(phone || '').trim();
@@ -72,6 +80,7 @@ const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    username: '',
     password: '',
     confirmPassword: '',
     phone: '',
@@ -152,6 +161,25 @@ const Register = () => {
               placeholder="Abeitu Kebede"
             />
             {fieldErrors.name && <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.name}</p>}
+          </div>
+
+          <div className="auth-field">
+            <label>Username *</label>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              required
+              minLength={3}
+              maxLength={30}
+              pattern="[A-Za-z0-9._-]{3,30}"
+              autoComplete="username"
+              aria-invalid={Boolean(fieldErrors.username)}
+              className={fieldErrors.username ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}
+              placeholder="Choose a username"
+            />
+            {fieldErrors.username && <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.username}</p>}
           </div>
           
           <div className="auth-field">

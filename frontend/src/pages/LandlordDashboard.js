@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalSystemStatus } from '../context/SystemStatusContext';
 import {
   FaBars,
   FaBell,
@@ -77,6 +78,8 @@ export const LandlordSidebar = ({
   notificationCount = 0,
   isOpen = false,
   onNavigate,
+  websiteName = 'House Rental Management System',
+  websiteLogoDataUri = '',
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -102,12 +105,16 @@ export const LandlordSidebar = ({
       className={`landlord-sidebar fixed inset-y-0 left-0 z-40 flex w-[260px] translate-x-0 flex-col border-r border-slate-700 bg-slate-900 text-slate-200 shadow-lg ${isOpen ? 'is-open' : ''}`}
     >
         <div className="flex items-center gap-3 border-b border-slate-700 px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-sm">
-            <FaBuilding aria-hidden="true" />
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-blue-600 text-lg text-white shadow-sm">
+            {websiteLogoDataUri ? (
+              <img src={websiteLogoDataUri} alt={websiteName} className="h-full w-full object-contain" />
+            ) : (
+              <FaBuilding aria-hidden="true" />
+            )}
           </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Workspace</p>
-            <h1 className="text-xl font-bold text-white">House Rental Management System</h1>
+            <h1 className="text-xl font-bold text-white">{websiteName}</h1>
           </div>
         </div>
 
@@ -156,10 +163,13 @@ export const LandlordSidebar = ({
 
 export const LandlordLayout = ({ children, user: suppliedUser = null, notificationCount = 0 }) => {
   const { user: authUser, logout } = useAuth();
+  const systemStatus = useOptionalSystemStatus();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const user = suppliedUser || authUser;
+  const websiteName = systemStatus?.status.branding.websiteName || 'House Rental Management System';
+  const websiteLogoDataUri = systemStatus?.status.branding.websiteLogoDataUri || '';
   const showBackToDashboard = [
     '/landlord/add-property',
     '/landlord/my-properties',
@@ -197,7 +207,7 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
         >
           {menuOpen ? <FaTimes aria-hidden="true" /> : <FaBars aria-hidden="true" />}
         </button>
-        <span className="landlord-mobile-title">House Rental</span>
+        <span className="landlord-mobile-title">{websiteName}</span>
         <LanguageSwitcher className="language-switcher-landlord" />
         <Link to="/landlord/profile" className="landlord-mobile-profile-link" aria-label="Profile">
           <ProfileAvatar user={user} className="landlord-mobile-profile-avatar" />
@@ -219,6 +229,8 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
         user={user}
         notificationCount={notificationCount}
         isOpen={menuOpen}
+        websiteName={websiteName}
+        websiteLogoDataUri={websiteLogoDataUri}
         onNavigate={() =>setMenuOpen(false)}
       />
       <main className="landlord-layout-main min-h-screen py-5 lg:py-8">

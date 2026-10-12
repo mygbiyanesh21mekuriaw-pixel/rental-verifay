@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const Property = require('../models/Property');
 const User = require('../models/User');
 const RentalRequest = require('../models/RentalRequest');
+const SystemSettings = require('../models/SystemSettings');
 const { getAllProperties, getPropertyById } = require('./propertyController');
 
 const createResponse = () => ({
@@ -39,6 +40,7 @@ const createPropertyByIdQuery = (property) => ({
 test('area-admin property search retains the assigned-area constraint', async () => {
   const originalUserFindById = User.findById;
   const originalPropertyFind = Property.find;
+  const originalSettingsFindOne = SystemSettings.findOne;
   const areaAdmin = {
     adminType: 'area',
     adminAreas: [{ city: 'Mekelle' }],
@@ -53,6 +55,12 @@ test('area-admin property search retains the assigned-area constraint', async ()
     requestedFilter = filter;
     return createFindQuery([]);
   };
+  SystemSettings.findOne = () => ({
+    select() {
+      return this;
+    },
+    lean: async () => null,
+  });
   const response = createResponse();
 
   try {
@@ -69,12 +77,14 @@ test('area-admin property search retains the assigned-area constraint', async ()
   } finally {
     User.findById = originalUserFindById;
     Property.find = originalPropertyFind;
+    SystemSettings.findOne = originalSettingsFindOne;
   }
 });
 
 test('landlord cannot read another landlord property by changing the property ID', async () => {
   const originalPropertyFindById = Property.findById;
   const originalRentalRequestExists = RentalRequest.exists;
+  const originalSettingsFindOne = SystemSettings.findOne;
   const property = {
     _id: 'property-b',
     landlord: { _id: 'landlord-b' },
@@ -87,6 +97,12 @@ test('landlord cannot read another landlord property by changing the property ID
   };
   Property.findById = () => createPropertyByIdQuery(property);
   RentalRequest.exists = async () => false;
+  SystemSettings.findOne = () => ({
+    select() {
+      return this;
+    },
+    lean: async () => null,
+  });
   const response = createResponse();
 
   try {
@@ -100,11 +116,13 @@ test('landlord cannot read another landlord property by changing the property ID
   } finally {
     Property.findById = originalPropertyFindById;
     RentalRequest.exists = originalRentalRequestExists;
+    SystemSettings.findOne = originalSettingsFindOne;
   }
 });
 
 test('property owner retains access to their verification document', async () => {
   const originalPropertyFindById = Property.findById;
+  const originalSettingsFindOne = SystemSettings.findOne;
   const property = {
     _id: 'property-b',
     landlord: { _id: 'landlord-b' },
@@ -116,6 +134,12 @@ test('property owner retains access to their verification document', async () =>
     },
   };
   Property.findById = () => createPropertyByIdQuery(property);
+  SystemSettings.findOne = () => ({
+    select() {
+      return this;
+    },
+    lean: async () => null,
+  });
   const response = createResponse();
 
   try {
@@ -128,5 +152,6 @@ test('property owner retains access to their verification document', async () =>
     assert.equal(response.body.verificationDocument, undefined);
   } finally {
     Property.findById = originalPropertyFindById;
+    SystemSettings.findOne = originalSettingsFindOne;
   }
 });

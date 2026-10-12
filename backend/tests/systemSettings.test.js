@@ -7,6 +7,7 @@ const settingsRouter = require('../routes/systemSettingsRoutes');
 const {
   getSystemSettings,
   updateSystemSettings,
+  uploadWebsiteLogo,
 } = require('../controllers/systemSettingsController');
 
 const callController = async (controller, req = {}) => {
@@ -75,6 +76,32 @@ test('GET and PUT settings routes require authentication and Platform Admin auth
     assert.equal(handlers[0], auth);
     assert.equal(handlers[1], platformAdminOnly);
   }
+  const logoRoute = settingsRouter.stack.find((layer) =>
+    layer.route?.path === '/logo' && layer.route.methods.post
+  );
+  assert.ok(logoRoute, 'POST logo route is registered');
+  const logoHandlers = logoRoute.route.stack.map((layer) => layer.handle);
+  assert.equal(logoHandlers[0], auth);
+  assert.equal(logoHandlers[1], platformAdminOnly);
+});
+
+test('website logo upload rejects SVG and malformed content without saving it', async () => {
+  const originalFindOneAndUpdate = SystemSettings.findOneAndUpdate;
+  let saveCalled = false;
+  SystemSettings.findOneAndUpdate = () => {
+    saveCalled = true;
+  };
+  const result = await callController(uploadWebsiteLogo, {
+    user: { id: 'platform-user' },
+    file: {
+      mimetype: 'image/svg+xml',
+      buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'),
+    },
+  });
+  SystemSettings.findOneAndUpdate = originalFindOneAndUpdate;
+
+  assert.equal(result.statusCode, 400);
+  assert.equal(saveCalled, false);
 });
 
 test('system settings reject invalid preference values without saving', async () => {
@@ -85,8 +112,7 @@ test('system settings reject invalid preference values without saving', async ()
   };
   const req = {
     body: {
-      defaultLanguage: 'xx',
-      defaultAppearance: 'light',
+      defaultAppearance: 'unknown',
       notifications: { inAppEnabled: true, emailEnabled: true },
     },
   };
@@ -117,7 +143,6 @@ test('GET system settings returns sensible defaults when no document exists', as
   const originalCreate = SystemSettings.create;
   SystemSettings.findOne = () => ({ lean: async () => null });
   SystemSettings.create = async () => ({
-    defaultLanguage: 'en',
     defaultAppearance: 'system',
     notifications: { inAppEnabled: true, emailEnabled: true },
   });
@@ -132,13 +157,24 @@ test('GET system settings returns sensible defaults when no document exists', as
 
   assert.equal(result.statusCode, 200);
   assert.deepEqual(result.body.settings, {
-    defaultLanguage: 'en',
     defaultAppearance: 'system',
     notifications: { inAppEnabled: true, emailEnabled: true },
+    general: {
+      websiteName: 'House Rental Management System',
+      websiteLogoDataUri: '',
+      contactEmail: '',
+      contactPhone: '',
+      contactAddress: '',
+    },
+    properties: { submissionsEnabled: true, requireAdminReview: true },
+    maintenance: {
+      enabled: false,
+      message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
+    },
   });
 });
 
-test('GET system settings loads saved values from the database', async () => {
+test('GET settings ignores legacy saved language values without changing other stored settings', async () => {
   const originalFindOne = SystemSettings.findOne;
   const savedSettings = {
     defaultLanguage: 'sid',
@@ -160,13 +196,27 @@ test('GET system settings loads saved values from the database', async () => {
 
   assert.deepEqual(query, { key: 'global' });
   assert.equal(result.statusCode, 200);
-  assert.deepEqual(result.body.settings, savedSettings);
+  assert.deepEqual(result.body.settings, {
+    defaultAppearance: savedSettings.defaultAppearance,
+    notifications: savedSettings.notifications,
+    general: {
+      websiteName: 'House Rental Management System',
+      websiteLogoDataUri: '',
+      contactEmail: '',
+      contactPhone: '',
+      contactAddress: '',
+    },
+    properties: { submissionsEnabled: true, requireAdminReview: true },
+    maintenance: {
+      enabled: false,
+      message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
+    },
+  });
 });
 
 test('system settings save only supported global preferences', async () => {
   const originalFindOneAndUpdate = SystemSettings.findOneAndUpdate;
   const savedSettings = {
-    defaultLanguage: 'am',
     defaultAppearance: 'dark',
     notifications: { inAppEnabled: false, emailEnabled: true },
   };
@@ -180,6 +230,7 @@ test('system settings save only supported global preferences', async () => {
   const req = {
     user: { id: 'platform-user' },
     body: {
+      defaultLanguage: 'am',
       ...savedSettings,
       ignoredField: 'not persisted',
     },
@@ -204,11 +255,26 @@ test('system settings save only supported global preferences', async () => {
 
   assert.deepEqual(query, { key: 'global' });
   assert.deepEqual(update.$set, {
-    defaultLanguage: 'am',
     defaultAppearance: 'dark',
-    notifications: { inAppEnabled: false, emailEnabled: true },
+    'notifications.inAppEnabled': false,
+    'notifications.emailEnabled': true,
     updatedBy: 'platform-user',
   });
   assert.equal(result.statusCode, 200);
-  assert.deepEqual(result.body.settings, savedSettings);
+  assert.deepEqual(result.body.settings, {
+    defaultAppearance: savedSettings.defaultAppearance,
+    notifications: savedSettings.notifications,
+    general: {
+      websiteName: 'House Rental Management System',
+      websiteLogoDataUri: '',
+      contactEmail: '',
+      contactPhone: '',
+      contactAddress: '',
+    },
+    properties: { submissionsEnabled: true, requireAdminReview: true },
+    maintenance: {
+      enabled: false,
+      message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
+    },
+  });
 });

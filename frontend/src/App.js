@@ -41,10 +41,13 @@ import LandlordBankInformation from './pages/LandlordBankInformation';
 import LandlordReviews from './pages/LandlordReviews';
 import TenantRentalRequestDetail from './pages/TenantRentalRequestDetail';
 import AdminSystemLogs from './pages/AdminSystemLogs';
+import SystemSettings from './pages/SystemSettings';
 
 //  (Components)
 import Navbar from './components/Navbar';
 import { LanguageProvider } from './context/LanguageContext';
+import { SystemStatusProvider, useSystemStatus } from './context/SystemStatusContext';
+import MaintenancePage from './pages/MaintenancePage';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -52,6 +55,21 @@ const ScrollToTop = () => {
   React.useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+
+  return null;
+};
+
+const ApplySystemPreferences = () => {
+  const { user } = useAuth();
+
+  React.useEffect(() => {
+    const preferences = user?.systemPreferences;
+    if (!preferences) return;
+
+    document.documentElement.dataset.appearance = preferences.defaultAppearance;
+    document.documentElement.style.colorScheme =
+      preferences.defaultAppearance === 'system' ? '' : preferences.defaultAppearance;
+  }, [user]);
 
   return null;
 };
@@ -147,6 +165,7 @@ const PublicAliasRoute = ({ target }) => {
 
 const AppFooter = () => {
   const { pathname } = useLocation();
+  const { status } = useSystemStatus();
 
   if (!['/', '/about', '/contact'].includes(pathname)) return null;
 
@@ -155,7 +174,7 @@ const AppFooter = () => {
       <div className="app-footer-content">
         <div className="app-footer-brand">
           <span className="app-footer-heading">Project Information</span>
-          <strong>House Rental Management System</strong>
+          <strong>{status.branding.websiteName}</strong>
           <span>Student Academic Project</span>
           <span>Mekdela Amba University</span>
           <span>College of Computing and Informatics</span>
@@ -168,23 +187,61 @@ const AppFooter = () => {
         </nav>
         <div className="app-footer-contact">
           <span className="app-footer-heading">Contact</span>
-          <a href="mailto:admin@gmail.com">admin@gmail.com</a>
+          {status.branding.contactEmail ? (
+            <a href={`mailto:${status.branding.contactEmail}`}>{status.branding.contactEmail}</a>
+          ) : (
+            <a href="mailto:admin@gmail.com">admin@gmail.com</a>
+          )}
+          {status.branding.contactPhone && <a href={`tel:${status.branding.contactPhone}`}>{status.branding.contactPhone}</a>}
+          {status.branding.contactAddress && <span>{status.branding.contactAddress}</span>}
         </div>
       </div>
       <div className="app-footer-bottom">
-        <span>© 2026 House Rental Management System. All Rights Reserved.</span>
+        <span>© 2026 {status.branding.websiteName}. All Rights Reserved.</span>
       </div>
     </footer>
   );
 };
 
 function AppContent() {
+  const { user, logout } = useAuth();
+  const { status, loading, error } = useSystemStatus();
+  const platformAdmin = user?.role === 'admin' &&
+    (user.adminType === 'platform' || !user.adminType);
+
+  React.useEffect(() => {
+    document.title = status.branding.websiteName;
+  }, [status.branding.websiteName]);
+
+  if (loading) {
+    return <div className="app-loading" role="status">Loading application settings…</div>;
+  }
+
+  if (error) {
+    return <div className="app-loading" role="alert">{error}</div>;
+  }
+
+  const maintenanceActive = status.maintenance.enabled && !platformAdmin;
+
   return (
     <div className="app">
       <Router>
-        <Navbar />
+        <ApplySystemPreferences />
+        {(!maintenanceActive || !user) && <Navbar />}
         <ScrollToTop />
         <main className="app-main">
+          {maintenanceActive ? (
+            user ? (
+              <MaintenancePage message={status.maintenance.message} onLogout={logout} />
+            ) : (
+              <Routes>
+                <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="*" element={<MaintenancePage message={status.maintenance.message} />} />
+              </Routes>
+            )
+          ) : (
           <Routes>
             {/* =====    ===== */}
             <Route path="/" element={<AuthenticatedPublicRoute><Home /></AuthenticatedPublicRoute>} />
@@ -351,6 +408,7 @@ function AppContent() {
             <Route path="/admin-dashboard/profile" element={<PrivateRoute allowedRoles={['admin']}><AdminProfile /></PrivateRoute>} />
             <Route path="/admin-dashboard/messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminMessages /></PrivateRoute>} />
             <Route path="/admin-dashboard/system-logs" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSystemLogs /></PrivateRoute>} />
+            <Route path="/admin-dashboard/system-settings" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><SystemSettings /></PrivateRoute>} />
             <Route path="/admin-dashboard/open" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><Navigate to="/admin-dashboard" replace /></PrivateRoute>} />
             <Route path="/admin-dashboard/properties-awaiting-verification" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['area']}><AdminSectionPage type="awaitingVerification" /></PrivateRoute>} />
             <Route path="/admin-dashboard/all-properties" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="allProperties" /></PrivateRoute>} />
@@ -360,8 +418,9 @@ function AppContent() {
             <Route path="/admin-dashboard/demo-bank-accounts" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="demoBankAccounts" /></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          )}
         </main>
-        <AppFooter />
+        {!maintenanceActive && <AppFooter />}
       </Router>
     </div>
   );
@@ -370,7 +429,9 @@ function AppContent() {
 function App() {
   return (
     <LanguageProvider>
-      <AppContent />
+      <SystemStatusProvider>
+        <AppContent />
+      </SystemStatusProvider>
     </LanguageProvider>
   );
 }

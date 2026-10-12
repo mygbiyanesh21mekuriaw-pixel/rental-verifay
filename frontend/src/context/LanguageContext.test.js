@@ -101,7 +101,9 @@ test.each([
       ti: 'ብደሓን ምጻእ፣ ',
       sid: 'Dagoominni wodheenna, ',
     }[language];
-    expect(screen.getByText(welcome)).toBeInTheDocument();
+    expect(screen.getByText((content, element) =>
+      element.tagName === 'SPAN' && element.textContent === welcome
+    )).toBeInTheDocument();
     expect(localStorage.getItem('rentalverify-language')).toBe(language);
     expect(document.documentElement).toHaveAttribute('lang', language);
 

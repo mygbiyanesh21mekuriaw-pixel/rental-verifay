@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import ProfilePhotoControl from './ProfilePhotoControl';
 import ProfileAvatar from './ProfileAvatar';
 import LanguageSwitcher from './LanguageSwitcher';
+import { useSystemStatus } from '../context/SystemStatusContext';
 import './navbar.css';
 
 import {
@@ -35,6 +36,7 @@ import {
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { status } = useSystemStatus();
   const location = useLocation();
 
   const [unreadCount, setUnreadCount] = useState(0);
@@ -259,6 +261,12 @@ const Navbar = () => {
     ],
 
     [
+      FaCog,
+      'System Settings',
+      '/admin-dashboard/system-settings',
+    ],
+
+    [
       FaChartBar,
       'Admin Analytics',
       '/admin-dashboard/analytics',
@@ -410,12 +418,12 @@ const Navbar = () => {
         <div className="navbar-topbar">
           <Link to="/" className="navbar-topbar-brand">
             <img
-              src="/mekdela-amba-logo.jpeg"
-              alt="Mekdela Amba University logo"
+              src={status.branding.websiteLogoDataUri || '/mekdela-amba-logo.jpeg'}
+              alt={`${status.branding.websiteName} logo`}
               className="navbar-topbar-logo"
             />
             <span className="navbar-topbar-brand-copy">
-              <strong>House Rental Management System</strong>
+              <strong>{status.branding.websiteName}</strong>
             </span>
           </Link>
           <div className="navbar-topbar-context">
@@ -485,13 +493,13 @@ const Navbar = () => {
             className="navbar-logo"
           >
             <img
-              src="/mekdela-amba-logo.jpeg"
-              alt="Mekdela Amba University logo"
+              src={status.branding.websiteLogoDataUri || '/mekdela-amba-logo.jpeg'}
+              alt={`${status.branding.websiteName} logo`}
               className="navbar-logo-image"
             />
 
             <span className="navbar-logo-text">
-              House Rental Management System
+              {status.branding.websiteName}
             </span>
           </Link>
 

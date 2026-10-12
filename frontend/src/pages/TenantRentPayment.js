@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import BackToDashboard from '../components/BackToDashboard';
 import './rentPayment.css';
 
+const RECEIPT_BANK_LOGO_URL = `${(process.env.PUBLIC_URL || '').replace(/\/$/, '')}/images/commercial-bank-of-ethiopia.jpg`;
 const formatStatus = (status) => {
   const normalizedStatus = typeof status === 'string' && status.trim() ? status.trim() : 'pending';
   return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1);
@@ -76,42 +77,75 @@ const escapePdfText = (value) => String(value)
   .replace(/[^\x20-\x7e]/g, '?')
   .replace(/[\\()]/g, '\\$&');
 
-const createReceiptPdf = (payment) => {
-  if (!isVerifiedPayment(payment)) return null;
+const encodePdfText = (text) => Uint8Array.from(text, character =>character.charCodeAt(0));
+
+const createReceiptPdf = (payment, logoJpegBytes) => {
+  if (!isVerifiedPayment(payment) || !(logoJpegBytes instanceof Uint8Array) || logoJpegBytes.length === 0) {
+    return null;
+  }
   const details = getReceiptDetails(payment);
   const textLines = [
+    'q',
+    '340 0 0 68 54 772 cm',
+    '/Logo Do',
+    'Q',
     'BT',
-    '/F1 18 Tf',
-    '1 0 0 1 54 760 Tm',
-    '(HOUSE RENTAL MANAGEMENT SYSTEM) Tj',
     '/F1 14 Tf',
-    '1 0 0 1 54 724 Tm',
+    '1 0 0 1 54 760 Tm',
     '(RENT PAYMENT RECEIPT) Tj',
     '/F1 10 Tf',
     ...details.flatMap(([label, value], index) => [
-      `1 0 0 1 54 ${680 - index * 34} Tm`,
+      `1 0 0 1 54 ${720 - index * 34} Tm`,
       `(${escapePdfText(label)}: ${escapePdfText(value)}) Tj`,
     ]),
     'ET',
   ].join('\n');
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    `<< /Length ${textLines.length} >>\nstream\n${textLines}\nendstream`,
-  ];
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(pdf.length);
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const crossReferenceOffset = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  pdf += `${offsets.slice(1).map(offset =>`${String(offset).padStart(10, '0')} 00000 n \n`).join('')}`;
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${crossReferenceOffset}\n%%EOF`;
-  return new Blob([pdf], { type: 'application/pdf' });
+  const contentBytes = encodePdfText(textLines);
+  const chunks = [];
+  let pdfLength = 0;
+  const appendBytes = (bytes) => {
+    chunks.push(bytes);
+    pdfLength += bytes.length;
+  };
+  const appendText = (text) => appendBytes(encodePdfText(text));
+  const objectOffsets = [0];
+  const appendObject = (objectNumber, parts) => {
+    objectOffsets.push(pdfLength);
+    appendText(`${objectNumber} 0 obj\n`);
+    parts.forEach((part) => {
+      if (typeof part === 'string') appendText(part);
+      else appendBytes(part);
+    });
+    appendText('\nendobj\n');
+  };
+
+  appendText('%PDF-1.4\n');
+  appendObject(1, ['<< /Type /Catalog /Pages 2 0 R >>']);
+  appendObject(2, ['<< /Type /Pages /Kids [3 0 R] /Count 1 >>']);
+  appendObject(3, [
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] ',
+    '/Resources << /Font << /F1 4 0 R >> /XObject << /Logo 6 0 R >> >> ',
+    '/Contents 5 0 R >>',
+  ]);
+  appendObject(4, ['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']);
+  appendObject(5, [
+    `<< /Length ${contentBytes.length} >>\nstream\n`,
+    contentBytes,
+    '\nendstream',
+  ]);
+  appendObject(6, [
+    `<< /Type /XObject /Subtype /Image /Width 295 /Height 59 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logoJpegBytes.length} >>\nstream\n`,
+    logoJpegBytes,
+    '\nendstream',
+  ]);
+
+  const crossReferenceOffset = pdfLength;
+  appendText(`xref\n0 ${objectOffsets.length}\n0000000000 65535 f \n`);
+  appendText(objectOffsets.slice(1)
+    .map(offset =>`${String(offset).padStart(10, '0')} 00000 n \n`)
+    .join(''));
+  appendText(`trailer\n<< /Size ${objectOffsets.length} /Root 1 0 R >>\nstartxref\n${crossReferenceOffset}\n%%EOF`);
+  return new Blob(chunks, { type: 'application/pdf' });
 };
 
 const TenantRentPayment = () => {
@@ -139,16 +173,27 @@ const TenantRentPayment = () => {
     window.setTimeout(() =>window.print(), 100);
   };
 
-  const downloadReceipt = (payment) => {
+  const downloadReceipt = async (payment) => {
     if (!isVerifiedPayment(payment)) return;
-    const url = URL.createObjectURL(createReceiptPdf(payment));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `rent-receipt-${payment.paymentReference}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() =>URL.revokeObjectURL(url), 1000);
+    try {
+      const logoResponse = await fetch(RECEIPT_BANK_LOGO_URL);
+      if (!logoResponse.ok) throw new Error('The bank logo could not be loaded.');
+      const logoBytes = new Uint8Array(await logoResponse.arrayBuffer());
+      const receiptPdf = createReceiptPdf(payment, logoBytes);
+      if (!receiptPdf) throw new Error('The verified receipt could not be generated.');
+
+      const url = URL.createObjectURL(receiptPdf);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `rent-receipt-${payment.paymentReference}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() =>URL.revokeObjectURL(url), 1000);
+    } catch (downloadError) {
+      console.error('Unable to download rent receipt:', downloadError);
+      setError('Unable to download the receipt. Please try again.');
+    }
   };
 
   useEffect(() => {
@@ -387,7 +432,15 @@ const TenantRentPayment = () => {
             <div>
               <p className="payment-eyebrow">Verified payment</p>
               <h2>Rent Payment Receipt</h2>
-              <p className="payment-muted">House Rental Management System</p>
+              <div className="payment-receipt-bank">
+                <img
+                  className="payment-receipt-bank-logo"
+                  src={RECEIPT_BANK_LOGO_URL}
+                  alt="Commercial Bank of Ethiopia logo"
+                  width="340"
+                  height="120"
+                />
+              </div>
             </div>
             <span className="payment-status payment-status-paid">Verified</span>
           </div>

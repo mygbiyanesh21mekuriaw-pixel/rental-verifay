@@ -10,6 +10,8 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/api/system', require('./routes/systemRoutes'));
+app.use(require('./middleware/systemAccess').maintenanceMode);
 app.use('/uploads', require('./middleware/privateUpload').privateUploadAccess);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -46,7 +48,9 @@ app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
-        message: 'File too large. Maximum allowed size is 10 MB per file.',
+        message: req.path === '/api/admin/system-settings/logo'
+          ? 'Website logo must be 1 MB or smaller.'
+          : 'File too large. Maximum allowed size is 10 MB per file.',
       });
     }
 

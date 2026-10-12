@@ -8,6 +8,36 @@ const normalizeAdminEmail = (email) => {
   return normalizedEmail.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
 };
 
+const getAvailableAdminUsername = async (email, requestedUsername, existingAdmin) => {
+  const currentUsername = String(requestedUsername || existingAdmin?.username || '').trim().toLowerCase();
+  const base = (currentUsername || String(email).split('@')[0])
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '')
+    .replace(/^[._-]+|[._-]+$/g, '');
+  const normalizedBase = base.length >= 3 ? base.slice(0, 30) : 'platformadmin';
+
+  if (requestedUsername && !/^[a-z0-9._-]{3,30}$/i.test(currentUsername)) {
+    throw new Error('ADMIN_USERNAME must be 3-30 characters and use letters, numbers, periods, underscores, or hyphens.');
+  }
+
+  let candidate = normalizedBase;
+  let suffix = 2;
+  while (true) {
+    const escapedCandidate = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const duplicate = await User.findOne({
+      username: { $regex: `^${escapedCandidate}$`, $options: 'i' },
+      ...(existingAdmin ? { _id: { $ne: existingAdmin._id } } : {}),
+    }).select('_id');
+
+    if (!duplicate) return candidate;
+    if (requestedUsername) throw new Error('ADMIN_USERNAME is already in use.');
+
+    const suffixText = String(suffix);
+    candidate = `${normalizedBase.slice(0, 30 - suffixText.length)}${suffixText}`;
+    suffix += 1;
+  }
+};
+
 async function createAdmin() {
   try {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/rental-db';
@@ -26,9 +56,15 @@ async function createAdmin() {
     });
 
     let admin = await User.findOne({ email: adminEmail });
+    const adminUsername = await getAvailableAdminUsername(
+      adminEmail,
+      process.env.ADMIN_USERNAME,
+      admin
+    );
     const adminPayload = {
       name: adminName,
       email: adminEmail,
+      username: adminUsername,
       phone: String(process.env.ADMIN_PHONE || '').trim(),
       role: 'admin',
       adminType: 'platform',

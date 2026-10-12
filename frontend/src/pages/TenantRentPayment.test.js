@@ -55,12 +55,44 @@ test('only a verified paid payment can be used for a receipt', () => {
   expect(isVerifiedPayment({ ...verifiedPayment, status: 'pending' })).toBe(false);
 });
 
-test('creates a PDF receipt only from verified backend payment data', () => {
-  const pdf = createReceiptPdf(verifiedPayment);
+test('embeds the bank logo and name in a PDF receipt created from verified payment data', async () => {
+  const logoBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+  const pdf = createReceiptPdf(verifiedPayment, logoBytes);
   expect(pdf).toBeInstanceOf(Blob);
   expect(pdf.type).toBe('application/pdf');
   expect(pdf.size).toBeGreaterThan(500);
-  expect(createReceiptPdf({ ...verifiedPayment, isVerified: false })).toBeNull();
+  expect(createReceiptPdf({ ...verifiedPayment, isVerified: false }, logoBytes)).toBeNull();
+  expect(createReceiptPdf(verifiedPayment)).toBeNull();
+  const pdfBytes = await readBlobBytes(pdf);
+  const pdfText = Array.from(pdfBytes, byte =>String.fromCharCode(byte)).join('');
+  expect(pdfText).not.toContain('(Commercial Bank of Ethiopia) Tj');
+  expect(pdfText).not.toContain('(HOUSE RENTAL MANAGEMENT SYSTEM) Tj');
+  expect(pdfText).toContain('340 0 0 68 54 772 cm');
+  expect(pdfText).toContain('(RENT PAYMENT RECEIPT) Tj');
+  expect(pdfText).toContain('/Subtype /Image');
+  expect(pdfText).toContain('/Filter /DCTDecode');
+  expect(pdfBytes).toContain(0xff);
+});
+
+const readBlobBytes = (blob) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () =>resolve(new Uint8Array(reader.result));
+  reader.onerror = () =>reject(reader.error);
+  reader.readAsArrayBuffer(blob);
+});
+
+test('shows the exact bank name in the verified receipt header', async () => {
+  axios.get.mockResolvedValue({ data: tenantPaymentContext });
+  renderTenantPayment();
+
+  expect(await screen.findByRole('img', { name: 'Commercial Bank of Ethiopia logo' }))
+    .toHaveAttribute('src', '/images/commercial-bank-of-ethiopia.jpg');
+  expect(screen.getByRole('img', { name: 'Commercial Bank of Ethiopia logo' }))
+    .toHaveAttribute('width', '340');
+  expect(screen.getByRole('img', { name: 'Commercial Bank of Ethiopia logo' }))
+    .toHaveAttribute('height', '120');
+  expect(screen.queryByText('Commercial Bank of Ethiopia')).not.toBeInTheDocument();
+  expect(screen.queryByText('House Rental Management System')).not.toBeInTheDocument();
 });
 
 test('prints the selected verified receipt', async () => {
@@ -71,6 +103,12 @@ test('prints the selected verified receipt', async () => {
   });
   renderTenantPayment();
   fireEvent.click(await screen.findByRole('button', { name: 'Print Receipt' }));
+  const receipt = screen.getByLabelText('Verified rent receipt for October 2026');
+  expect(receipt).toHaveAttribute('data-printing', 'true');
+  expect(receipt.querySelector('img')).toHaveAttribute(
+    'src',
+    '/images/commercial-bank-of-ethiopia.jpg'
+  );
 
   await act(async () => {
     await new Promise(resolve => window.setTimeout(resolve, 120));
@@ -105,6 +143,11 @@ test('tenant receives a clear message when landlord has not registered a bank ac
 
 test('downloads a PDF from the verified receipt', async () => {
   axios.get.mockResolvedValue({ data: tenantPaymentContext });
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    arrayBuffer: async () => new Uint8Array([0xff, 0xd8, 0xff, 0xd9]).buffer,
+  });
   const originalCreateObjectUrl = URL.createObjectURL;
   const originalRevokeObjectUrl = URL.revokeObjectURL;
   const createObjectUrl = jest.fn(() => 'blob:rent-receipt');
@@ -114,9 +157,21 @@ test('downloads a PDF from the verified receipt', async () => {
   renderTenantPayment();
   fireEvent.click(await screen.findByRole('button', { name: 'Download PDF' }));
 
-  expect(createObjectUrl).toHaveBeenCalledWith(expect.objectContaining({ type: 'application/pdf' }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/images/commercial-bank-of-ethiopia.jpg'));
+  await waitFor(() => expect(createObjectUrl).toHaveBeenCalledWith(expect.objectContaining({ type: 'application/pdf' })));
+  const downloadedPdf = createObjectUrl.mock.calls[0][0];
+  const downloadedPdfBytes = await readBlobBytes(downloadedPdf);
+  const logoStart = downloadedPdfBytes.findIndex((byte, index) => (
+    byte === 0xff &&
+    downloadedPdfBytes[index + 1] === 0xd8 &&
+    downloadedPdfBytes[index + 2] === 0xff &&
+    downloadedPdfBytes[index + 3] === 0xd9
+  ));
+  expect(logoStart).toBeGreaterThanOrEqual(0);
   expect(click).toHaveBeenCalledTimes(1);
   click.mockRestore();
+  if (originalFetch) global.fetch = originalFetch;
+  else delete global.fetch;
   if (originalCreateObjectUrl) {
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectUrl });
   } else {

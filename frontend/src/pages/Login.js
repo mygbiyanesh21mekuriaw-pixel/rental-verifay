@@ -9,7 +9,7 @@ const dashboardPaths = {
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const normalizeEmailAddress = (email) => {
+const normalizeLoginEmail = (email) => {
   const normalized = String(email || '').trim().toLowerCase();
   return normalized.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
 };
@@ -75,13 +75,12 @@ const EyeOffIcon = () => (
 // ==========================================
 const validateLoginForm = ({ email, password }) => {
   const nextErrors = {};
+  const normalizedEmail = normalizeLoginEmail(email);
 
-  const trimmedEmail = normalizeEmailAddress(email);
-
-  if (!trimmedEmail) {
+  if (!normalizedEmail) {
     nextErrors.email = 'Email is required';
-  } else if (!emailPattern.test(trimmedEmail)) {
-    nextErrors.email = 'Please enter a valid email address';
+  } else if (normalizedEmail.length > 254 || !emailPattern.test(normalizedEmail)) {
+    nextErrors.email = 'Enter a valid email address';
   }
 
   if (!password) {
@@ -154,7 +153,7 @@ const Login = () => {
       // CALL AUTH LOGIN
       // ========================================
       const result = await login(
-        normalizeEmailAddress(email),
+        normalizeLoginEmail(email),
         password
       );
 
@@ -208,7 +207,7 @@ const Login = () => {
   // CHECK PLATFORM ADMIN
   // ==========================================
   const isPlatformAdmin =
-    normalizeEmailAddress(email) ===
+    normalizeLoginEmail(email) ===
     platformAdminEmail;
 
   // ==========================================
@@ -221,6 +220,12 @@ const Login = () => {
           LOGIN CARD
       ======================================== */}
       <div className="auth-card">
+
+        <img
+          src="/mekdela-amba-logo.jpeg"
+          alt="Mekdela Amba University logo"
+          className="mx-auto mb-4 h-16 w-16 object-contain"
+        />
 
         {/* TITLE */}
         <span className="rv-kicker">House Rental
@@ -288,7 +293,7 @@ const Login = () => {
                   ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
                   : ''
               }
-              placeholder="your@email.com"
+              placeholder="Enter your email"
             />
 
             {fieldErrors.email && (

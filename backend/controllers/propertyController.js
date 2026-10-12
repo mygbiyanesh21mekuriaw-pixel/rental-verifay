@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Property = require('../models/Property');
+const SystemSettings = require('../models/SystemSettings');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const VerificationRequest = require('../models/VerificationRequest');
@@ -347,6 +348,10 @@ const getAllProperties = async (req, res) => {
       availability,
       sortPrice,
     } = req.query;
+    const systemSettings = await SystemSettings.findOne({ key: 'global' })
+      .select('properties.requireAdminReview')
+      .lean();
+    const reviewRequired = systemSettings?.properties?.requireAdminReview !== false;
 
     const parseNumeric = (value, fieldName) => {
       if (value === undefined || value === null || value === '') return undefined;
@@ -359,9 +364,17 @@ const getAllProperties = async (req, res) => {
 
     let filter = {};
     const publicVerifiedFilter = {
-      isVerified: true,
-      verificationStatus: 'approved',
-      availabilityStatus: { $in: ['available', null] },
+      $and: [
+        reviewRequired
+          ? { isVerified: true, verificationStatus: 'approved' }
+          : {
+            $or: [
+              { isVerified: true, verificationStatus: 'approved' },
+              { isVerified: false, verificationStatus: 'pending' },
+            ],
+          },
+        { availabilityStatus: { $in: ['available', null] } },
+      ],
     };
 
     if (req.user?.role === 'tenant') {
@@ -456,7 +469,7 @@ const getAllProperties = async (req, res) => {
     if (location) pushRegexFilter('location', location);
 
     if (fieldSearchConditions.length > 0) {
-      filter.$and = fieldSearchConditions;
+      filter.$and = [...(filter.$and || []), ...fieldSearchConditions];
     }
 
     if (search) {
@@ -553,6 +566,10 @@ const getAllProperties = async (req, res) => {
 // አንድ ንብረት ማግኘት
 const getPropertyById = async (req, res) => {
   try {
+    const settings = await SystemSettings.findOne({ key: 'global' })
+      .select('properties.requireAdminReview')
+      .lean();
+    const reviewRequired = settings?.properties?.requireAdminReview !== false;
     const property = await Property.findById(req.params.id)
       .populate('landlord', 'name email phone profilePhoto role');
     
@@ -560,8 +577,13 @@ const getPropertyById = async (req, res) => {
       return res.status(404).json({ message: 'Property not found' });
     }
 
+    const approvedForPublic = property.isVerified && property.verificationStatus === 'approved';
+    const pendingPubliclyVisible = !reviewRequired &&
+      !property.isVerified &&
+      property.verificationStatus === 'pending';
+
     if (!req.user) {
-      if (!property.isVerified || property.verificationStatus !== 'approved') {
+      if (!approvedForPublic && !pendingPubliclyVisible) {
         return res.status(403).json({ message: 'This property is not verified yet' });
       }
       const publicProperty = propertyResponse(property, null);
@@ -585,15 +607,14 @@ const getPropertyById = async (req, res) => {
         typeof property.price === 'number' && property.price > 0 &&
         typeof property.bedrooms === 'number' && property.bedrooms >= 0;
       const canViewRequestedProperty = hasRentalRequest && String(property.rentedBy) === String(req.user.id);
-      if (!hasValidLandlord || !property.isVerified || property.verificationStatus !== 'approved' || (!isAvailable && !canViewRequestedProperty) || !hasValidData) {
+      if (!hasValidLandlord || (!approvedForPublic && !pendingPubliclyVisible) || (!isAvailable && !canViewRequestedProperty) || !hasValidData) {
         return res.status(403).json({ message: 'This property is not available' });
       }
     }
 
     if (req.user.role === 'landlord') {
       const ownsProperty = String(property.landlord?._id || property.landlord) === String(req.user.id);
-      const isPubliclyAvailable = property.isVerified
-        && property.verificationStatus === 'approved'
+      const isPubliclyAvailable = (approvedForPublic || pendingPubliclyVisible)
         && property.availabilityStatus !== 'rented';
       if (!ownsProperty && !isPubliclyAvailable) {
         return res.status(404).json({ message: 'Property not found' });

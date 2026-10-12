@@ -55,6 +55,7 @@ const AdminSectionPage = ({ type }) => {
   const [adminForm, setAdminForm] = useState({
     name: '',
     email: '',
+    username: '',
     phone: '',
     password: '',
     adminType: 'area',
@@ -191,6 +192,7 @@ const AdminSectionPage = ({ type }) => {
     setAdminForm({
       name: admin.name || '',
       email: admin.email || '',
+      username: admin.username || '',
       phone: admin.phone || '',
       password: '',
       adminType: 'area',
@@ -202,7 +204,7 @@ const AdminSectionPage = ({ type }) => {
 
   const handleCancelAdminEdit = () => {
     setEditingAdminId(null);
-    setAdminForm({ name: '', email: '', phone: '', password: '', adminType: 'area', area: '' });
+    setAdminForm({ name: '', email: '', username: '', phone: '', password: '', adminType: 'area', area: '' });
     setAdminFormError('');
     setAdminFormMessage('');
   };
@@ -220,7 +222,10 @@ const AdminSectionPage = ({ type }) => {
         adminType: 'area',
         adminAreas: [adminForm.area],
       };
-      if (!editingAdminId) payload.password = adminForm.password;
+      if (!editingAdminId) {
+        payload.username = adminForm.username;
+        payload.password = adminForm.password;
+      }
       const token = localStorage.getItem('token');
       const endpoint = editingAdminId
         ? `${process.env.REACT_APP_API_URL}/api/admin/users/admin/${editingAdminId}`
@@ -335,6 +340,7 @@ const AdminSectionPage = ({ type }) => {
           <form onSubmit={handleAdminSubmit} className="admin-grid">
             <input name="name" value={adminForm.name} onChange={handleAdminFormChange} placeholder="Full name" required className="admin-card-detail" />
             <input name="email" type="email" value={adminForm.email} onChange={handleAdminFormChange} placeholder="Email" required className="admin-card-detail" />
+            {!editingAdminId && <input name="username" value={adminForm.username} onChange={handleAdminFormChange} placeholder="Username" minLength={3} maxLength={30} pattern="[A-Za-z0-9._-]{3,30}" required className="admin-card-detail" />}
             <input name="phone" value={adminForm.phone} onChange={handleAdminFormChange} placeholder="Phone" className="admin-card-detail" />
             {!editingAdminId && <input name="password" type="password" value={adminForm.password} onChange={handleAdminFormChange} placeholder="Password" minLength="6" required className="admin-card-detail" />}
             <input

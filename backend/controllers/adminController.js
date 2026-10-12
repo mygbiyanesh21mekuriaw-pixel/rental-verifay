@@ -105,12 +105,16 @@ const normalizeAreaAdminFields = (adminAreas) => {
 
 const createAdminAccount = async (req, res) => {
   try {
-    const { name, email, phone, password, adminType = 'area', adminAreas = [] } = req.body;
+    const { name, email, username, phone, password, adminType = 'area', adminAreas = [] } = req.body;
     const normalizedName = String(name || '').trim();
     const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedUsername = String(username || '').trim().toLowerCase();
 
-    if (!normalizedName || !normalizedEmail || !password) {
-      return res.status(400).json({ message: 'Name, email and password are required' });
+    if (!normalizedName || !normalizedEmail || !normalizedUsername || !password) {
+      return res.status(400).json({ message: 'Name, email, username and password are required' });
+    }
+    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername)) {
+      return res.status(400).json({ message: 'Username must be 3-30 characters and use letters, numbers, periods, underscores, or hyphens.' });
     }
     if (!['platform', 'area'].includes(adminType)) {
       return res.status(400).json({ message: 'Admin type must be platform or area' });
@@ -128,10 +132,17 @@ const createAdminAccount = async (req, res) => {
     if (existingUser) {
       return res.status(409).json({ message: 'A user with this email already exists' });
     }
+    const escapedUsername = normalizedUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (await User.findOne({
+      username: { $regex: `^${escapedUsername}$`, $options: 'i' },
+    })) {
+      return res.status(409).json({ message: 'That username is already in use.' });
+    }
 
     const admin = await User.create({
       name: normalizedName,
       email: normalizedEmail,
+      username: normalizedUsername,
       phone: String(phone || '').trim(),
       password: await bcrypt.hash(String(password), 10),
       role: 'admin',
@@ -143,6 +154,9 @@ const createAdminAccount = async (req, res) => {
     delete safeAdmin.password;
     res.status(201).json({ message: 'Admin account created successfully', user: safeAdmin });
   } catch (error) {
+    if (error?.code === 11000 && error?.keyPattern?.username) {
+      return res.status(409).json({ message: 'That username is already in use.' });
+    }
     res.status(500).json({ message: 'Unable to create admin account' });
   }
 };
