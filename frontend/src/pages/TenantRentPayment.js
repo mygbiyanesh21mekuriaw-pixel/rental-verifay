@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import BackToDashboard from '../components/BackToDashboard';
 import './rentPayment.css';
 
@@ -152,6 +153,7 @@ const TenantRentPayment = () => {
   const { propertyId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const logout = useAuth()?.logout;
   const [context, setContext] = useState(null);
   const [paymentPeriod, setPaymentPeriod] = useState(getDefaultPaymentPeriod);
   const [loading, setLoading] = useState(true);
@@ -161,6 +163,15 @@ const TenantRentPayment = () => {
   const [paymentReturnState, setPaymentReturnState] = useState(null);
   const [returnCountdown, setReturnCountdown] = useState(PAYMENT_SUCCESS_DELAY_SECONDS);
   const [printingReceiptId, setPrintingReceiptId] = useState(null);
+
+  const handleUnauthorized = (requestError) => {
+    if (requestError.response?.status !== 401) return false;
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    logout?.();
+    navigate('/login', { replace: true, state: { sessionExpired: true } });
+    return true;
+  };
 
   useEffect(() => {
     const handleAfterPrint = () =>setPrintingReceiptId(null);
@@ -230,6 +241,7 @@ const TenantRentPayment = () => {
         return payload;
       } catch (requestError) {
         if (cancelled) return null;
+        if (handleUnauthorized(requestError)) return null;
         setError(readablePaymentMessage(
           requestError.response?.data?.message,
           'Unable to load rent payment details.'
@@ -321,7 +333,7 @@ const TenantRentPayment = () => {
       if (returnPollTimer) window.clearTimeout(returnPollTimer);
       window.removeEventListener('focus', handleFocusRefresh);
     };
-  }, [location.key, navigate, propertyId]);
+  }, [location.key, logout, navigate, propertyId]);
 
   const submitPayment = async (event) => {
     event.preventDefault();
@@ -352,6 +364,7 @@ const TenantRentPayment = () => {
       setContext(current => ({ ...current, payments: [response.data.payment, ...current.payments] }));
       setPaymentPeriod('');
     } catch (requestError) {
+      if (handleUnauthorized(requestError)) return;
       setError(readablePaymentMessage(
         requestError.response?.data?.message,
         'Unable to submit rent payment.'

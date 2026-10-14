@@ -8,6 +8,7 @@ import { createReceiptPdf, isVerifiedPayment } from './TenantRentPayment';
 
 jest.mock('axios', () => ({
   get: jest.fn(),
+  post: jest.fn(),
 }));
 
 const verifiedPayment = {
@@ -38,6 +39,7 @@ const renderTenantPayment = () => render(
   <MemoryRouter initialEntries={['/tenant/rent-payment/property-1']}>
     <Routes>
       <Route path="/tenant/rent-payment/:propertyId" element={<TenantRentPayment />} />
+      <Route path="/login" element={<div>Sign-in page</div>} />
     </Routes>
   </MemoryRouter>
 );
@@ -45,6 +47,7 @@ const renderTenantPayment = () => render(
 beforeEach(() => {
   localStorage.setItem('token', 'test-token');
   axios.get.mockReset();
+  axios.post.mockReset();
 });
 
 test('only a verified paid payment can be used for a receipt', () => {
@@ -125,6 +128,20 @@ test('tenant rent payment screen never asks for landlord bank information', asyn
   expect(screen.queryByLabelText(/bank/i)).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/account name/i)).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/account number/i)).not.toBeInTheDocument();
+});
+
+test('expired authentication during payment clears the session and redirects to sign-in', async () => {
+  axios.get.mockResolvedValue({ data: tenantPaymentContext });
+  axios.post.mockRejectedValue({
+    response: { status: 401, data: { message: 'Token is not valid' } },
+  });
+  renderTenantPayment();
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Pay Rent' }));
+
+  expect(await screen.findByText('Sign-in page')).toBeInTheDocument();
+  expect(localStorage.getItem('token')).toBeNull();
+  expect(localStorage.getItem('user')).toBeNull();
 });
 
 test('tenant receives a clear message when landlord has not registered a bank account', async () => {

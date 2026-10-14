@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import axios from 'axios';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Login from './Login';
 import { AuthProvider } from '../context/AuthContext';
 
@@ -67,4 +67,20 @@ test('login rejects an invalid email before sending a request', () => {
 
   expect(screen.getByText('Enter a valid email address')).toBeInTheDocument();
   expect(axios.post).not.toHaveBeenCalled();
+});
+
+test('login explains when an expired session requires signing in again', () => {
+  render(
+    <MemoryRouter initialEntries={[{ pathname: '/login', state: { sessionExpired: true } }]}>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+        </Routes>
+      </AuthProvider>
+    </MemoryRouter>
+  );
+
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Your session expired. Please sign in again to continue your payment.'
+  );
 });

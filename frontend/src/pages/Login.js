@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 
 const dashboardPaths = {
   tenant: '/tenant-dashboard',
@@ -108,6 +108,7 @@ const Login = () => {
 
   const { login, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ==========================================
   // REDIRECT IF ALREADY LOGGED IN
@@ -236,6 +237,12 @@ const Login = () => {
 
         <p className="auth-subtitle">Sign in to manage your verified rental journey.
         </p>
+
+        {location.state?.sessionExpired && (
+          <p className="auth-subtitle" role="status">
+            Your session expired. Please sign in again to continue your payment.
+          </p>
+        )}
 
         {/* ======================================
             GENERAL ERROR
