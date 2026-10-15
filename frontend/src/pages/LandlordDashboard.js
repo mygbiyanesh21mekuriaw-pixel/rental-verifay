@@ -2,22 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useOptionalSystemStatus } from '../context/SystemStatusContext';
 import {
-  FaBars,
   FaBell,
-  FaBuilding,
   FaCheck,
-  FaCog,
   FaFileAlt,
   FaHardHat,
   FaHome,
-  FaHourglassHalf,
   FaMoneyBill,
-  FaPlus,
-  FaSignOutAlt,
-  FaStar,
-  FaTimes,
 } from 'react-icons/fa';
 import LandlordSectionPage from './LandlordSectionPage';
 import LandlordRequests from './LandlordRequests';
@@ -27,14 +18,16 @@ import LandlordNotifications from './LandlordNotifications';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
 import PropertyImage from '../components/PropertyImage';
 import { getPropertyImages } from '../utils/propertyMedia';
-import ProfileAvatar from '../components/ProfileAvatar';
-import LanguageSwitcher from '../components/LanguageSwitcher';
 import BackToPreviousPage from '../components/BackToPreviousPage';
 import LandlordBackToDashboard from '../components/LandlordBackToDashboard';
+import { useLanguage } from '../context/LanguageContext';
+import DashboardLayout, { getDashboardMenuGroups, useDashboardLayout } from '../components/DashboardLayout';
+import Navbar from '../components/Navbar';
 import './landlordDashboard.css';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const LandlordNotificationContext = React.createContext(0);
 
 const isValidImageFile = (file) => {
   if (!file) return false;
@@ -58,118 +51,30 @@ const getFileErrorMessage = (file, label) => {
   return '';
 };
 
-export const landlordSidebarItems = [
-  { key: 'myProperties', label: 'My Properties', icon: <FaHome aria-hidden="true" />, path: '/landlord/my-properties' },
-  { key: 'verified', label: 'Verified Properties', icon: <FaCheck aria-hidden="true" />, path: '/landlord/verified-properties' },
-  { key: 'addProperty', label: 'Add Property', icon: <FaPlus aria-hidden="true" />, path: '/landlord/add-property' },
-  { key: 'rentalRequests', label: 'Rental Requests', icon: <FaFileAlt aria-hidden="true" />, path: '/landlord/rental-requests' },
-  { key: 'rented', label: 'Rented Properties', icon: <FaHardHat aria-hidden="true" />, path: '/landlord/rented-properties' },
-  { key: 'reviews', label: 'Tenant Reviews', icon: <FaStar aria-hidden="true" />, path: '/landlord/reviews' },
-  { key: 'underReview', label: 'Under Review', icon: <FaHourglassHalf aria-hidden="true" />, path: '/landlord/under-review' },
-  { key: 'rejected', label: 'Rejected', icon: <FaTimes aria-hidden="true" />, path: '/landlord/rejected' },
-  { key: 'rentPayments', label: 'Rent Payments', icon: <FaMoneyBill aria-hidden="true" />, path: '/landlord/rent-payments' },
-  { key: 'notifications', label: 'Notifications', icon: <FaBell aria-hidden="true" />, path: '/landlord/notifications' },
-  { key: 'bankInformation', label: 'Bank Information', icon: <FaBuilding aria-hidden="true" />, path: '/landlord/bank-information' },
-  { key: 'accountSettings', label: 'Account Settings', icon: <FaCog aria-hidden="true" />, path: '/landlord/account-settings' },
-];
+const getRentalRequestStatus = (request) => (
+  request.status === 'approved' || request.status === 'confirmed'
+    ? 'Approved'
+    : request.status === 'rejected'
+      ? 'Rejected'
+      : request.status === 'expired'
+        ? 'Expired'
+        : 'Pending'
+);
 
-export const LandlordSidebar = ({
-  user,
-  notificationCount = 0,
-  isOpen = false,
-  onNavigate,
-  websiteName = 'House Rental Management System',
-  websiteLogoDataUri = '',
-}) => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { logout } = useAuth();
-
-  const getActiveKey = () => {
-    const exactMatch = landlordSidebarItems.find((item) => {
-      if (item.path === location.pathname) return true;
-      if (item.path === '/landlord/add-property') {
-        return location.pathname.startsWith('/landlord/edit-property');
-      }
-      return false;
-    });
-
-    return exactMatch ? exactMatch.key : 'myProperties';
-  };
-
-  const activeSection = getActiveKey();
-
-  return (
-    <aside
-      id="landlord-navigation"
-      className={`landlord-sidebar fixed inset-y-0 left-0 z-40 flex w-[260px] translate-x-0 flex-col border-r border-slate-700 bg-slate-900 text-slate-200 shadow-lg ${isOpen ? 'is-open' : ''}`}
-    >
-        <div className="flex items-center gap-3 border-b border-slate-700 px-5 py-5">
-          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-blue-600 text-lg text-white shadow-sm">
-            {websiteLogoDataUri ? (
-              <img src={websiteLogoDataUri} alt={websiteName} className="h-full w-full object-contain" />
-            ) : (
-              <FaBuilding aria-hidden="true" />
-            )}
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Workspace</p>
-            <h1 className="text-xl font-bold text-white">{websiteName}</h1>
-          </div>
-        </div>
-
-        <nav className="landlord-sidebar-navigation flex-1 space-y-1.5 overflow-y-auto px-3 py-4">
-          {landlordSidebarItems.map(({ key, label, icon, path }) => {
-            const isActive = activeSection === key;
-            const isNotifications = key === 'notifications';
-
-            return (
-              <Link
-                key={key}
-                to={path}
-                onClick={onNavigate}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-[#493ed6] text-white shadow-sm ring-1 ring-white/10'
-                    : 'text-white hover:bg-[#6675e8] hover:text-white'
-                }`}
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-base shadow-sm ring-1 ring-slate-700">
-                  {icon}
-                </span>
-                <span className="flex-1 truncate">{label}</span>
-                {isNotifications && notificationCount > 0 && (
-                  <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    {notificationCount}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-slate-700 p-4">
-          <div className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">{user?.name || 'User'}</p>
-              <p className="truncate text-xs text-slate-400">{user?.email || 'user@example.com'}</p>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Landlord</p>
-            </div>
-          </div>
-        </div>
-    </aside>
-  );
+const getRentalRequestDate = (createdAt, formatDate) => {
+  const date = createdAt ? new Date(createdAt) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? formatDate(date, { year: 'numeric', month: 'short', day: 'numeric' })
+    : '—';
 };
 
 export const LandlordLayout = ({ children, user: suppliedUser = null, notificationCount = 0 }) => {
-  const { user: authUser, logout } = useAuth();
-  const systemStatus = useOptionalSystemStatus();
-  const navigate = useNavigate();
+  const { user: authUser } = useAuth();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { t } = useLanguage();
+  const dashboardLayout = useDashboardLayout();
+  const [currentNotificationCount, setCurrentNotificationCount] = useState(notificationCount);
   const user = suppliedUser || authUser;
-  const websiteName = systemStatus?.status.branding.websiteName || 'House Rental Management System';
-  const websiteLogoDataUri = systemStatus?.status.branding.websiteLogoDataUri || '';
   const showBackToDashboard = [
     '/landlord/add-property',
     '/landlord/my-properties',
@@ -186,68 +91,70 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
   ].includes(location.pathname);
 
   useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
+    if (!user) {
+      setCurrentNotificationCount(0);
+      return undefined;
+    }
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
+    let active = true;
+    const fetchUnreadCount = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/notifications/unread-count`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (active) {
+          setCurrentNotificationCount(
+            Number(response.data?.unreadCount ?? response.data?.count ?? 0)
+          );
+        }
+      } catch (error) {
+        console.error('Unable to load landlord notification count:', error);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = window.setInterval(fetchUnreadCount, 30000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [user]);
+
+  const content = (
+    <>
+      {showBackToDashboard && <LandlordBackToDashboard />}
+      {children}
+    </>
+  );
+  const wrappedContent = dashboardLayout
+    ? content
+    : (
+      <DashboardLayout
+        header={<Navbar />}
+        menuGroups={getDashboardMenuGroups(user, t)}
+        user={user}
+        title={t('Landlord')}
+      >
+        {content}
+      </DashboardLayout>
+    );
 
   return (
-    <div className="landlord-layout min-h-screen bg-slate-50 text-slate-900">
-      <header className="landlord-mobile-header">
-        <button
-          type="button"
-          className="landlord-menu-toggle"
-          aria-label={menuOpen ? 'Close landlord navigation' : 'Open landlord navigation'}
-          aria-expanded={menuOpen}
-          aria-controls="landlord-navigation"
-          onClick={() =>setMenuOpen((open) => !open)}
-        >
-          {menuOpen ? <FaTimes aria-hidden="true" /> : <FaBars aria-hidden="true" />}
-        </button>
-        <span className="landlord-mobile-title">{websiteName}</span>
-        <LanguageSwitcher className="language-switcher-landlord" />
-        <Link to="/landlord/profile" className="landlord-mobile-profile-link" aria-label="Profile">
-          <ProfileAvatar user={user} className="landlord-mobile-profile-avatar" />
-          <span>Profile</span>
-        </Link>
-        <button type="button" className="landlord-mobile-logout" onClick={handleLogout}>
-          <FaSignOutAlt aria-hidden="true" />
-          <span>Logout</span>
-        </button>
-      </header>
-      <button
-        type="button"
-        className={`landlord-sidebar-backdrop ${menuOpen ? 'is-open' : ''}`}
-        onClick={() =>setMenuOpen(false)}
-        aria-label="Close landlord navigation"
-        tabIndex={menuOpen ? 0 : -1}
-      />
-      <LandlordSidebar
-        user={user}
-        notificationCount={notificationCount}
-        isOpen={menuOpen}
-        websiteName={websiteName}
-        websiteLogoDataUri={websiteLogoDataUri}
-        onNavigate={() =>setMenuOpen(false)}
-      />
-      <main className="landlord-layout-main min-h-screen py-5 lg:py-8">
-        <div>
-          {showBackToDashboard && <LandlordBackToDashboard />}
-          {children}
-        </div>
-      </main>
-    </div>
+    <LandlordNotificationContext.Provider value={currentNotificationCount}>
+      {wrappedContent}
+    </LandlordNotificationContext.Provider>
   );
 };
 
 const LandlordDashboard = ({ initialShowForm = false }) => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { t, formatDate } = useLanguage();
+  const notificationCount = React.useContext(LandlordNotificationContext);
   const { propertyId } = useParams();
-  const [notificationCount, setNotificationCount] = useState(0);
   const isEditMode = Boolean(propertyId);
   const location = useLocation();
   const [showForm, setShowForm] = useState(initialShowForm || isEditMode);
@@ -258,6 +165,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
     verified: 0,
     rented: 0,
     requests: 0,
+    waitingRequests: 0,
     payments: 0,
     notifications: 0,
   });
@@ -278,6 +186,9 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   const [formSuccess, setFormSuccess] = useState('');
   const [imageFiles, setImageFiles] = useState([]);
   const [existingPropertyImages, setExistingPropertyImages] = useState([]);
+  const [recentRequests, setRecentRequests] = useState([]);
+  const [recentRequestsLoading, setRecentRequestsLoading] = useState(true);
+  const [recentRequestsError, setRecentRequestsError] = useState(false);
   const [documentFile, setDocumentFile] = useState(null);
   const [existingProofOfOwnership, setExistingProofOfOwnership] = useState(false);
 
@@ -325,24 +236,30 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   }, [initialShowForm, isEditMode, propertyId]);
 
   useEffect(() => {
-    if (!user) {
-      setNotificationCount(0);
-      return;
-    }
-
-    const fetchNotificationCount = async () => {
+    let active = true;
+    const loadRecentRequests = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/notifications/unread-count`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setNotificationCount(Number(response.data?.unreadCount ?? response.data?.count ?? 0));
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/api/rental-requests/landlord-requests?limit=5`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!Array.isArray(response.data)) {
+          throw new Error('Unexpected recent rental requests response');
+        }
+        if (active) setRecentRequests(response.data);
       } catch (error) {
-        setNotificationCount(0);
+        console.error('Unable to load recent landlord rental requests:', error);
+        if (active) setRecentRequestsError(true);
+      } finally {
+        if (active) setRecentRequestsLoading(false);
       }
     };
 
-    fetchNotificationCount();
+    loadRecentRequests();
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   useEffect(() => {
@@ -352,6 +269,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         verified: 0,
         rented: 0,
         requests: 0,
+        waitingRequests: 0,
         payments: 0,
         notifications: 0,
       });
@@ -377,6 +295,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
           verified: landlordProperties.filter((property) =>property.isVerified && property.verificationStatus === 'approved').length,
           rented: landlordProperties.filter((property) =>property.availabilityStatus === 'rented').length,
           requests: requests.length,
+          waitingRequests: requests.filter((request) => String(request.status || '').trim().toLowerCase() === 'pending').length,
           payments: payments.length,
           notifications: notificationCount,
         });
@@ -386,6 +305,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
           verified: 0,
           rented: 0,
           requests: 0,
+          waitingRequests: 0,
           payments: 0,
           notifications: notificationCount,
         });
@@ -394,53 +314,6 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
 
     loadOverviewStats();
   }, [user, notificationCount]);
-
-  const handleSidebarClick = (key) => {
-    if (key === 'logout') {
-      logout();
-      navigate('/', { replace: true });
-      return;
-    }
-
-    if (key === 'addProperty') {
-      navigate('/landlord/add-property');
-      setShowForm(true);
-      setActiveSection('addProperty');
-      return;
-    }
-
-    const pathMap = {
-      myProperties: '/landlord/my-properties',
-      verified: '/landlord/verified-properties',
-      rentalRequests: '/landlord/rental-requests',
-      rented: '/landlord/rented-properties',
-      reviews: '/landlord/reviews',
-      underReview: '/landlord/under-review',
-      rejected: '/landlord/rejected',
-      rentPayments: '/landlord/rent-payments',
-      messages: '/landlord/messages',
-      profile: '/landlord/profile',
-      notifications: '/landlord/notifications',
-    };
-
-    if (pathMap[key]) {
-      navigate(pathMap[key]);
-    }
-
-    setShowForm(false);
-    setActiveSection(key);
-  };
-
-  const handleCardClick = (key) => {
-    if (key === 'addProperty') {
-      setShowForm(true);
-      setActiveSection('addProperty');
-      return;
-    }
-
-    setShowForm(false);
-    setActiveSection(key);
-  };
 
   const handleFormChange = (e) => {
     setFormData((previous) => ({
@@ -614,45 +487,188 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   };
 
   const renderOverview = () => {
+    const today = new Date();
+    const todayDateTime = new Date(
+      today.getTime() - today.getTimezoneOffset() * 60000
+    ).toISOString().slice(0, 10);
     const cards = [
       { key: 'myProperties', label: 'My Properties', value: overviewStats.properties, icon: <FaHome aria-hidden="true" />, path: '/landlord/my-properties', accent: 'bg-blue-50 text-blue-700' },
       { key: 'verified', label: 'Verified Properties', value: overviewStats.verified, icon: <FaCheck aria-hidden="true" />, path: '/landlord/verified-properties', accent: 'bg-[#1d4ed8] text-white' },
-      { key: 'rentalRequests', label: 'Rental Requests', value: overviewStats.requests, icon: <FaFileAlt aria-hidden="true" />, path: '/landlord/rental-requests', accent: 'bg-violet-50 text-violet-700' },
+      { key: 'rentalRequests', label: 'Rental Requests', value: overviewStats.requests, icon: <FaFileAlt aria-hidden="true" />, path: '/landlord/rental-requests', accent: 'bg-blue-50 text-blue-700' },
       { key: 'rented', label: 'Rented Properties', value: overviewStats.rented, icon: <FaHardHat aria-hidden="true" />, path: '/landlord/rented-properties', accent: 'bg-amber-50 text-amber-700' },
       { key: 'rentPayments', label: 'Rent Payments', value: overviewStats.payments, icon: <FaMoneyBill aria-hidden="true" />, path: '/landlord/rent-payments', accent: 'bg-cyan-50 text-cyan-700' },
       { key: 'notifications', label: 'Notifications', value: overviewStats.notifications, icon: <FaBell aria-hidden="true" />, path: '/landlord/notifications', accent: 'bg-rose-50 text-rose-700' },
     ];
 
     return (
-      <div className="space-y-6">
-        <div className="landlord-dashboard-header">
-          <h2 className="landlord-dashboard-title">Landlord Dashboard</h2>
-          <p className="landlord-dashboard-welcome">Welcome to {user?.name || 'Landlord'}.</p>
+      <div className="w-full min-w-0 space-y-6">
+        <div className="dashboard-welcome-banner !m-0 !min-w-0 !flex !flex-row !flex-wrap !items-center !justify-between !gap-2 !rounded-2xl !border-0 !bg-green-700 !px-4 !py-4 !shadow-sm md:!px-6">
+          <h1 className="landlord-dashboard-title !text-xl !leading-tight !text-white sm:!text-2xl">
+            {t('Welcome back, ')}{user?.name || t('Landlord')}
+          </h1>
+          <time className="ml-auto text-right text-xs font-medium leading-snug text-white/90" dateTime={todayDateTime}>
+            {formatDate(today, { dateStyle: 'full' })}
+          </time>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
           {cards.map((card) => (
-            <button
+            <Link
               key={card.key}
-              type="button"
-              className="group h-full min-h-[170px] rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-              onClick={() => {
-                setActiveSection(card.key);
-                navigate(card.path);
-              }}
+              to={card.path}
+              className="group flex h-full min-h-[132px] min-w-0 cursor-pointer items-stretch rounded-2xl border border-slate-200 bg-white p-4 text-left text-inherit no-underline shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2"
             >
-              <div className="flex h-full items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-1 flex-col justify-between">
-                  <p className="text-sm font-medium text-slate-500">{card.label}</p>
-                  <p className="mt-5 text-3xl font-bold tracking-tight text-slate-900">{card.value}</p>
+              <div className="flex h-full w-full items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                  <p className="text-sm font-medium text-slate-500">{t(card.label)}</p>
+                  <div>
+                    {card.key === 'rentalRequests' && (
+                      <div>
+                        <p className="m-0 text-3xl font-bold tracking-tight text-slate-900">
+                          {t('{{count}} total', { count: card.value })}
+                        </p>
+                        <span className="mt-1 block text-xs font-medium text-slate-500">
+                          {t('{{count}} pending', { count: overviewStats.waitingRequests })}
+                        </span>
+                      </div>
+                    )}
+                    {card.key !== 'rentalRequests' && (
+                      <p className="text-3xl font-bold tracking-tight text-slate-900">{card.value}</p>
+                    )}
+                    {card.key === 'notifications' && (
+                      <span className="mt-1 block text-sm font-medium text-slate-500">{t('Unread')}</span>
+                    )}
+                  </div>
                 </div>
                 <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-2xl shadow-sm ring-1 ring-slate-200 ${card.accent}`}>
                   {card.icon}
                 </span>
               </div>
-            </button>
+            </Link>
           ))}
         </div>
+
+        <section className="w-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="landlord-recent-requests-title">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
+            <h3 id="landlord-recent-requests-title" className="m-0 min-w-0 text-base font-bold text-slate-900 sm:text-lg">{t('Recent Rental Requests')}</h3>
+            <Link to="/landlord/rental-requests" className="shrink-0 rounded font-semibold text-[var(--rv-dashboard-topbar)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rv-dashboard-topbar)] focus-visible:ring-offset-2">
+              {t('View all')}
+            </Link>
+          </div>
+          {recentRequestsLoading ? (
+            <div className="space-y-3 p-4 sm:p-5" role="status" aria-label={t('Loading recent rental requests...')}>
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <span className="h-4 animate-pulse rounded bg-slate-200" />
+                  <span className="h-4 animate-pulse rounded bg-slate-200" />
+                  <span className="h-4 animate-pulse rounded bg-slate-200" />
+                  <span className="h-4 animate-pulse rounded bg-slate-200" />
+                </div>
+              ))}
+              <span className="sr-only">{t('Loading recent rental requests...')}</span>
+            </div>
+          ) : recentRequestsError ? (
+            <p className="m-0 p-6 text-sm text-red-700" role="alert">
+              {t('Unable to load recent rental requests.')}
+            </p>
+          ) : recentRequests.length === 0 ? (
+            <p className="m-0 p-6 text-sm text-slate-500">{t('No requests yet')}</p>
+          ) : (
+            <>
+              <div className="space-y-3 p-3 lg:hidden">
+                {recentRequests.map((request) => {
+                  const status = getRentalRequestStatus(request);
+                  const statusColor = status === 'Approved'
+                    ? 'bg-green-100 text-green-800'
+                    : status === 'Rejected'
+                      ? 'bg-red-100 text-red-800'
+                      : status === 'Expired'
+                        ? 'bg-slate-100 text-slate-700'
+                        : 'bg-amber-100 text-amber-800';
+
+                  return (
+                    <article key={request._id} className="min-w-0 rounded-xl border border-slate-200 p-3">
+                      <div className="flex min-w-0 items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="m-0 truncate text-sm font-semibold text-slate-900">{request.tenant?.name || request.tenantName || '—'}</p>
+                          <p className="m-0 mt-1 truncate text-sm text-slate-600">{request.property?.title || '—'}</p>
+                        </div>
+                        <span className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-1 text-xs font-bold ${statusColor}`}>
+                          {t(status)}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                        <p className="m-0 min-w-0 truncate text-xs text-slate-500">
+                          {t('Date')}: {getRentalRequestDate(request.createdAt, formatDate)}
+                        </p>
+                        <Link
+                          to={`/landlord/rental-requests/${request._id}`}
+                          className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-[var(--rv-dashboard-topbar)] px-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-[var(--rv-dashboard-navy)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rv-dashboard-topbar)] focus-visible:ring-offset-2"
+                        >
+                          {t('View')}
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <div className="hidden w-full max-w-full overflow-x-auto lg:block">
+              <table className="w-full min-w-[640px] table-fixed border-collapse text-left" aria-label={t('Recent Rental Requests')}>
+                <colgroup>
+                  <col className="w-[22%]" />
+                  <col className="w-[30%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[12%]" />
+                </colgroup>
+                <thead className="bg-slate-50 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th scope="col" className="px-3 py-3 sm:px-4">{t('Tenant')}</th>
+                    <th scope="col" className="px-3 py-3 sm:px-4">{t('Property')}</th>
+                    <th scope="col" className="px-3 py-3 sm:px-4">{t('Date')}</th>
+                    <th scope="col" className="px-3 py-3 sm:px-4">{t('Status')}</th>
+                    <th scope="col" className="px-2 py-3 text-right"><span className="sr-only">{t('View')}</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-sm text-slate-700">
+                  {recentRequests.map((request) => {
+                    const status = getRentalRequestStatus(request);
+
+                    return (
+                      <tr key={request._id}>
+                        <td className="truncate px-3 py-3 sm:px-4">{request.tenant?.name || request.tenantName || '—'}</td>
+                        <td className="truncate px-3 py-3 sm:px-4">{request.property?.title || '—'}</td>
+                        <td className="whitespace-nowrap px-3 py-3 sm:px-4">{getRentalRequestDate(request.createdAt, formatDate)}</td>
+                        <td className="px-3 py-3 sm:px-4">
+                          <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${
+                            status === 'Approved'
+                              ? 'bg-green-100 text-green-800'
+                              : status === 'Rejected'
+                                ? 'bg-red-100 text-red-800'
+                                : status === 'Expired'
+                                  ? 'bg-slate-100 text-slate-700'
+                                  : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {t(status)}
+                          </span>
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          <Link
+                            to={`/landlord/rental-requests/${request._id}`}
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg bg-[var(--rv-dashboard-topbar)] px-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-[var(--rv-dashboard-navy)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rv-dashboard-topbar)] focus-visible:ring-offset-2"
+                          >
+                            {t('View')}
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              </div>
+            </>
+          )}
+        </section>
       </div>
     );
   };
@@ -695,10 +711,10 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
       {!showForm && renderMainSection()}
 
       {showForm && (
-        <div className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="w-full min-w-0">
           {isEditMode && <BackToPreviousPage />}
-          <div className="landlord-property-form-header">
-            <h3 className="landlord-property-form-title">
+          <div className="mb-3">
+            <h3 className="m-0 text-2xl font-bold text-slate-800">
               {isEditMode ? 'Update property' : 'Add a new property'}
             </h3>
           </div>

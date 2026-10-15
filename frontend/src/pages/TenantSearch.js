@@ -349,15 +349,15 @@ const TenantSearch = () => {
   const selectedProperty = properties.find((property) =>property._id === selectedPropertyId) || null;
 
   return (
-    <div className="tenant-container">
-      <BackToDashboard />
+    <div className="tenant-container !m-0 !w-full !min-w-0 !max-w-none !p-0">
+      <BackToDashboard className="!mt-0 !mb-3 !w-fit !max-w-full" />
 
-      <div className="tenant-header">
-        <h1 className="tenant-title">Advanced Property Search</h1>
-        <p className="tenant-subtitle">Find verified rental properties</p>
+      <div className="mb-3 min-w-0">
+        <h1 className="m-0 text-2xl font-bold text-slate-800">Advanced Property Search</h1>
+        <p className="m-0 mt-1 text-slate-500">Find verified rental properties</p>
       </div>
 
-      <div className="tenant-search-form">
+      <div className="tenant-search-form !m-0 !w-full !min-w-0 !max-w-none">
         <form onSubmit={handleSearch} className="tenant-search-main-form">
           <div className="tenant-search-controls tenant-search-layout">
             <label className="tenant-field-label">Title</label>

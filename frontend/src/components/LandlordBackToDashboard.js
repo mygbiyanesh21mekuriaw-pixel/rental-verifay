@@ -5,6 +5,7 @@ const LandlordBackToDashboard = () => (
   <BackToDashboard
     dashboardRoute="/landlord-dashboard"
     label="← Back to Dashboard"
+    className="!m-0"
   />
 );
 

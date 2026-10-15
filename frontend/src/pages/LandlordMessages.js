@@ -51,11 +51,9 @@ const LandlordMessages = () => {
   };
 
   return (
-    <div className="tenant-container tenant-section-page">
+    <div className="tenant-container tenant-section-page !m-0 !w-full !max-w-none !p-0 flex flex-col gap-3">
       {propertyId && <BackToPreviousPage />}
-      <div className="tenant-header">
-        <h1 className="tenant-title">Messages</h1>
-      </div>
+      <h1 className="m-0 text-2xl font-bold text-slate-800">Messages</h1>
       <section className="tenant-section tenant-message-panel">
         {loading && <div className="tenant-loading">Loading conversations...</div>}
         {!loading && error && <div className="tenant-empty"><p>{error}</p></div>}
@@ -93,4 +91,3 @@ const LandlordMessages = () => {
 };
 
 export default LandlordMessages;
-

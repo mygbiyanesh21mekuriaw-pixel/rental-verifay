@@ -8,7 +8,6 @@ const Home = () => (
     <div className="home-container">
       <section className="home-hero" aria-label="Featured home overview">
         <p className="home-eyebrow">A better way to find your next home</p>
-        <h1 className="home-title">House Rental</h1>
         <p className="home-subtitle">
           Find and rent verified properties with confidence.
         </p>

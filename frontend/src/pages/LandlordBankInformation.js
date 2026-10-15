@@ -258,16 +258,16 @@ const LandlordBankInformation = () => {
   );
 
   return (
-    <section className="landlord-account-page landlord-bank-information">
-      <header className="landlord-account-heading landlord-bank-information-heading">
+    <section className="landlord-account-page landlord-bank-information !m-0 !w-full !max-w-none !p-0 flex flex-col gap-3">
+      <header>
         <div>
-          <p>LANDLORD WORKSPACE</p>
-          <h1>Bank Information</h1>
-          <span>Manage your saved bank details and view rent credits. Transfers are sent through Chapa and confirmed before they are marked executed.</span>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">LANDLORD WORKSPACE</p>
+          <h1 className="m-0 text-2xl font-bold text-slate-800">Bank Information</h1>
+          <span className="text-sm text-slate-600">Manage your saved bank details and view rent credits. Transfers are sent through Chapa and confirmed before they are marked executed.</span>
         </div>
       </header>
 
-      <section className="landlord-account-card bank-account-panel" aria-labelledby="bank-account-panel-title">
+      <section className="landlord-account-card bank-account-panel !mb-0" aria-labelledby="bank-account-panel-title">
         <h2 id="bank-account-panel-title">Bank Information</h2>
 
         {message && <p className="landlord-account-message" role="status">{message}</p>}
@@ -277,7 +277,7 @@ const LandlordBankInformation = () => {
             <p className="landlord-account-message" role="alert">{loadError}</p>
             <button
               type="button"
-              className="landlord-account-button"
+              className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]"
               onClick={loadBankInformation}
               disabled={loading}
             >
@@ -329,12 +329,12 @@ const LandlordBankInformation = () => {
                 {renderFormFields(false)}
                 {error && <p className="landlord-account-message" role="alert">{error}</p>}
                 <div className="landlord-account-actions">
-                  <button type="submit" className="landlord-account-button" disabled={saving || !canSubmitForm}>
+                  <button type="submit" className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]" disabled={saving || !canSubmitForm}>
                     {saving ? 'Saving...' : 'Create Account'}
                   </button>
                   <button
                     type="button"
-                    className="landlord-account-button"
+                    className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]"
                     onClick={() => {
                       setShowCreateForm(false);
                       setError('');
@@ -371,7 +371,7 @@ const LandlordBankInformation = () => {
             </span>
             <h3>No payout bank account has been registered yet.</h3>
             <p>You need to create a bank account to receive rent payments from tenants.</p>
-            <button type="button" className="landlord-account-button" onClick={openCreateForm}>
+            <button type="button" className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]" onClick={openCreateForm}>
               <span aria-hidden="true">＋</span> Create Bank Account
             </button>
           </div>
@@ -484,12 +484,12 @@ const LandlordBankInformation = () => {
               )}
               {error && <p className="landlord-account-message" role="alert">{error}</p>}
               <div className="landlord-account-actions">
-                <button type="submit" className="landlord-account-button" disabled={saving || !canSubmitForm}>
+                <button type="submit" className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]" disabled={saving || !canSubmitForm}>
                   {saving ? 'Saving...' : 'Update Account'}
                 </button>
                 <button
                   type="button"
-                  className="landlord-account-button"
+                  className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]"
                   onClick={() => {
                     setShowUpdateModal(false);
                     setError('');

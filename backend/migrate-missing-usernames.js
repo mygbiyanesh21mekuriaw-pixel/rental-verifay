@@ -2,19 +2,19 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('./models/User');
 
-const usernamePattern = /^[a-z0-9._-]{3,30}$/;
+const usernamePattern = /^[a-z0-9_]{3,20}$/;
 
 const createUsernameBase = (user) => {
   const emailLocalPart = String(user.email || '').split('@')[0] || '';
   const base = emailLocalPart
     .toLowerCase()
-    .replace(/[^a-z0-9._-]/g, '')
-    .replace(/^[._-]+|[._-]+$/g, '');
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/^_+|_+$/g, '');
 
-  if (base.length >= 3) return base.slice(0, 30);
+  if (base.length >= 3) return base.slice(0, 20);
 
   const idSuffix = String(user._id || '').replace(/[^a-z0-9]/gi, '').slice(-8).toLowerCase();
-  return `user${idSuffix || 'account'}`.slice(0, 30);
+  return `user${idSuffix || 'account'}`.slice(0, 20);
 };
 
 const planMissingUsernames = (users) => {
@@ -35,7 +35,7 @@ const planMissingUsernames = (users) => {
 
     while (!usernamePattern.test(candidate) || reservedUsernames.has(candidate.toLowerCase())) {
       const suffixText = String(suffix);
-      candidate = `${base.slice(0, 30 - suffixText.length)}${suffixText}`;
+      candidate = `${base.slice(0, 20 - suffixText.length)}${suffixText}`;
       suffix += 1;
     }
 

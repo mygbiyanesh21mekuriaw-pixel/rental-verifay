@@ -12,7 +12,7 @@ const { uploadFilesToUrls } = require('../utils/uploadMedia');
 const registrationNamePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
 const registrationEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const registrationPhonePattern = /^(?:0[79]\d{8}|\+251[79]\d{8})$/;
-const usernamePattern = /^[a-z0-9._-]{3,30}$/;
+const usernamePattern = /^[a-z0-9_]{3,20}$/;
 
 const normalizeLoginEmail = (email) => {
   const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -92,7 +92,7 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Enter a valid email address.' });
     }
     if (!usernamePattern.test(normalizedUsername)) {
-      return res.status(400).json({ message: 'Username must be 3-30 characters and use letters, numbers, periods, underscores, or hyphens.' });
+      return res.status(400).json({ message: 'Username must be 3-20 characters and use only letters, numbers, or underscores.' });
     }
     if (!registrationPhonePattern.test(normalizedPhone)) {
       return res.status(400).json({ message: 'Use 09XXXXXXXX, 07XXXXXXXX, +2519XXXXXXXX, or +2517XXXXXXXX.' });
@@ -167,22 +167,28 @@ const register = async (req, res) => {
 // ተጠቃሚ መግቢያ
 const login = async (req, res) => {
   try {
-    const rawEmail = req.body?.email;
-    const email = typeof rawEmail === 'string' ? normalizeLoginEmail(rawEmail) : '';
+    const rawIdentifier = req.body?.identifier ?? req.body?.email;
+    const identifier = typeof rawIdentifier === 'string' ? rawIdentifier.trim().toLowerCase() : '';
     const password = req.body?.password;
-    if (!email || typeof password !== 'string' || password.length === 0) {
-      return res.status(400).json({ message: 'Email and password are required.' });
-    }
-    if (email.length > 254 || password.length > 1024) {
+    if (!identifier || typeof password !== 'string' || password.length === 0) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    if (!registrationEmailPattern.test(email)) {
+    if (identifier.length > 254 || password.length > 1024) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const isEmail = identifier.includes('@');
+    const normalizedIdentifier = isEmail ? normalizeLoginEmail(identifier) : identifier;
+    if (
+      (isEmail && !registrationEmailPattern.test(normalizedIdentifier)) ||
+      (!isEmail && !usernamePattern.test(normalizedIdentifier))
+    ) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const escapedIdentifier = normalizedIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const matchingUsers = await User.find({
-      email: { $regex: `^${escapedEmail}$`, $options: 'i' },
+      [isEmail ? 'email' : 'username']: { $regex: `^${escapedIdentifier}$`, $options: 'i' },
     })
       .limit(2)
       .select('+bankAccountNumber');

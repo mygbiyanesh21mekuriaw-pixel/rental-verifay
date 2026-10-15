@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { FaTrash } from 'react-icons/fa';
-import { useAuth } from '../context/AuthContext';
 import BackToDashboard from '../components/BackToDashboard';
 import './TenantDashboard.css';
 
 const TenantNotifications = () => {
-  const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
@@ -101,13 +99,9 @@ const TenantNotifications = () => {
   }, [fetchNotifications]);
 
   return (
-    <div className="tenant-container">
-      <BackToDashboard />
-      
-      <div className="tenant-header">
-        <h1 className="tenant-title">Notifications</h1>
-        <p className="tenant-subtitle">Welcome, {user?.name}!</p>
-      </div>
+    <div className="w-full min-w-0 max-w-none space-y-4">
+      <BackToDashboard className="!mt-0 max-sm:!w-auto max-sm:!justify-start" />
+      <h1 className="m-0 text-2xl font-bold text-slate-800">Notifications</h1>
 
       {loading && (
         <div className="tenant-loading">
@@ -167,4 +161,3 @@ const TenantNotifications = () => {
 };
 
 export default TenantNotifications;
-

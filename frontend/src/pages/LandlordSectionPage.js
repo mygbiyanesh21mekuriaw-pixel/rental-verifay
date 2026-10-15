@@ -146,12 +146,10 @@ const LandlordSectionPage = ({ type }) => {
   }
 
   return (
-    <div style={styles.container}>
-      <div className="landlord-section-page-header">
-        <h2 className="landlord-section-page-title">{config.title}</h2>
-      </div>
+    <div className="flex w-full min-w-0 max-w-none flex-col gap-3">
+      <h1 className="m-0 text-2xl font-bold text-slate-800">{config.title}</h1>
       {successNotice && (
-        <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">
           {successNotice}
         </div>
       )}
@@ -219,24 +217,24 @@ const LandlordSectionPage = ({ type }) => {
                   </section>
                 );
               })()}
-              <div style={styles.cardActions}>
+              <div className={`grid ${type === 'rented' ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5 px-4 pb-4`}>
                 {type === 'rented' && (
                   <button 
                     onClick={() =>handleMessage(property)}
-                    style={styles.messageBtn}
+                    className="h-8 w-full min-w-0 rounded-md border border-[#4299e1] bg-[#4299e1] px-2 text-xs font-bold leading-none text-white transition-colors hover:border-[#3182ce] hover:bg-[#3182ce] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4299e1] focus-visible:ring-offset-2"
                     title="Send message"
                   >Message
                   </button>
                 )}
-                <button 
+                <button
                   onClick={() =>handleUpdate(property)}
-                  style={styles.updateBtn}
+                  className="h-8 w-full min-w-0 rounded-md border border-[#805ad5] bg-[#805ad5] px-2 text-xs font-bold leading-none text-white transition-colors hover:border-[#6b46c1] hover:bg-[#6b46c1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#805ad5] focus-visible:ring-offset-2"
                   title="Edit property"
                 >Update
                 </button>
-                <button 
+                <button
                   onClick={() =>handleDelete(property._id)}
-                  style={styles.deleteBtn}
+                  className="h-8 w-full min-w-0 rounded-md border border-[#e53e3e] bg-[#e53e3e] px-2 text-xs font-bold leading-none text-white transition-colors hover:border-[#c53030] hover:bg-[#c53030] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e53e3e] focus-visible:ring-offset-2"
                   title="Delete property"
                 >Delete
                 </button>
@@ -245,7 +243,7 @@ const LandlordSectionPage = ({ type }) => {
                     onClick={() => navigate(`/landlord/rent-payments?propertyId=${property._id}`, {
                       state: { from: `${location.pathname}${location.search}` },
                     })}
-                    style={styles.paymentBtn}
+                    className="col-span-3 h-8 w-full rounded-md border border-[#d69e2e] bg-[#d69e2e] px-2 text-xs font-bold leading-none text-white transition-colors hover:border-[#b7791f] hover:bg-[#b7791f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d69e2e] focus-visible:ring-offset-2"
                     title="View rent payments"
                   >Rent Payments
                   </button>
@@ -260,11 +258,6 @@ const LandlordSectionPage = ({ type }) => {
 };
 
 const styles = {
-  container: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '30px 20px',
-  },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -449,71 +442,6 @@ const styles = {
   reviewDate: {
     color: '#64748b',
     fontSize: '11px',
-  },
-  cardActions: {
-    padding: '0 16px 16px',
-    display: 'flex',
-    gap: '6px',
-    flexWrap: 'wrap',
-  },
-  messageBtn: {
-    flex: 1,
-    minWidth: '70px',
-    padding: '8px 10px',
-    backgroundColor: '#4299e1',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '12px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  updateBtn: {
-    flex: 1,
-    minWidth: '70px',
-    padding: '8px 10px',
-    backgroundColor: '#805ad5',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '12px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  deleteBtn: {
-    flex: 1,
-    minWidth: '70px',
-    padding: '8px 10px',
-    backgroundColor: '#e53e3e',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '12px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  paymentBtn: {
-    flex: 1,
-    minWidth: '110px',
-    padding: '8px 10px',
-    backgroundColor: '#d69e2e',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '12px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-  viewBtn: {
-    flex: 1,
-    padding: '8px 12px',
-    backgroundColor: '#4299e1',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
   },
 };
 

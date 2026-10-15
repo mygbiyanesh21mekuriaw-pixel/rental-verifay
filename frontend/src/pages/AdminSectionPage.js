@@ -13,6 +13,7 @@ const sectionConfig = {
   awaitingVerification: { title: 'Properties awaiting verification', endpoint: 'pending-properties' },
   allProperties: { title: 'Properties', status: 'all' },
   pending: { title: 'Under Review', endpoint: 'pending-properties' },
+  reviewProperties: { title: 'Under Review', status: 'pending' },
   rentalRequests: { title: 'Rental Requests', endpoint: 'rental-requests/admin-requests' },
   rejected: { title: 'Rejected', status: 'rejected' },
   allUsers: { title: 'All users', endpoint: 'users' },
@@ -45,7 +46,7 @@ const AdminSectionPage = ({ type }) => {
   const isUserListPage = type === 'allUsers';
   const isAreaAdminPropertySection = currentUser?.role === 'admin'
     && currentUser?.adminType === 'area'
-    && ['allProperties', 'pending', 'awaitingVerification', 'rejected', 'verified', 'rentalRequests'].includes(type);
+    && ['allProperties', 'pending', 'reviewProperties', 'awaitingVerification', 'rejected', 'verified', 'rentalRequests'].includes(type);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -77,7 +78,7 @@ const AdminSectionPage = ({ type }) => {
     && ['verified', 'rejected', 'pending', 'allProperties', 'rentalRequests'].includes(type);
   const canManageVerification = currentUser?.role === 'admin'
     && currentUser?.adminType === 'area'
-    && (type === 'pending' || type === 'awaitingVerification');
+    && (type === 'pending' || type === 'reviewProperties' || type === 'awaitingVerification');
   const canManageRentalRequests = currentUser?.role === 'admin' && currentUser?.adminType === 'area';
 
   const fetchItems = useCallback(async () => {

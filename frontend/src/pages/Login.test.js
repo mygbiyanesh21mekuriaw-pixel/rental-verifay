@@ -17,7 +17,7 @@ beforeEach(() => {
   });
 });
 
-test('login submits normalized email and password using the backend email API format', async () => {
+test('login submits normalized email and password as an identifier', async () => {
   render(
     <MemoryRouter>
       <AuthProvider>
@@ -30,9 +30,9 @@ test('login submits normalized email and password using the backend email API fo
   expect(universityLogo).toHaveAttribute('src', '/mekdela-amba-logo.jpeg');
   expect(universityLogo).toHaveClass('mx-auto');
 
-  const emailInput = screen.getByLabelText('Email');
-  expect(emailInput).toHaveAttribute('placeholder', 'Enter your email');
-  expect(emailInput).toHaveAttribute('type', 'email');
+  const emailInput = screen.getByLabelText('Email or Username');
+  expect(emailInput).toHaveAttribute('placeholder', 'Enter your email or username');
+  expect(emailInput).toHaveAttribute('type', 'text');
 
   fireEvent.change(emailInput, { target: { value: ' Tenant@Example.com ' } });
   fireEvent.change(screen.getByLabelText('Password'), {
@@ -43,12 +43,12 @@ test('login submits normalized email and password using the backend email API fo
   await waitFor(() => {
     expect(axios.post).toHaveBeenCalledWith(
       `${process.env.REACT_APP_API_URL}/api/auth/login`,
-      { email: 'tenant@example.com', password: 'correct-password' }
+      { identifier: 'tenant@example.com', password: 'correct-password' }
     );
   });
 });
 
-test('login rejects an invalid email before sending a request', () => {
+test('login accepts a username without email-format validation', async () => {
   render(
     <MemoryRouter>
       <AuthProvider>
@@ -57,16 +57,20 @@ test('login rejects an invalid email before sending a request', () => {
     </MemoryRouter>
   );
 
-  fireEvent.change(screen.getByLabelText('Email'), {
-    target: { value: 'not-an-email' },
+  fireEvent.change(screen.getByLabelText('Email or Username'), {
+    target: { value: ' Tenant_1 ' },
   });
   fireEvent.change(screen.getByLabelText('Password'), {
     target: { value: 'correct-password' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Login' }));
 
-  expect(screen.getByText('Enter a valid email address')).toBeInTheDocument();
-  expect(axios.post).not.toHaveBeenCalled();
+  await waitFor(() => {
+    expect(axios.post).toHaveBeenCalledWith(
+      `${process.env.REACT_APP_API_URL}/api/auth/login`,
+      { identifier: 'tenant_1', password: 'correct-password' }
+    );
+  });
 });
 
 test('login explains when an expired session requires signing in again', () => {

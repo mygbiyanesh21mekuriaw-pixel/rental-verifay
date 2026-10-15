@@ -36,10 +36,12 @@ const LandlordPayments = () => {
   }, [propertyId]);
 
   return (
-    <div className="payment-page">
+    <div className="payment-page !m-0 !w-full !max-w-none !p-0 flex flex-col gap-3">
       {propertyId && <BackToPreviousPage />}
-      <div className="payment-page-header">
-        <div><p className="payment-eyebrow">Landlord finance</p><h1>Rent Payments</h1><p>{propertyId ? 'Payments for this rented property.' : 'Payments received for your properties.'}</p></div>
+      <div>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Landlord finance</p>
+        <h1 className="m-0 text-2xl font-bold text-slate-800">Rent Payments</h1>
+        <p className="mt-1 text-sm text-slate-600">{propertyId ? 'Payments for this rented property.' : 'Payments received for your properties.'}</p>
       </div>
       <p className="payment-muted">
         Verified live payments are credited and submitted to your registered bank through Chapa. Sandbox requests use Chapa's test simulation and never move real bank funds. A transfer is marked EXECUTED only after Chapa confirms a live transfer.

@@ -53,24 +53,24 @@ const LandlordProfile = () => {
   };
 
   if (loading) {
-    return <section className="landlord-account-page"><p>Loading profile...</p></section>;
+    return <section className="landlord-account-page !m-0 !w-full !max-w-none !p-0"><p>Loading profile...</p></section>;
   }
 
   return (
-    <section className="landlord-account-page">
-      <header className="landlord-account-heading">
+    <section className="landlord-account-page !m-0 !w-full !max-w-none !p-0 flex flex-col gap-3">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p>LANDLORD</p>
-          <h1>Profile</h1>
-          <span>Manage your name, phone number, and profile photo.</span>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">LANDLORD</p>
+          <h1 className="m-0 text-2xl font-bold text-slate-800">Profile</h1>
+          <span className="text-sm text-slate-600">Manage your name, phone number, and profile photo.</span>
         </div>
         {!editing && (
-          <button type="button" className="landlord-account-button" onClick={() =>setEditing(true)}>Edit Profile
+          <button type="button" className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]" onClick={() =>setEditing(true)}>Edit Profile
           </button>
         )}
       </header>
 
-      <div className="landlord-account-card landlord-profile-card">
+      <div className="landlord-account-card landlord-profile-card !mb-0">
         <ProfilePhotoControl user={user || profile} showLabel />
         {editing ? (
           <form className="landlord-account-form" onSubmit={saveProfile}>
@@ -95,7 +95,7 @@ const LandlordProfile = () => {
                 setMessage('');
               }}>Cancel
               </button>
-              <button type="submit" className="landlord-account-button" disabled={saving}>
+              <button type="submit" className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Profile'}
               </button>
             </div>

@@ -3,107 +3,142 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('./models/User');
 
+const PLATFORM_ADMIN_USERNAME = 'platform_admin';
+const LEGACY_PLATFORM_ADMIN_USERNAME = 'platform.admin';
+
 const normalizeAdminEmail = (email) => {
-  const normalizedEmail = String(email || '').trim().toLowerCase();
-  return normalizedEmail.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
+  const normalized = String(email || '').trim().toLowerCase();
+  return normalized.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
 };
 
-const getAvailableAdminUsername = async (email, requestedUsername, existingAdmin) => {
-  const currentUsername = String(requestedUsername || existingAdmin?.username || '').trim().toLowerCase();
-  const base = (currentUsername || String(email).split('@')[0])
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]/g, '')
-    .replace(/^[._-]+|[._-]+$/g, '');
-  const normalizedBase = base.length >= 3 ? base.slice(0, 30) : 'platformadmin';
+const isPlatformAdmin = (user) => user?.role === 'admin' && (
+  user.adminType === 'platform' ||
+  (!user.adminType && (!user.adminAreas || user.adminAreas.length === 0))
+);
 
-  if (requestedUsername && !/^[a-z0-9._-]{3,30}$/i.test(currentUsername)) {
-    throw new Error('ADMIN_USERNAME must be 3-30 characters and use letters, numbers, periods, underscores, or hyphens.');
+const warnUsernameCollision = (adminEmail) => {
+  console.warn(
+    `⚠️  Cannot set Platform Admin username to "${PLATFORM_ADMIN_USERNAME}" for ${adminEmail || 'the existing Platform Admin'}: another user already has that username.`
+  );
+};
+
+const findExistingPlatformAdmin = async (adminEmail) => {
+  let occupiedEmail = false;
+  if (adminEmail) {
+    const accountForEmail = await User.findOne({ email: adminEmail });
+    if (isPlatformAdmin(accountForEmail)) return accountForEmail;
+    if (accountForEmail) {
+      occupiedEmail = true;
+      console.warn(`⚠️  Admin bootstrap skipped: ${adminEmail} is not the existing Platform Admin account; its fields were left unchanged.`);
+    }
   }
 
-  let candidate = normalizedBase;
-  let suffix = 2;
-  while (true) {
-    const escapedCandidate = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const duplicate = await User.findOne({
-      username: { $regex: `^${escapedCandidate}$`, $options: 'i' },
-      ...(existingAdmin ? { _id: { $ne: existingAdmin._id } } : {}),
-    }).select('_id');
+  const platformAdmin = await User.findOne({
+    role: 'admin',
+    $or: [
+      { adminType: 'platform' },
+      { adminType: { $exists: false }, adminAreas: { $size: 0 } },
+    ],
+  });
+  return platformAdmin || (occupiedEmail ? false : null);
+};
 
-    if (!duplicate) return candidate;
-    if (requestedUsername) throw new Error('ADMIN_USERNAME is already in use.');
+const setCanonicalUsername = async (admin) => {
+  const username = typeof admin.username === 'string' ? admin.username.trim().toLowerCase() : '';
+  if (username && username !== LEGACY_PLATFORM_ADMIN_USERNAME) return admin;
 
-    const suffixText = String(suffix);
-    candidate = `${normalizedBase.slice(0, 30 - suffixText.length)}${suffixText}`;
-    suffix += 1;
+  const duplicate = await User.findOne({
+    username: { $regex: `^${PLATFORM_ADMIN_USERNAME}$`, $options: 'i' },
+    _id: { $ne: admin._id },
+  }).select('_id');
+
+  if (duplicate) {
+    warnUsernameCollision(admin.email);
+    return admin;
+  }
+
+  try {
+    const result = await User.updateOne(
+      { _id: admin._id },
+      { $set: { username: PLATFORM_ADMIN_USERNAME } },
+      { runValidators: true }
+    );
+    if (result.matchedCount !== 1) {
+      throw new Error(`Platform Admin ${admin.email || admin._id} changed while its username was being updated.`);
+    }
+
+    admin.username = PLATFORM_ADMIN_USERNAME;
+    console.log(`✅ Updated Platform Admin username to ${PLATFORM_ADMIN_USERNAME}.`);
+    return admin;
+  } catch (error) {
+    if (error?.code === 11000) {
+      warnUsernameCollision(admin.email);
+      return admin;
+    }
+    throw error;
   }
 };
 
 async function createAdmin() {
   try {
-    const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/rental-db';
+    if (mongoose.connection.readyState !== 1) {
+      const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/rental-db';
+      await mongoose.connect(mongoUri, {
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 15000,
+      });
+    }
+
     const adminEmail = normalizeAdminEmail(process.env.ADMIN_EMAIL);
+    let admin = await findExistingPlatformAdmin(adminEmail);
+
+    const adminCount = await User.countDocuments({ role: 'admin' });
+    if (adminCount > 1) {
+      console.warn(`⚠️  Found ${adminCount} admin accounts. Bootstrap will not create or delete any admin accounts.`);
+    }
+
+    if (admin === false) return null;
+    if (admin) return await setCanonicalUsername(admin);
+
     const adminPassword = String(process.env.ADMIN_PASSWORD || '').trim();
     const adminName = String(process.env.ADMIN_NAME || '').trim();
-
     if (!adminEmail || !adminPassword || !adminName) {
       console.log('ℹ️  Platform admin bootstrap skipped. Set ADMIN_EMAIL, ADMIN_PASSWORD, and ADMIN_NAME to create the initial admin.');
       return null;
     }
 
-    await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 15000,
-      socketTimeoutMS: 15000,
-    });
+    const duplicate = await User.findOne({
+      username: { $regex: `^${PLATFORM_ADMIN_USERNAME}$`, $options: 'i' },
+    }).select('_id');
+    if (duplicate) {
+      warnUsernameCollision(adminEmail);
+      return null;
+    }
 
-    let admin = await User.findOne({ email: adminEmail });
-    const adminUsername = await getAvailableAdminUsername(
-      adminEmail,
-      process.env.ADMIN_USERNAME,
-      admin
-    );
-    const adminPayload = {
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(adminPassword, salt);
+    admin = new User({
       name: adminName,
       email: adminEmail,
-      username: adminUsername,
+      username: PLATFORM_ADMIN_USERNAME,
+      password: hashedPassword,
       phone: String(process.env.ADMIN_PHONE || '').trim(),
       role: 'admin',
       adminType: 'platform',
       adminAreas: [],
-    };
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(adminPassword, salt);
-
-    if (admin) {
-      const needsUpdate = admin.role !== 'admin'
-        || admin.adminType !== 'platform'
-        || admin.name !== adminName
-        || admin.phone !== adminPayload.phone
-        || (admin.adminAreas || []).length !== 0
-        || !(await bcrypt.compare(adminPassword, admin.password));
-
-      admin.set({
-        ...adminPayload,
-        password: hashedPassword,
-      });
-
-      await admin.save();
-
-      if (needsUpdate) {
-        console.log(`✅ Existing account updated to Platform Admin: ${adminEmail}`);
-      } else {
-        console.log(`⚠️  Platform admin already exists: ${adminEmail}`);
-      }
-
-      return admin;
-    }
-
-    admin = new User({
-      ...adminPayload,
-      password: hashedPassword,
     });
 
-    await admin.save();
+    try {
+      await admin.save();
+    } catch (error) {
+      if (error?.code === 11000) {
+        if (error?.keyPattern?.username) warnUsernameCollision(adminEmail);
+        else console.warn(`⚠️  Platform admin ${adminEmail} was created by another process; no second account was added.`);
+        return null;
+      }
+      throw error;
+    }
+
     console.log('✅ Platform admin created successfully!');
     console.log(`📧 Email: ${adminEmail}`);
     return admin;

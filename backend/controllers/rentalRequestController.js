@@ -344,18 +344,27 @@ const getLandlordRentRequests = async (req, res) => {
   try {
     const landlordId = req.user.id;
     const { status } = req.query;
+    const limit = req.query.limit === undefined ? null : Number(req.query.limit);
+
+    if (limit !== null && (!Number.isInteger(limit) || limit < 1)) {
+      return res.status(400).json({ message: 'Limit must be a positive integer' });
+    }
     
     let filter = { landlord: landlordId };
     if (status) {
       filter.status = status;
     }
 
-    const requests = await RentRequest.find(filter)
+    let requestsQuery = RentRequest.find(filter)
       .populate('property', 'title location price images propertyImages image description bedrooms')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
+    if (limit !== null) {
+      requestsQuery = requestsQuery.limit(Math.min(limit, 100));
+    }
 
+    const requests = await requestsQuery;
     res.json(requests);
   } catch (error) {
     console.error('Error fetching landlord rent requests:', error);

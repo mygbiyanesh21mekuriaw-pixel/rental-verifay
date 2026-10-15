@@ -3,12 +3,14 @@ import axios from 'axios';
 import { FaCamera } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import ProfileAvatar from './ProfileAvatar';
+import { useLanguage } from '../context/LanguageContext';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const ProfilePhotoControl = ({ user, className = '', showLabel = false }) => {
   const { updateUser } = useAuth();
+  const { t } = useLanguage();
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
@@ -52,21 +54,21 @@ const ProfilePhotoControl = ({ user, className = '', showLabel = false }) => {
     <div className={`profile-photo-control ${className}`.trim()}>
       <label
         className="profile-photo-control-trigger"
-        aria-label="Choose profile photo"
-        title="Choose profile photo"
+        aria-label={t('Choose profile photo')}
+        title={t('Change photo')}
       >
         <ProfileAvatar user={user} className="profile-photo-control-avatar" />
         <span className="profile-photo-control-camera" aria-hidden="true">
           {uploading ? '' : <FaCamera />}
         </span>
-        {showLabel && <span className="profile-photo-control-label">Change photo</span>}
+        {showLabel && <span className="profile-photo-control-label">{t('Change photo')}</span>}
         <input
           ref={inputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
           onChange={uploadPhoto}
           disabled={uploading}
-          aria-label="Upload profile photo"
+          aria-label={t('Upload profile photo')}
         />
       </label>
       {message && (

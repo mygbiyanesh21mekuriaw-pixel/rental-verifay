@@ -18,8 +18,8 @@ const buildMonthLabel = (monthKey) => {
   if (!monthKey) return 'N/A';
   const [year, month] = String(monthKey).split('-');
   if (!year || !month) return monthKey;
-  const date = new Date(Number(year), Number(month) - 1, 1);
-  return date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+  return date.toLocaleString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 };
 
 const buildTrendSeries = (records, key = 'month') => {
@@ -33,10 +33,11 @@ const buildTrendSeries = (records, key = 'month') => {
       count: Number(entry.count || 0),
     }))
     .map((entry) => ({
+      key: entry.key,
       label: key === 'month' ? buildMonthLabel(entry.key) : entry.key,
       value: entry.count,
     }))
-    .sort((left, right) => (left.label || '').localeCompare(right.label || ''));
+    .sort((left, right) => (left.key || '').localeCompare(right.key || ''));
 };
 
 const getAdminAreas = async (adminId) => {
@@ -161,12 +162,41 @@ const createAdminAccount = async (req, res) => {
   }
 };
 
-const getAdminAnalyticsSnapshot = async () => {
+const getAdminAnalyticsSnapshot = async ({ range = 'all', timezone = 'UTC' } = {}) => {
+  const now = new Date();
+  const createdAtFilter = {};
+  if (range === '30d') {
+    createdAtFilter.$gte = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  } else if (range === '6m') {
+    const start = new Date(now);
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    start.setMonth(start.getMonth() - 5);
+    createdAtFilter.$gte = start;
+  }
+  const filterByRange = (filter = {}) => (
+    Object.keys(createdAtFilter).length ? { ...filter, createdAt: createdAtFilter } : filter
+  );
+  const dateExpression = {
+    $dateToString: { format: '%Y-%m', date: '$createdAt', timezone },
+  };
+  const trendPipeline = [
+    ...(Object.keys(createdAtFilter).length ? [{ $match: filterByRange() }] : []),
+    {
+      $group: {
+        _id: dateExpression,
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ];
   const [
     totalUsers,
     totalTenants,
     totalLandlords,
     totalAdmins,
+    totalPlatformAdmins,
+    totalAreaAdmins,
     totalProperties,
     verifiedProperties,
     pendingProperties,
@@ -178,65 +208,55 @@ const getAdminAnalyticsSnapshot = async () => {
     approvedRentalRequests,
     rejectedRentalRequests,
     propertyStatusData,
+    availabilityStatusData,
     userRoleData,
     rentalRequestStatusData,
     propertyTrendData,
     userTrendData,
     rentalRequestTrendData,
   ] = await Promise.all([
-    User.countDocuments(),
-    User.countDocuments({ role: 'tenant' }),
-    User.countDocuments({ role: 'landlord' }),
-    User.countDocuments({ role: 'admin' }),
-    Property.countDocuments(),
-    Property.countDocuments({ isVerified: true, verificationStatus: 'approved' }),
-    Property.countDocuments({ verificationStatus: 'pending' }),
-    Property.countDocuments({ verificationStatus: 'rejected' }),
-    Property.countDocuments({ availabilityStatus: 'available' }),
-    Property.countDocuments({ availabilityStatus: 'rented' }),
-    RentalRequest.countDocuments(),
-    RentalRequest.countDocuments({ status: 'pending' }),
-    RentalRequest.countDocuments({ status: 'approved' }),
-    RentalRequest.countDocuments({ status: 'rejected' }),
+    User.countDocuments(filterByRange()),
+    User.countDocuments(filterByRange({ role: 'tenant' })),
+    User.countDocuments(filterByRange({ role: 'landlord' })),
+    User.countDocuments(filterByRange({ role: 'admin' })),
+    User.countDocuments(filterByRange({
+      role: 'admin',
+      $or: [{ adminType: 'platform' }, { adminType: null }],
+    })),
+    User.countDocuments(filterByRange({ role: 'admin', adminType: 'area' })),
+    Property.countDocuments(filterByRange()),
+    Property.countDocuments(filterByRange({ isVerified: true, verificationStatus: 'approved' })),
+    Property.countDocuments(filterByRange({ verificationStatus: 'pending' })),
+    Property.countDocuments(filterByRange({ verificationStatus: 'rejected' })),
+    Property.countDocuments(filterByRange({ availabilityStatus: 'available' })),
+    Property.countDocuments(filterByRange({ availabilityStatus: 'rented' })),
+    RentalRequest.countDocuments(filterByRange()),
+    RentalRequest.countDocuments(filterByRange({ status: 'pending' })),
+    RentalRequest.countDocuments(filterByRange({ status: 'approved' })),
+    RentalRequest.countDocuments(filterByRange({ status: 'rejected' })),
     Property.aggregate([
+      ...(Object.keys(createdAtFilter).length ? [{ $match: filterByRange() }] : []),
       { $group: { _id: '$verificationStatus', count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
+    Property.aggregate([
+      ...(Object.keys(createdAtFilter).length ? [{ $match: filterByRange() }] : []),
+      { $group: { _id: '$availabilityStatus', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]),
     User.aggregate([
+      ...(Object.keys(createdAtFilter).length ? [{ $match: filterByRange() }] : []),
       { $group: { _id: '$role', count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
     RentalRequest.aggregate([
+      ...(Object.keys(createdAtFilter).length ? [{ $match: filterByRange() }] : []),
       { $group: { _id: '$status', count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
-    Property.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]),
-    User.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]),
-    RentalRequest.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]),
+    Property.aggregate(trendPipeline),
+    User.aggregate(trendPipeline),
+    RentalRequest.aggregate(trendPipeline),
   ]);
 
   const propertyStatus = {
@@ -252,6 +272,8 @@ const getAdminAnalyticsSnapshot = async () => {
     tenants: totalTenants,
     landlords: totalLandlords,
     admins: totalAdmins,
+    platformAdmins: totalPlatformAdmins,
+    areaAdmins: totalAreaAdmins,
   };
 
   const rentalRequestStatus = {
@@ -272,6 +294,18 @@ const getAdminAnalyticsSnapshot = async () => {
   const propertyBuckets = normalizeBucket(propertyStatusData);
   const userBuckets = normalizeBucket(userRoleData);
   const rentalBuckets = normalizeBucket(rentalRequestStatusData);
+  const otherPropertyStatus = Math.max(
+    totalProperties - verifiedProperties - pendingProperties - rejectedProperties,
+    0,
+  );
+  const otherAvailabilityStatus = Math.max(totalProperties - availableProperties - rentedProperties, 0);
+  const confirmedRentalRequests = rentalBuckets.confirmed || 0;
+  const expiredRentalRequests = rentalBuckets.expired || 0;
+  const otherRentalRequests = Math.max(
+    totalRentalRequests - pendingRentalRequests - approvedRentalRequests - rejectedRentalRequests
+      - confirmedRentalRequests - expiredRentalRequests,
+    0,
+  );
 
   return {
     generatedAt: new Date().toISOString(),
@@ -280,36 +314,51 @@ const getAdminAnalyticsSnapshot = async () => {
       totalTenants,
       totalLandlords,
       totalAdmins,
+      totalPlatformAdmins,
+      totalAreaAdmins,
       totalProperties,
       verifiedProperties,
       pendingProperties,
       rejectedProperties,
       availableProperties,
       rentedProperties,
+      otherPropertyStatus,
+      otherAvailabilityStatus,
       totalRentalRequests,
       pendingRentalRequests,
       approvedRentalRequests,
       rejectedRentalRequests,
+      confirmedRentalRequests,
+      expiredRentalRequests,
+      otherRentalRequests,
     },
     propertyStatus: {
       verified: propertyStatus.verified,
       pending: propertyStatus.pending,
       rejected: propertyStatus.rejected,
+      other: otherPropertyStatus,
       available: propertyStatus.available,
       rented: propertyStatus.rented,
+      otherAvailability: otherAvailabilityStatus,
       breakdown: propertyBuckets,
+      availabilityBreakdown: normalizeBucket(availabilityStatusData),
     },
     userRoles: {
       total: totalUsers,
       tenants: totalTenants,
       landlords: totalLandlords,
       admins: totalAdmins,
+      platformAdmins: totalPlatformAdmins,
+      areaAdmins: totalAreaAdmins,
       breakdown: userBuckets,
     },
     rentalRequestStatus: {
       pending: pendingRentalRequests,
       approved: approvedRentalRequests,
       rejected: rejectedRentalRequests,
+      confirmed: confirmedRentalRequests,
+      expired: expiredRentalRequests,
+      other: otherRentalRequests,
       total: totalRentalRequests,
       breakdown: rentalBuckets,
     },
@@ -565,6 +614,11 @@ const getStats = async (req, res) => {
     const landlords = await User.countDocuments({ role: 'landlord' });
     const tenants = await User.countDocuments({ role: 'tenant' });
     const admins = await User.countDocuments({ role: 'admin' });
+    const platformAdmins = await User.countDocuments({
+      role: 'admin',
+      $or: [{ adminType: 'platform' }, { adminType: null }],
+    });
+    const areaAdmins = await User.countDocuments({ role: 'admin', adminType: 'area' });
 
     res.json({
       totalProperties,
@@ -576,6 +630,8 @@ const getStats = async (req, res) => {
       landlords,
       tenants,
       admins,
+      platformAdmins,
+      areaAdmins,
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -585,7 +641,17 @@ const getStats = async (req, res) => {
 // አዲስ አድሚን አናሊቲክስ ማስላት
 const getAnalytics = async (req, res) => {
   try {
-    const analytics = await getAdminAnalyticsSnapshot();
+    const range = ['30d', '6m', 'all'].includes(req.query.range) ? req.query.range : 'all';
+    let timezone = 'UTC';
+    if (typeof req.query.timezone === 'string') {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: req.query.timezone });
+        timezone = req.query.timezone;
+      } catch (error) {
+        console.warn('Invalid analytics timezone; using UTC.');
+      }
+    }
+    const analytics = await getAdminAnalyticsSnapshot({ range, timezone });
     res.json(analytics);
   } catch (error) {
     console.error('Analytics fetch failed:', error);

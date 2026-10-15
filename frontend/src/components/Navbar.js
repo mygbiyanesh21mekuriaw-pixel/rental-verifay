@@ -6,6 +6,8 @@ import ProfilePhotoControl from './ProfilePhotoControl';
 import ProfileAvatar from './ProfileAvatar';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useSystemStatus } from '../context/SystemStatusContext';
+import { useLanguage } from '../context/LanguageContext';
+import { useDashboardLayout } from './DashboardLayout';
 import './navbar.css';
 
 import {
@@ -32,12 +34,17 @@ import {
   FaClipboardList,
   FaCreditCard,
   FaEnvelope,
+  FaBuilding,
+  FaTh,
 } from 'react-icons/fa';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { status } = useSystemStatus();
+  const { t } = useLanguage();
   const location = useLocation();
+  const dashboardLayout = useDashboardLayout();
+  const setDashboardUnreadCount = dashboardLayout?.setUnreadCount;
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -55,6 +62,7 @@ const Navbar = () => {
   useEffect(() => {
     if (!user) {
       setUnreadCount(0);
+      setDashboardUnreadCount?.(0);
       return;
     }
 
@@ -71,11 +79,12 @@ const Navbar = () => {
           }
         );
 
-        setUnreadCount(
-          Number(response.data?.unreadCount || 0)
-        );
+        const count = Number(response.data?.unreadCount ?? response.data?.count ?? 0);
+        setUnreadCount(count);
+        setDashboardUnreadCount?.(count);
       } catch (error) {
         setUnreadCount(0);
+        setDashboardUnreadCount?.(0);
       }
     };
 
@@ -89,7 +98,7 @@ const Navbar = () => {
     return () => {
       window.clearInterval(refreshInterval);
     };
-  }, [user, location.pathname]);
+  }, [user, location.pathname, setDashboardUnreadCount]);
 
   // ==========================================
   // LOGOUT
@@ -308,20 +317,26 @@ const Navbar = () => {
   // ==========================================
   const areaAdminLinks = [
     [
-      FaHome,
+      FaTh,
       'Dashboard',
       '/admin-dashboard',
     ],
 
     [
-      FaHome,
+      FaBuilding,
       'Properties',
       '/admin-dashboard/all-properties',
     ],
 
     [
+      FaHourglassHalf,
+      'Under Review',
+      '/admin-dashboard/pending',
+    ],
+
+    [
       FaCheck,
-      'Verified Properties',
+      'Verified',
       '/admin-dashboard/verified',
     ],
 
@@ -335,12 +350,6 @@ const Navbar = () => {
       FaClipboardList,
       'Rental Requests',
       '/admin-dashboard/rental-requests',
-    ],
-
-    [
-      FaSearch,
-      'Under Review',
-      '/admin-dashboard/pending',
     ],
 
     [
@@ -408,14 +417,28 @@ const Navbar = () => {
     : user?.role === 'landlord'
       ? '/landlord/notifications'
       : '/tenant/notifications';
-
   return (
     <>
       {/* ==========================================
           TOP LOGOUT BAR
       ========================================== */}
       {user && (
-        <div className="navbar-topbar">
+        <div className={dashboardLayout
+          ? 'dashboard-shell-topbar !relative !inset-auto !z-30 !flex !h-[66px] !w-full !items-center !justify-start !gap-2 !border-0 !border-b !border-white/10 !bg-[var(--rv-dashboard-topbar)] !px-3 !py-0 !text-white !shadow-sm md:!h-[78px] md:!gap-5 md:!px-6'
+          : 'navbar-topbar'}
+        >
+          {dashboardLayout && (
+            <button
+              type="button"
+              onClick={dashboardLayout.toggleMenu}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 md:hidden"
+              aria-label={t(dashboardLayout.menuOpen ? 'Close navigation menu' : 'Open navigation menu')}
+              aria-expanded={dashboardLayout.menuOpen}
+              aria-controls="dashboard-navigation"
+            >
+              {dashboardLayout.menuOpen ? <FaTimes aria-hidden="true" /> : <FaBars aria-hidden="true" />}
+            </button>
+          )}
           <Link to="/" className="navbar-topbar-brand">
             <img
               src={status.branding.websiteLogoDataUri || '/mekdela-amba-logo.jpeg'}
@@ -427,8 +450,13 @@ const Navbar = () => {
             </span>
           </Link>
           <div className="navbar-topbar-context">
-            <span>{getRoleName(user.role)} workspace</span>
-            <strong>Overview / Dashboard</strong>
+            <span>
+              {t(user.role === 'admin'
+                ? user.adminType === 'area' ? 'Area Admin' : 'Platform Admin'
+                : getRoleName(user.role))}
+              {' '}{t('Workspace')}
+            </span>
+            <strong>{dashboardLayout?.title || t('Overview / Dashboard')}</strong>
           </div>
           <Link
             to={notificationsPath}
@@ -443,22 +471,28 @@ const Navbar = () => {
               </span>
             )}
           </Link>
-          <LanguageSwitcher className="language-switcher-topbar" />
+          <LanguageSwitcher
+            className={`language-switcher-topbar ${dashboardLayout ? '[&_select]:max-md:!w-[76px] [&_select]:max-md:!max-w-[76px]' : ''}`}
+          />
           <button
             type="button"
             onClick={handleLogout}
-            className="navbar-top-logout-btn"
+            className={`${dashboardLayout ? 'shrink-0 ' : ''}navbar-top-logout-btn ${dashboardLayout ? '!inline-flex !min-h-10 !items-center !justify-center !gap-2 !rounded-lg !border !border-white/20 !bg-white/10 !px-3 !py-0 !text-white !shadow-none hover:!translate-y-0 hover:!bg-white/20 hover:!shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 max-md:!h-9 max-md:!w-9 max-md:!gap-0 max-md:!p-0' : ''}`}
           >
             <FaSignOutAlt aria-hidden="true" />
-            <span>Logout</span>
+            <span className={dashboardLayout ? 'max-md:!hidden' : ''}>Logout</span>
           </button>
           {user.role === 'landlord' ? (
-            <Link to="/landlord/profile" className="navbar-top-profile-link" aria-label="Profile">
+            <Link to="/landlord/profile" className={`navbar-top-profile-link ${dashboardLayout ? '!text-white' : ''}`} aria-label="Profile">
               <ProfileAvatar user={user} className="navbar-top-profile-avatar" />
               <span>Profile</span>
             </Link>
           ) : (
-            <ProfilePhotoControl user={user} className="navbar-top-profile-photo" showLabel />
+            <ProfilePhotoControl
+              user={user}
+              className={`navbar-top-profile-photo ${dashboardLayout ? '[&_.profile-photo-control-label]:!text-white' : ''} ${dashboardLayout && user.role === 'tenant' ? '[&_.profile-photo-control-camera]:!h-6 [&_.profile-photo-control-camera]:!w-6 [&_.profile-photo-control-camera]:!text-xs' : ''}`}
+              showLabel
+            />
           )}
         </div>
       )}
@@ -466,16 +500,13 @@ const Navbar = () => {
       {/* ==========================================
           MAIN NAVBAR
       ========================================== */}
+      {user?.role !== 'landlord' && !dashboardLayout && (
       <nav
         className={`navbar ${
           user ? 'navbar-authenticated' : ''
         } ${
           user?.role === 'landlord'
             ? 'navbar-landlord'
-            : ''
-        } ${
-          !user && location.pathname === '/'
-            ? 'navbar-home'
             : ''
         } ${
           !user && ['/', '/about', '/contact', '/login', '/register', '/forgot-password', '/reset-password'].includes(location.pathname)
@@ -677,7 +708,7 @@ const Navbar = () => {
                         {isNotificationsItem &&
                           unreadCount > 0 && (
                             <span className="navbar-notification-badge">
-                              {unreadCount}
+                              {unreadCount > 99 ? '99+' : unreadCount}
                             </span>
                           )}
                       </Link>
@@ -722,6 +753,7 @@ const Navbar = () => {
           </div>
         </div>
       </nav>
+      )}
     </>
   );
 };

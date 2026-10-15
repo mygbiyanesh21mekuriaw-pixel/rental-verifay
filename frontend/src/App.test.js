@@ -46,12 +46,14 @@ test('renders only the public navigation before login', async () => {
   renderApp();
 
   const [navbar] = await screen.findAllByRole('navigation');
+  expect(navbar).toHaveClass('navbar-public');
+  expect(navbar).not.toHaveClass('navbar-home');
 
   expect(
-    screen.getByRole('heading', {
+    screen.queryByRole('heading', {
       name: 'House Rental',
     })
-  ).toBeInTheDocument();
+  ).not.toBeInTheDocument();
   expect(
     screen.getByText('A better way to find your next home')
   ).toBeInTheDocument();
@@ -165,12 +167,19 @@ test('renders only the public navigation before login', async () => {
       name: 'Contact Us',
     })
   ).toBeInTheDocument();
-
+  expect(within(footerNavigation).getByRole('link', { name: 'Login' }))
+    .toHaveAttribute('href', '/login');
+  expect(within(footerNavigation).getByRole('link', { name: 'Register' }))
+    .toHaveAttribute('href', '/register');
   expect(
-    within(footerNavigation).queryByRole('link', {
-      name: /login|register/i,
-    })
-  ).not.toBeInTheDocument();
+    within(footerNavigation).getByRole('link', { name: 'Home' })
+  ).toHaveClass('app-footer-link');
+  expect(
+    within(footerNavigation).getByRole('link', { name: 'About Us' })
+  ).toHaveClass('app-footer-link');
+  expect(
+    within(footerNavigation).getByRole('link', { name: 'Contact Us' })
+  ).toHaveClass('app-footer-link');
 
   expect(
     within(footer).getByRole('link', {
@@ -178,8 +187,39 @@ test('renders only the public navigation before login', async () => {
     })
   ).toHaveAttribute('href', 'mailto:admin@gmail.com');
   expect(
+    within(footer).getByRole('link', { name: 'admin@gmail.com' }).querySelector('svg')
+  ).toHaveAttribute('aria-hidden', 'true');
+  expect(within(footer).getByText(/\+251 9X XXX XXXX/)).toBeInTheDocument();
+  expect(within(footer).getByText(/Mekdela Amba, Ethiopia/)).toBeInTheDocument();
+  expect(within(footer).getByRole('link', { name: 'Privacy Policy' }))
+    .toHaveAttribute('href', '/privacy-policy');
+  expect(within(footer).getByRole('link', { name: 'Terms of Service' }))
+    .toHaveAttribute('href', '/terms');
+  expect(within(footer).getByRole('group', { name: 'Social media links' }))
+    .toBeInTheDocument();
+  ['Telegram', 'Facebook', 'LinkedIn', 'Instagram'].forEach((label) => {
+    expect(within(footer).getByRole('link', { name: label }))
+      .toHaveAttribute('rel', 'noopener noreferrer');
+  });
+  expect(
     within(footer).getByText('© 2026 House Rental Management System. All Rights Reserved.')
   ).toBeInTheDocument();
+});
+
+test('footer legal links open the matching policy pages and footer remains available', async () => {
+  renderApp();
+
+  fireEvent.click(screen.getByRole('link', { name: 'Privacy Policy' }));
+  expect(await screen.findByRole('heading', { name: 'Privacy Policy' }))
+    .toBeInTheDocument();
+  expect(screen.getByText('Information we collect')).toBeInTheDocument();
+  expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('link', { name: 'Terms of Service' }));
+  expect(await screen.findByRole('heading', { name: 'Terms of Service' }))
+    .toBeInTheDocument();
+  expect(screen.getByText('Fraud and prohibited activity')).toBeInTheDocument();
+  expect(screen.getByRole('contentinfo')).toBeInTheDocument();
 });
 
 test('switches language immediately and keeps it when navigating to another page', async () => {
@@ -227,10 +267,12 @@ test('keeps the full logo and brand visible after restoring an authenticated ses
 
   renderApp();
 
-  const [navbar] = await screen.findAllByRole('navigation');
-  expect(within(navbar).getByRole('img', { name: /house rental management system logo/i }))
+  const brandLink = await screen.findByRole('link', {
+    name: /house rental management system logo house rental management system/i,
+  });
+  expect(within(brandLink).getByRole('img', { name: /house rental management system logo/i }))
     .toHaveAttribute('src', '/mekdela-amba-logo.jpeg');
-  expect(within(navbar).getByText('House Rental Management System')).toBeInTheDocument();
+  expect(screen.getAllByText('House Rental Management System').length).toBeGreaterThan(0);
 });
 
 test('hides the footer on an authenticated dashboard', async () => {
@@ -300,11 +342,17 @@ test.each([
 
     expect(await screen.findByRole('heading', { name: amharicHeading }))
       .toBeInTheDocument();
+    expect(document.querySelector('.dashboard-welcome-banner')).toBeInTheDocument();
+    expect(screen.getByRole('time')).toBeInTheDocument();
     expect(screen.getAllByRole('combobox')[0])
       .toHaveValue('am');
     expect(localStorage.getItem('rentalverify-language')).toBe('am');
     expect(screen.queryByRole('heading', { name: englishHeading }))
       .not.toBeInTheDocument();
+    expect(screen.getByRole('complementary')).toHaveClass('rounded-xl', 'w-64');
+    expect(screen.getByRole('main')).toHaveClass('p-3', 'md:p-4', 'bg-white');
+    expect(document.querySelectorAll('.dashboard-shell-topbar')).toHaveLength(1);
+    expect(document.querySelectorAll('.dashboard-layout-sidebar')).toHaveLength(1);
   }
 );
 
@@ -348,7 +396,7 @@ test('toggles the mobile navigation and closes it after navigation', async () =>
 });
 
 test.each(['/login', '/register'])(
-  'hides the footer on %s',
+  'hides the shared footer on %s',
   (path) => {
     window.history.pushState({}, '', path);
 
@@ -427,16 +475,16 @@ test('shows landlord dashboard actions for the main sections', async () => {
   ).not.toBeInTheDocument();
 
   expect(
-    screen.getByRole('button', {
+    screen.getAllByRole('link', {
       name: /rental requests/i,
-    })
-  ).toBeInTheDocument();
+    }).length
+  ).toBeGreaterThan(0);
 
   expect(
-    screen.getByRole('button', {
+    screen.getAllByRole('link', {
       name: /rent payments/i,
-    })
-  ).toBeInTheDocument();
+    }).length
+  ).toBeGreaterThan(0);
 
 expect(
   screen.getAllByRole('link', {

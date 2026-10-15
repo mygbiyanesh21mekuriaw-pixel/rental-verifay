@@ -46,7 +46,8 @@ body {
 
 .app-footer-content {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(240px, 1.4fr) minmax(180px, 0.8fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
   gap: 32px;
   max-width: 1200px;
   margin: 0 auto;
@@ -54,7 +55,8 @@ body {
 
 .app-footer-brand,
 .app-footer-links,
-.app-footer-contact {
+.app-footer-contact,
+.app-footer-legal {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -73,14 +75,12 @@ body {
 }
 
 .app-footer-links {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 18px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .app-footer-heading {
-  flex-basis: 100%;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -92,9 +92,28 @@ body {
   text-decoration: none;
 }
 
-.app-footer-links a:hover {
-  color: #fff;
+.app-footer-links a:hover,
+.app-footer-links a:focus-visible {
+  color: #e98b3a;
   text-decoration: underline;
+}
+
+.app-footer-icon {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.app-footer-contact .app-footer-heading,
+.app-footer-email,
+.app-footer-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.app-footer-detail {
+  color: #aebbd0;
+  font-size: 13px;
 }
 
 .app-footer-contact a {
@@ -109,6 +128,34 @@ body {
   text-decoration: underline;
 }
 
+.app-footer-socials {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.app-footer-socials a {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(203, 213, 225, 0.12);
+  color: #c7d2fe;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.app-footer-socials a:hover,
+.app-footer-socials a:focus-visible {
+  transform: translateY(-2px);
+  background: rgba(233, 139, 58, 0.2);
+  color: #e98b3a;
+}
+
 .app-footer-bottom {
   display: flex;
   flex-direction: column;
@@ -120,14 +167,20 @@ body {
   text-align: center;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .app-footer {
     padding: 22px 18px 14px;
   }
 
   .app-footer-content {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 18px;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-footer-content {
+    grid-template-columns: 1fr;
   }
 }
 

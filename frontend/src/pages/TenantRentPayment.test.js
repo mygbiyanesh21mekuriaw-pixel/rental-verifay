@@ -88,6 +88,8 @@ test('shows the exact bank name in the verified receipt header', async () => {
   axios.get.mockResolvedValue({ data: tenantPaymentContext });
   renderTenantPayment();
 
+  expect(await screen.findByRole('heading', { name: 'Pay Rent' })).toBeInTheDocument();
+  expect(document.querySelector('.payment-page')).toHaveClass('!w-full', '!max-w-none', '!mx-0', '!p-0');
   expect(await screen.findByRole('img', { name: 'Commercial Bank of Ethiopia logo' }))
     .toHaveAttribute('src', '/images/commercial-bank-of-ethiopia.jpg');
   expect(screen.getByRole('img', { name: 'Commercial Bank of Ethiopia logo' }))

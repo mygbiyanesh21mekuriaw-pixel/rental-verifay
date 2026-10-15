@@ -62,32 +62,32 @@ const LandlordAccountSettings = () => {
   };
 
   return (
-    <section className="landlord-account-page">
+    <section className={`landlord-account-page !m-0 !w-full !max-w-none !p-0 ${user?.role === 'tenant' ? '' : 'flex flex-col gap-3'}`}>
       {user?.role === 'tenant' && (
         <BackToDashboard label="← Back to Dashboard" />
       )}
-      <header className="landlord-account-heading landlord-account-settings-heading">
+      <header className={user?.role === 'tenant' ? 'mb-3 w-full bg-transparent p-0 shadow-none' : ''}>
         <div>
-          <p>{accountRole}</p>
-          <h1>Account Settings</h1>
-          <span>Update your sign-in email and password.</span>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{accountRole}</p>
+          <h1 className="m-0 text-2xl font-bold text-slate-800">Account Settings</h1>
+          <span className="text-sm text-slate-600">Update your sign-in email and password.</span>
         </div>
       </header>
 
-      <section className="landlord-account-card">
+      <section className={`landlord-account-card ${user?.role === 'tenant' ? '' : '!mb-0'}`}>
         <h2>Email address</h2>
         <form className="landlord-account-form" onSubmit={saveEmail}>
           <label>Email
             <input type="email" value={email} onChange={(event) =>setEmail(event.target.value)} required />
           </label>
-          <button type="submit" className="landlord-account-button" disabled={savingEmail}>
+          <button type="submit" className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]" disabled={savingEmail}>
             {savingEmail ? 'Saving...' : 'Save Email'}
           </button>
           {emailMessage && <p className="landlord-account-message" role="status">{emailMessage}</p>}
         </form>
       </section>
 
-      <section className="landlord-account-card">
+      <section className={`landlord-account-card ${user?.role === 'tenant' ? '' : '!mb-0'}`}>
         <h2>Password</h2>
         <form className="landlord-account-form" onSubmit={changePassword}>
           <label>Current password
@@ -118,7 +118,7 @@ const LandlordAccountSettings = () => {
               required
             />
           </label>
-          <button type="submit" className="landlord-account-button" disabled={savingPassword}>
+          <button type="submit" className="landlord-account-button !border-[var(--rv-dashboard-topbar)] !bg-[var(--rv-dashboard-topbar)] hover:!bg-[var(--rv-dashboard-navy)]" disabled={savingPassword}>
             {savingPassword ? 'Saving...' : 'Change Password'}
           </button>
           {passwordMessage && <p className="landlord-account-message" role="status">{passwordMessage}</p>}

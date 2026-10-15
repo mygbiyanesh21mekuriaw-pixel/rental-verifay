@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { FaStar } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { fetchFavoriteIds, getFavoriteIds, toggleFavorite } from '../utils/favorites';
 import BackToDashboard from '../components/BackToDashboard';
@@ -104,7 +105,15 @@ const RentalReview = ({ propertyId }) => {
     return (
       <div className="tenant-review-saved">
         <strong>Your review</strong>
-        <span className="tenant-review-stars">{''.repeat(review.rating)}</span>
+        <span className="tenant-review-stars" role="img" aria-label={`${review.rating} out of 5 stars`}>
+          {Array.from({ length: 5 }, (_, index) => (
+            <FaStar
+              key={index}
+              aria-hidden="true"
+              className={index < review.rating ? 'text-amber-400' : 'text-slate-300'}
+            />
+          ))}
+        </span>
         <p>{review.comment}</p>
       </div>
     );
@@ -124,12 +133,15 @@ const RentalReview = ({ propertyId }) => {
               <button
                 key={star}
                 type="button"
-                className={`tenant-review-star-btn ${rating >= star ? 'selected' : ''}`}
-                onClick={() =>setRating(star)}
+                className={`tenant-review-star-btn !inline-flex !h-10 !w-10 !items-center !justify-center !rounded-lg !p-0 text-xl transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 ${rating >= star ? '!text-amber-400' : '!text-slate-300'}`}
+                onClick={() => {
+                  setRating(star);
+                  setError('');
+                }}
                 aria-label={`${star} star${star === 1 ? '' : 's'}`}
                 aria-pressed={rating === star}
               >
-                {rating >= star ? '' : ''}
+                <FaStar aria-hidden="true" />
               </button>
             ))}
           </div>
@@ -145,8 +157,24 @@ const RentalReview = ({ propertyId }) => {
           />
           {error && <p className="tenant-review-error" role="alert">{error}</p>}
           <div className="tenant-review-form-actions">
-            <button type="button" className="tenant-review-cancel-btn" onClick={() =>setIsOpen(false)}>Cancel</button>
-            <button type="submit" className="tenant-review-submit-btn" disabled={submitting || !comment.trim()}>
+            <button
+              type="button"
+              className="tenant-review-cancel-btn !inline-flex !h-11 !w-36 !items-center !justify-center !p-0 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              onClick={() => {
+                setIsOpen(false);
+                setRating(0);
+                setComment('');
+                setError('');
+              }}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="tenant-review-submit-btn !inline-flex !h-11 !w-36 !items-center !justify-center !p-0 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              disabled={submitting || !rating || !comment.trim()}
+            >
               {submitting ? 'Submitting...' : 'Submit Review'}
             </button>
           </div>
@@ -416,11 +444,11 @@ const TenantSectionPage = ({ type }) => {
   }
 
   return (
-    <div className="tenant-container tenant-section-page">
-      <div className="tenant-header">
-        <h1 className="tenant-title">{config.title}</h1>
-        <p className="tenant-subtitle">Welcome, {user?.name}!</p>
-        <BackToDashboard />
+    <div className="tenant-container tenant-section-page !m-0 !w-full !min-w-0 !max-w-none !p-0">
+      <BackToDashboard className="!mt-0 !mb-3 !w-fit !max-w-full" />
+      <div className="mb-3 min-w-0">
+        <h1 className="m-0 text-2xl font-bold text-slate-800">{config.title}</h1>
+        <p className="m-0 mt-1 text-slate-500">Welcome, {user?.name}!</p>
       </div>
       <section className="tenant-section">
         {items.length === 0 ? (

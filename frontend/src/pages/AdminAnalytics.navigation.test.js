@@ -8,6 +8,10 @@ jest.mock('axios', () => ({
   get: jest.fn(),
 }));
 
+jest.mock('../context/LanguageContext', () => ({
+  useLanguage: () => ({ t: (value) => value }),
+}));
+
 const CurrentPath = () => {
   const location = useLocation();
   return <div data-testid="current-path">{location.pathname}</div>;

@@ -8,7 +8,6 @@ const dashboardPaths = {
   admin: '/admin-dashboard',
 };
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const normalizeLoginEmail = (email) => {
   const normalized = String(email || '').trim().toLowerCase();
   return normalized.replace(/@rentalverifay\.com$/i, '@rentalverify.com');
@@ -73,14 +72,12 @@ const EyeOffIcon = () => (
 // ==========================================
 // VALIDATE LOGIN FORM
 // ==========================================
-const validateLoginForm = ({ email, password }) => {
+const validateLoginForm = ({ identifier, password }) => {
   const nextErrors = {};
-  const normalizedEmail = normalizeLoginEmail(email);
+  const normalizedIdentifier = String(identifier || '').trim();
 
-  if (!normalizedEmail) {
-    nextErrors.email = 'Email is required';
-  } else if (normalizedEmail.length > 254 || !emailPattern.test(normalizedEmail)) {
-    nextErrors.email = 'Enter a valid email address';
+  if (!normalizedIdentifier) {
+    nextErrors.identifier = 'Email or username is required';
   }
 
   if (!password) {
@@ -97,7 +94,7 @@ const validateLoginForm = ({ email, password }) => {
 // LOGIN COMPONENT
 // ==========================================
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
 
   const [error, setError] = useState('');
@@ -135,7 +132,7 @@ const Login = () => {
 
     // Validate form
     const validationErrors = validateLoginForm({
-      email,
+      identifier,
       password,
     });
 
@@ -154,7 +151,7 @@ const Login = () => {
       // CALL AUTH LOGIN
       // ========================================
       const result = await login(
-        normalizeLoginEmail(email),
+        normalizeLoginEmail(identifier),
         password
       );
 
@@ -179,7 +176,7 @@ const Login = () => {
       // ========================================
       setError(
         result?.error ||
-          'Login failed. Please check your email and password.'
+          'Login failed. Please check your email or username and password.'
       );
     } catch (loginError) {
       // ========================================
@@ -208,7 +205,7 @@ const Login = () => {
   // CHECK PLATFORM ADMIN
   // ==========================================
   const isPlatformAdmin =
-    normalizeLoginEmail(email) ===
+    normalizeLoginEmail(identifier) ===
     platformAdminEmail;
 
   // ==========================================
@@ -266,24 +263,24 @@ const Login = () => {
         >
 
           {/* ====================================
-              EMAIL
+              EMAIL OR USERNAME
           ==================================== */}
           <div className="auth-field">
 
-            <label htmlFor="login-email">Email
+            <label htmlFor="login-identifier">Email or Username
             </label>
 
             <input
-              id="login-email"
-              type="email"
-              value={email}
+              id="login-identifier"
+              type="text"
+              value={identifier}
               onChange={(e) => {
-                setEmail(e.target.value);
+                setIdentifier(e.target.value);
 
-                if (fieldErrors.email) {
+                if (fieldErrors.identifier) {
                   setFieldErrors((current) => ({
                     ...current,
-                    email: '',
+                    identifier: '',
                   }));
                 }
 
@@ -293,19 +290,19 @@ const Login = () => {
                 }
               }}
               required
-              autoComplete="email"
-              aria-invalid={Boolean(fieldErrors.email)}
+              autoComplete="username"
+              aria-invalid={Boolean(fieldErrors.identifier)}
               className={
-                fieldErrors.email
+                fieldErrors.identifier
                   ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
                   : ''
               }
-              placeholder="Enter your email"
+              placeholder="Enter your email or username"
             />
 
-            {fieldErrors.email && (
+            {fieldErrors.identifier && (
               <p className="mt-1 text-xs font-medium text-red-600">
-                {fieldErrors.email}
+                {fieldErrors.identifier}
               </p>
             )}
 

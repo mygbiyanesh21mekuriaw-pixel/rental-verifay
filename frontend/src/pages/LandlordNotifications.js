@@ -92,10 +92,8 @@ const LandlordNotifications = () => {
   }, []);
 
   return (
-    <div className="tenant-container">
-      <div className="tenant-header">
-        <h1 className="tenant-title">Notifications</h1>
-      </div>
+    <div className="tenant-container !m-0 !w-full !max-w-none !p-0 flex flex-col gap-3">
+      <h1 className="m-0 text-2xl font-bold text-slate-800">Notifications</h1>
 
       {loading ? (
         <div className="tenant-loading">Loading notifications...</div>
@@ -145,4 +143,3 @@ const LandlordNotifications = () => {
 };
 
 export default LandlordNotifications;
-

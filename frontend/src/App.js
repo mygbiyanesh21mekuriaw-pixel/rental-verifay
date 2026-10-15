@@ -1,6 +1,17 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import {
+  FaAddressCard,
+  FaEnvelope,
+  FaFacebookF,
+  FaInstagram,
+  FaLinkedinIn,
+  FaPhone,
+  FaTelegramPlane,
+} from 'react-icons/fa';
 import { useAuth } from './context/AuthContext';
+import { useLanguage } from './context/LanguageContext';
+import DashboardLayout, { getDashboardMenuGroups } from './components/DashboardLayout';
 
 // CSS
 import './App.css';
@@ -28,6 +39,7 @@ import TenantSearch from './pages/TenantSearch';
 import TenantNotifications from './pages/TenantNotifications';
 import AboutUs from './pages/AboutUs';
 import ContactUs from './pages/ContactUs';
+import { PrivacyPolicy, TermsOfService } from './pages/LegalPages';
 import TenantMessages from './pages/TenantMessages';
 import LandlordMessages from './pages/LandlordMessages';
 import TenantRentPayment from './pages/TenantRentPayment';
@@ -57,6 +69,55 @@ const ScrollToTop = () => {
   }, [pathname]);
 
   return null;
+};
+
+const RouteMain = ({ children }) => {
+  const { pathname } = useLocation();
+  const isLandlordRoute = pathname === '/landlord-dashboard' || pathname.startsWith('/landlord/');
+
+  return (
+    isLandlordRoute
+      ? <div className="landlord-route-container w-full min-w-0 flex-1">{children}</div>
+      : <main className="app-main">{children}</main>
+  );
+};
+
+const DashboardRouteShell = ({ children, maintenanceActive }) => {
+  const { user } = useAuth();
+  const location = useLocation();
+  const { t } = useLanguage();
+  const role = user?.role;
+  const isDashboardRoute = !maintenanceActive && (
+    (role === 'landlord' && (location.pathname === '/landlord-dashboard' || location.pathname.startsWith('/landlord/'))) ||
+    (role === 'tenant' && (location.pathname === '/tenant-dashboard' || location.pathname.startsWith('/tenant/'))) ||
+    (role === 'admin' && location.pathname.startsWith('/admin-dashboard'))
+  );
+
+  if (!isDashboardRoute) {
+    return (
+      <>
+        {(!maintenanceActive || !user) && <Navbar />}
+        <ScrollToTop />
+        <RouteMain>{children}</RouteMain>
+      </>
+    );
+  }
+
+  const roleTitle = role === 'admin'
+    ? t(user.adminType === 'area' ? 'Area Admin' : 'Platform Admin')
+    : t(role === 'landlord' ? 'Landlord' : 'Tenant');
+
+  return (
+    <DashboardLayout
+      header={<Navbar />}
+      menuGroups={getDashboardMenuGroups(user, t)}
+      user={user}
+      title={roleTitle}
+    >
+      <ScrollToTop />
+      <div className="w-full min-w-0">{children}</div>
+    </DashboardLayout>
+  );
 };
 
 const ApplySystemPreferences = () => {
@@ -166,38 +227,76 @@ const PublicAliasRoute = ({ target }) => {
 const AppFooter = () => {
   const { pathname } = useLocation();
   const { status } = useSystemStatus();
+  const { t } = useLanguage();
 
-  if (!['/', '/about', '/contact'].includes(pathname)) return null;
+  if (pathname === '/login' || pathname === '/register') return null;
+  if (!['/', '/about', '/contact', '/login', '/register', '/privacy-policy', '/terms'].includes(pathname)) return null;
 
   return (
     <footer className="app-footer">
       <div className="app-footer-content">
         <div className="app-footer-brand">
-          <span className="app-footer-heading">Project Information</span>
+          <span className="app-footer-heading">{t('Project Information')}</span>
           <strong>{status.branding.websiteName}</strong>
-          <span>Student Academic Project</span>
-          <span>Mekdela Amba University</span>
-          <span>College of Computing and Informatics</span>
+          <span>{t('Student Academic Project')}</span>
+          <span>{t('Mekdela Amba University')}</span>
+          <span>{t('College of Computing and Informatics')}</span>
         </div>
-        <nav className="app-footer-links" aria-label="Footer navigation">
-          <span className="app-footer-heading">Quick Links</span>
-          <Link to="/">Home</Link>
-          <Link to="/about">About Us</Link>
-          <Link to="/contact">Contact Us</Link>
+        <nav className="app-footer-links" aria-label={t('Footer navigation')}>
+          <span className="app-footer-heading">{t('Quick Links')}</span>
+          <Link className="app-footer-link" to="/">{t('Home')}</Link>
+          <Link className="app-footer-link" to="/about">{t('About Us')}</Link>
+          <Link className="app-footer-link" to="/contact">{t('Contact Us')}</Link>
+          <Link className="app-footer-link" to="/login">{t('Login')}</Link>
+          <Link className="app-footer-link" to="/register">{t('Register')}</Link>
         </nav>
         <div className="app-footer-contact">
-          <span className="app-footer-heading">Contact</span>
+          <span className="app-footer-heading">
+            <FaAddressCard className="app-footer-icon" aria-hidden="true" />
+            {t('Contact')}
+          </span>
           {status.branding.contactEmail ? (
-            <a href={`mailto:${status.branding.contactEmail}`}>{status.branding.contactEmail}</a>
+            <a className="app-footer-email" href={`mailto:${status.branding.contactEmail}`}>
+              <FaEnvelope className="app-footer-icon" aria-hidden="true" />
+              {status.branding.contactEmail}
+            </a>
           ) : (
-            <a href="mailto:admin@gmail.com">admin@gmail.com</a>
+            <a className="app-footer-email" href="mailto:admin@gmail.com">
+              <FaEnvelope className="app-footer-icon" aria-hidden="true" />
+              admin@gmail.com
+            </a>
           )}
-          {status.branding.contactPhone && <a href={`tel:${status.branding.contactPhone}`}>{status.branding.contactPhone}</a>}
-          {status.branding.contactAddress && <span>{status.branding.contactAddress}</span>}
+          <span className="app-footer-detail">
+            <FaPhone className="app-footer-icon" aria-hidden="true" />
+            {t('Phone')}: +251 9X XXX XXXX
+          </span>
+          <span className="app-footer-detail">
+            <FaAddressCard className="app-footer-icon" aria-hidden="true" />
+            {t('Address')}: Mekdela Amba, Ethiopia
+          </span>
+        </div>
+        <div className="app-footer-legal">
+          <span className="app-footer-heading">{t('Legal')}</span>
+          <Link className="app-footer-link" to="/privacy-policy">{t('Privacy Policy')}</Link>
+          <Link className="app-footer-link" to="/terms">{t('Terms of Service')}</Link>
+          <div className="app-footer-socials" role="group" aria-label={t('Social media links')}>
+            <a href="https://t.me/#" target="_blank" rel="noopener noreferrer" aria-label={t('Telegram')}>
+              <FaTelegramPlane aria-hidden="true" />
+            </a>
+            <a href="https://facebook.com/#" target="_blank" rel="noopener noreferrer" aria-label={t('Facebook')}>
+              <FaFacebookF aria-hidden="true" />
+            </a>
+            <a href="https://linkedin.com/#" target="_blank" rel="noopener noreferrer" aria-label={t('LinkedIn')}>
+              <FaLinkedinIn aria-hidden="true" />
+            </a>
+            <a href="https://instagram.com/#" target="_blank" rel="noopener noreferrer" aria-label={t('Instagram')}>
+              <FaInstagram aria-hidden="true" />
+            </a>
+          </div>
         </div>
       </div>
       <div className="app-footer-bottom">
-        <span>© 2026 {status.branding.websiteName}. All Rights Reserved.</span>
+        <span>{t('© 2026 House Rental Management System. All Rights Reserved.', { websiteName: status.branding.websiteName })}</span>
       </div>
     </footer>
   );
@@ -227,9 +326,7 @@ function AppContent() {
     <div className="app">
       <Router>
         <ApplySystemPreferences />
-        {(!maintenanceActive || !user) && <Navbar />}
-        <ScrollToTop />
-        <main className="app-main">
+        <DashboardRouteShell maintenanceActive={maintenanceActive}>
           {maintenanceActive ? (
             user ? (
               <MaintenancePage message={status.maintenance.message} onLogout={logout} />
@@ -251,6 +348,8 @@ function AppContent() {
             <Route path="/about-us" element={<PublicAliasRoute target="/about" />} />
             <Route path="/contact" element={<AuthenticatedPublicRoute><ContactUs /></AuthenticatedPublicRoute>} />
             <Route path="/contact-us" element={<PublicAliasRoute target="/contact" />} />
+            <Route path="/privacy-policy" element={<AuthenticatedPublicRoute><PrivacyPolicy /></AuthenticatedPublicRoute>} />
+            <Route path="/terms" element={<AuthenticatedPublicRoute><TermsOfService /></AuthenticatedPublicRoute>} />
             <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
             <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -411,6 +510,7 @@ function AppContent() {
             <Route path="/admin-dashboard/system-settings" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><SystemSettings /></PrivateRoute>} />
             <Route path="/admin-dashboard/open" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><Navigate to="/admin-dashboard" replace /></PrivateRoute>} />
             <Route path="/admin-dashboard/properties-awaiting-verification" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['area']}><AdminSectionPage type="awaitingVerification" /></PrivateRoute>} />
+            <Route path="/admin-dashboard/review-properties" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="reviewProperties" /></PrivateRoute>} />
             <Route path="/admin-dashboard/all-properties" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="allProperties" /></PrivateRoute>} />
             <Route path="/admin-dashboard/all-users" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="allUsers" /></PrivateRoute>} />
             <Route path="/admin-dashboard/admin-management" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="adminManagement" /></PrivateRoute>} />
@@ -419,7 +519,7 @@ function AppContent() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           )}
-        </main>
+        </DashboardRouteShell>
         {!maintenanceActive && <AppFooter />}
       </Router>
     </div>

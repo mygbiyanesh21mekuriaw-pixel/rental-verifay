@@ -5,6 +5,7 @@ const path = require('path');
 const connectDB = require('./config/db');
 const createAdmin = require('./create-admin');
 const { migrateLegacyBankAccountNumbers } = require('./utils/bankAccountCrypto');
+const reportInvalidUsernames = require('./utils/reportInvalidUsernames');
 const { startPayoutReconciliation } = require('./services/payoutReconciliation');
 
 // የአካባቢ ተለዋዋጮችን ጫን
@@ -57,6 +58,7 @@ const startServer = async () => {
   await connectDB();
   await migrateLegacyBankAccountNumbers();
   await createAdmin();
+  await reportInvalidUsernames();
 
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {

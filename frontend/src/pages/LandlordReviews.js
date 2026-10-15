@@ -25,11 +25,11 @@ const LandlordReviews = () => {
   }, []);
 
   return (
-    <main className="landlord-reviews-page">
-      <header className="landlord-reviews-header">
-        <p className="landlord-reviews-eyebrow">RENTER FEEDBACK</p>
-        <h1>Tenant Reviews</h1>
-        <p>Reviews from tenants who rented your properties.</p>
+    <main className="landlord-reviews-page !m-0 !w-full !max-w-none !p-0 flex flex-col gap-3">
+      <header>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">RENTER FEEDBACK</p>
+        <h1 className="m-0 text-2xl font-bold text-slate-800">Tenant Reviews</h1>
+        <p className="mt-1 text-sm text-slate-600">Reviews from tenants who rented your properties.</p>
       </header>
 
       {loading && <p className="landlord-reviews-state">Loading reviews...</p>}
@@ -67,5 +67,3 @@ const LandlordReviews = () => {
 };
 
 export default LandlordReviews;
-
-

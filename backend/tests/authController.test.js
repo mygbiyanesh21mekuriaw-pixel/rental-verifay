@@ -7,6 +7,23 @@ const { login, serializeUser } = require('../controllers/authController');
 const { encryptBankAccountNumber } = require('../utils/bankAccountCrypto');
 const { planMissingUsernames } = require('../migrate-missing-usernames');
 
+test('username field is optional, normalized, and protected by a sparse unique index', () => {
+  const usernamePath = User.schema.path('username');
+  const usernameIndex = User.schema.indexes().find(([fields]) => fields.username === 1);
+  const user = new User({ username: ' Tenant_1 ' });
+
+  assert.notEqual(usernamePath.options.required, true);
+  assert.equal(usernamePath.options.trim, true);
+  assert.equal(usernamePath.options.lowercase, true);
+  assert.equal(usernamePath.options.minlength, 3);
+  assert.equal(usernamePath.options.maxlength, 20);
+  assert.deepEqual(usernamePath.options.match, /^[a-z0-9_]+$/);
+  assert.deepEqual(usernameIndex[0], { username: 1 });
+  assert.equal(usernameIndex[1].unique, true);
+  assert.equal(usernameIndex[1].sparse, true);
+  assert.equal(user.username, 'tenant_1');
+});
+
 const createResponse = () => ({
   statusCode: null,
   body: null,
@@ -111,6 +128,62 @@ test('login accepts registered emails for tenant, landlord, and admin roles', as
   }
 });
 
+test('login accepts usernames and identifier emails while retaining email request compatibility', async () => {
+  const originals = {
+    find: User.find,
+    createSystemLog: SystemLog.create,
+    jwtSecret: process.env.JWT_SECRET,
+  };
+  const hashedPassword = await bcrypt.hash('correct-password', 4);
+  const queries = [];
+  SystemLog.create = async () => null;
+  process.env.JWT_SECRET = 'test-jwt-secret';
+  User.find = (query) => ({
+    limit: () => ({
+      select: async () => {
+        queries.push(query);
+        const isMatchingEmail = query.email?.$regex === '^test@example\\.com$';
+        const isMatchingUsername = query.username?.$regex === '^tenant_1$';
+        return isMatchingEmail || isMatchingUsername
+          ? [{
+            _id: { toString: () => 'test-user-id' },
+            name: 'Test User',
+            email: 'test@example.com',
+            username: 'tenant_1',
+            password: hashedPassword,
+            role: 'tenant',
+          }]
+          : [];
+      },
+    }),
+  });
+
+  try {
+    for (const body of [
+      { identifier: ' TENANT_1 ', password: 'correct-password' },
+      { identifier: ' TEST@EXAMPLE.COM ', password: 'correct-password' },
+      { email: ' TEST@EXAMPLE.COM ', password: 'correct-password' },
+    ]) {
+      const response = createResponse();
+      await login({ body }, response);
+      assert.equal(response.statusCode, null);
+      assert.equal(response.body.user.email, 'test@example.com');
+      assert.ok(response.body.token);
+    }
+
+    assert.deepEqual(queries, [
+      { username: { $regex: '^tenant_1$', $options: 'i' } },
+      { email: { $regex: '^test@example\\.com$', $options: 'i' } },
+      { email: { $regex: '^test@example\\.com$', $options: 'i' } },
+    ]);
+  } finally {
+    User.find = originals.find;
+    SystemLog.create = originals.createSystemLog;
+    if (originals.jwtSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = originals.jwtSecret;
+  }
+});
+
 test('login rejects incorrect passwords, unknown emails, malformed emails, and missing credentials', async () => {
   const originalFind = User.find;
   const user = {
@@ -122,7 +195,8 @@ test('login rejects incorrect passwords, unknown emails, malformed emails, and m
     limit: () => ({
       select: async () => {
         lookupCount += 1;
-        return query.email?.$regex === '^known@example\\.com$'
+        return query.email?.$regex === '^known@example\\.com$' ||
+          query.username?.$regex === '^known_user$'
           ? [user]
           : [];
       },
@@ -140,24 +214,28 @@ test('login rejects incorrect passwords, unknown emails, malformed emails, and m
         message: 'Invalid credentials',
       },
       {
+        body: { identifier: 'known_user', password: 'wrong-password' },
+        message: 'Invalid credentials',
+      },
+      {
+        body: { identifier: 'missing_user', password: 'correct-password' },
+        message: 'Invalid credentials',
+      },
+      {
         body: { email: 'not-an-email', password: 'correct-password' },
         message: 'Invalid credentials',
       },
       {
         body: { email: '', password: 'correct-password' },
-        message: 'Email and password are required.',
+        message: 'Invalid credentials',
       },
       {
         body: { email: 'known@example.com', password: '' },
-        message: 'Email and password are required.',
-      },
-      {
-        body: { identifier: 'known@example.com', password: 'correct-password' },
-        message: 'Email and password are required.',
+        message: 'Invalid credentials',
       },
       {
         body: { password: 'correct-password' },
-        message: 'Email and password are required.',
+        message: 'Invalid credentials',
       },
     ];
     for (const req of cases) {
@@ -168,9 +246,44 @@ test('login rejects incorrect passwords, unknown emails, malformed emails, and m
         message: req.message,
       });
     }
-    assert.equal(lookupCount, 2);
+    assert.equal(lookupCount, 4);
   } finally {
     User.find = originalFind;
+  }
+});
+
+test('registration rejects usernames outside the 3-20 letter, number, underscore format', async () => {
+  const originalFindOne = User.findOne;
+  const { register } = require('../controllers/authController');
+  const invalidUsernames = ['ab', 'username-that-is-too-long', 'has space', 'has@sign', 'name-with-hyphen'];
+
+  try {
+    for (const username of invalidUsernames) {
+      let lookupCount = 0;
+      User.findOne = async () => {
+        lookupCount += 1;
+        return null;
+      };
+      const response = createResponse();
+      await register({
+        body: {
+          name: 'Tenant Example',
+          email: 'tenant@example.com',
+          username,
+          phone: '0912345678',
+          password: 'secure-password',
+          role: 'tenant',
+        },
+      }, response);
+
+      assert.equal(response.statusCode, 400, username);
+      assert.deepEqual(response.body, {
+        message: 'Username must be 3-20 characters and use only letters, numbers, or underscores.',
+      });
+      assert.equal(lookupCount, 0);
+    }
+  } finally {
+    User.findOne = originalFindOne;
   }
 });
 

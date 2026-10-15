@@ -77,11 +77,11 @@ export const AuthProvider = ({ children }) => {
     loadUser(token);
   }, [token, loadUser]);
 
-  const login = async (email, password) => {
+  const login = async (identifier, password) => {
     try {
-      const normalizedEmail = normalizeLoginEmail(email);
+      const normalizedIdentifier = normalizeLoginEmail(identifier);
       const res = await axios.post(process.env.REACT_APP_API_URL + '/api/auth/login', {
-        email: normalizedEmail,
+        identifier: normalizedIdentifier,
         password,
       });
 

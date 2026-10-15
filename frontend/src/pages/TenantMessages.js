@@ -67,34 +67,48 @@ const TenantMessages = () => {
     }
   };
 
-  if (loading) return <div className="tenant-loading"><div className="tenant-loading-spinner"></div><span>Loading...</span></div>;
+  if (loading) {
+    return (
+      <div className="w-full min-w-0" role="status">
+        <p className="m-0 text-sm text-slate-600">Loading...</p>
+      </div>
+    );
+  }
   if (error) return (
-    <div className="tenant-container tenant-section-page">
-      <div className="tenant-header">
-        <h1 className="tenant-title">Messages</h1>
+    <div className="w-full min-w-0 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="m-0 text-2xl font-bold text-slate-800">Messages</h1>
         <BackToDashboard
+          className="!mt-0 max-sm:!w-auto max-sm:!justify-start"
           dashboardRoute={location.state?.from || '/tenant-dashboard'}
           label=" Back to Previous Page"
         />
       </div>
-      <div className="tenant-empty"><p>{error}</p></div>
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>
     </div>
   );
 
   return (
-    <div className="tenant-container tenant-section-page">
-      <div className="tenant-header">
-        <h1 className="tenant-title">Messages</h1>
-        {conversation && <>
-          <p className="tenant-subtitle">{conversation.property?.title}  {conversation.property?.location}</p>
-          <p className="tenant-subtitle">Landlord: {conversation.landlord?.name}</p>
-        </>}
+    <div className="w-full min-w-0 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="m-0 text-2xl font-bold text-slate-800">Messages</h1>
+          {conversation && (
+            <div className="mt-2 space-y-1">
+              <p className="m-0 break-words text-sm text-slate-600">
+                {conversation.property?.title} {conversation.property?.location}
+              </p>
+              <p className="m-0 text-sm text-slate-600">Landlord: {conversation.landlord?.name}</p>
+            </div>
+          )}
+        </div>
         <BackToDashboard
+          className="!mt-0 max-sm:!w-auto max-sm:!justify-start"
           dashboardRoute={location.state?.from || '/tenant-dashboard'}
           label=" Back to Previous Page"
         />
       </div>
-      <section className="tenant-section tenant-message-panel">
+      <section className="tenant-message-panel">
         {!conversationId && !conversation && conversations.length === 0 && <p className="tenant-empty">No conversations yet.</p>}
         {!conversationId && !conversation && conversations.map(item => (
           <button type="button" className="tenant-message-conversation" key={item._id} onClick={() =>navigate(`/tenant/messages?conversationId=${item._id}`)}>
@@ -124,5 +138,4 @@ const TenantMessages = () => {
 };
 
 export default TenantMessages;
-
 

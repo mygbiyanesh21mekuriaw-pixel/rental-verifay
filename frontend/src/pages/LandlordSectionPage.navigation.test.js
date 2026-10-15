@@ -86,6 +86,57 @@ test.each([
   }
 );
 
+test('uses screenshot-matched update and delete action styles', async () => {
+  activeProperty = {
+    ...property,
+    availabilityStatus: 'available',
+    verificationStatus: 'approved',
+    isVerified: true,
+  };
+
+  render(
+    <MemoryRouter initialEntries={['/landlord/verified-properties']}>
+      <Routes>
+        <Route
+          path="/landlord/verified-properties"
+          element={<LandlordSectionPage type="verified" />}
+        />
+      </Routes>
+    </MemoryRouter>
+  );
+
+  const updateButton = await screen.findByRole('button', { name: 'Update' });
+  const deleteButton = screen.getByRole('button', { name: 'Delete' });
+  expect(updateButton).toHaveClass('bg-[#805ad5]', 'text-white', 'h-8');
+  expect(deleteButton).toHaveClass('bg-[#e53e3e]', 'text-white', 'h-8');
+  expect(screen.getByRole('heading', { name: 'Verified Properties' }))
+    .toHaveClass('text-2xl', 'font-bold', 'text-slate-800');
+  expect(document.querySelector('.landlord-section-page-header')).not.toBeInTheDocument();
+});
+
+test('uses screenshot-matched message and rent payment action styles', async () => {
+  render(
+    <MemoryRouter initialEntries={['/landlord/rented-properties']}>
+      <Routes>
+        <Route
+          path="/landlord/rented-properties"
+          element={<LandlordSectionPage type="rented" />}
+        />
+      </Routes>
+    </MemoryRouter>
+  );
+
+  const messageButton = await screen.findByRole('button', { name: 'Message' });
+  const paymentButton = screen.getByRole('button', { name: 'Rent Payments' });
+  expect(messageButton).toHaveClass('bg-[#4299e1]', 'text-white', 'h-8');
+  expect(screen.getByRole('button', { name: 'Update' }))
+    .toHaveClass('bg-[#805ad5]', 'text-white', 'h-8');
+  expect(screen.getByRole('button', { name: 'Delete' }))
+    .toHaveClass('bg-[#e53e3e]', 'text-white', 'h-8');
+  expect(paymentButton).toHaveClass('bg-[#d69e2e]', 'text-white', 'h-8', 'col-span-3');
+  expect(paymentButton.parentElement).toHaveClass('grid-cols-3');
+});
+
 test.each([
   {
     type: 'rejected',

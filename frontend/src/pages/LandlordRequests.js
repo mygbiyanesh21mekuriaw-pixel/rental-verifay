@@ -30,10 +30,8 @@ const LandlordRequests = () => {
   }, []);
 
   return (
-    <div className="tenant-container tenant-section-page">
-      <div className="tenant-header">
-        <h1 className="tenant-title">Rental Requests</h1>
-      </div>
+    <div className="landlord-requests-page tenant-container tenant-section-page !m-0 !w-full !max-w-none !p-0 flex flex-col gap-3">
+      <h1 className="m-0 text-2xl font-bold text-slate-800">Rental Requests</h1>
 
       {loading ? (
         <div className="tenant-loading">Loading rental requests...</div>
@@ -62,7 +60,7 @@ const LandlordRequests = () => {
 
               {request.status === 'pending' && (
                 <div className="tenant-request-actions">
-                  <Link to={`/landlord/rental-requests/${request._id}`} className="tenant-request-btn tenant-request-btn-primary">View Details
+                  <Link to={`/landlord/rental-requests/${request._id}`} className="tenant-request-btn tenant-request-btn-primary rounded-lg bg-[var(--rv-dashboard-topbar)] px-4 py-2 font-semibold text-white no-underline transition-colors hover:bg-[var(--rv-dashboard-navy)]">View Details
                   </Link>
                 </div>
               )}

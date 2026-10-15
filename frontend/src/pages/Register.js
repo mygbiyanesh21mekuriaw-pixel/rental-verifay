@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { useLanguage } from '../context/LanguageContext';
 
 const dashboardPaths = {
   tenant: '/tenant-dashboard',
@@ -9,7 +10,7 @@ const dashboardPaths = {
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const usernamePattern = /^[a-z0-9._-]{3,30}$/i;
+const usernamePattern = /^[a-z0-9_]{3,20}$/i;
 const namePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
 const phonePattern = /^(?:0[79]\d{8}|\+251[79]\d{8})$/;
 
@@ -47,7 +48,7 @@ const validateRegisterForm = ({ name, email, username, phone, password, confirmP
   if (!trimmedUsername) {
     nextErrors.username = 'Username is required';
   } else if (!usernamePattern.test(trimmedUsername)) {
-    nextErrors.username = 'Use 3-30 letters, numbers, periods, underscores, or hyphens';
+    nextErrors.username = 'Use 3-20 letters, numbers, or underscores';
   }
 
   const trimmedPhone = String(phone || '').trim();
@@ -95,6 +96,7 @@ const Register = () => {
   
   const { register, user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (user?.role) {
@@ -172,8 +174,8 @@ const Register = () => {
               onChange={handleChange}
               required
               minLength={3}
-              maxLength={30}
-              pattern="[A-Za-z0-9._-]{3,30}"
+              maxLength={20}
+              pattern="[A-Za-z0-9_]{3,20}"
               autoComplete="username"
               aria-invalid={Boolean(fieldErrors.username)}
               className={fieldErrors.username ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}
@@ -302,6 +304,13 @@ const Register = () => {
             {loading ? 'Registering...' : 'Register'}
           </button>
         </form>
+
+        <p className="register-legal-note">
+          {t('By registering, you agree to our')}{' '}
+          <Link to="/terms">{t('Terms of Service')}</Link>{' '}
+          {t('and')}{' '}
+          <Link to="/privacy-policy">{t('Privacy Policy')}</Link>.
+        </p>
         
         <p className="auth-footer">Already have an account? <Link to="/login">Login</Link>
         </p>
