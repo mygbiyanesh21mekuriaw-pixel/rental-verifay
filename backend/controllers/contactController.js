@@ -39,21 +39,23 @@ const submitContactMessage = async (req, res) => {
     if (name.length > 120 || email.length > 254 || subject.length > 180 || message.length > 5000) {
       return res.status(400).json({ message: 'One or more fields exceed the maximum length.' });
     }
-
     const contactMessage = await ContactMessage.create({ name, email, subject, message });
-    const adminEmail = await getPlatformAdminEmail();
-
-    if (adminEmail && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-      await sendEmail({
-        to: adminEmail,
-        subject: `Contact Us: ${subject}`,
-        text: `From: ${name} <${email}>\n\n${message}`,
-        html: `<p><strong>From:</strong> ${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;</p><p><strong>Subject:</strong> ${escapeHtml(subject)}</p><p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>`,
-      });
+    try {
+      const adminEmail = await getPlatformAdminEmail();
+      if (adminEmail && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        await sendEmail({
+          to: adminEmail,
+          subject: `Contact Us: ${subject}`,
+          text: `From: ${name} <${email}>\n\n${message}`,
+          html: `<p><strong>From:</strong> ${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;</p><p><strong>Subject:</strong> ${escapeHtml(subject)}</p><p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>`,
+        });
+      }
+    } catch (emailError) {
+      console.error('Contact message was saved, but email notification to the Platform Admin failed:', emailError);
     }
 
     res.status(201).json({
-      message: 'Your message was sent to the Platform Admin.',
+      message: 'Your message was saved in the Platform Admin contact inbox.',
       contactMessageId: contactMessage._id,
     });
   } catch (error) {
