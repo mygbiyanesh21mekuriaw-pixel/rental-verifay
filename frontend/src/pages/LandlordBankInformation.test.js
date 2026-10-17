@@ -147,9 +147,8 @@ test('shows saved landlord account details with a masked number', async () => {
   expect(screen.getByText('Dejen Mulat')).toBeInTheDocument();
   expect(screen.getByText('*********6789')).toBeInTheDocument();
   expect(screen.getByText('Internal Available Balance')).toBeInTheDocument();
-  expect(screen.getByText(
-    'This is your internal platform balance, not the balance in your Commercial Bank of Ethiopia (CBE) account. External transfers appear only after Chapa confirms them.'
-  )).toBeInTheDocument();
+  expect(screen.getByText('Manage your saved bank details and view rent credits.')).toBeInTheDocument();
+  expect(document.querySelector('.bank-account-details p')).toBeNull();
   expect(screen.getByText('ETB 2,000')).toBeInTheDocument();
   expect(screen.queryByLabelText('Account Number')).not.toBeInTheDocument();
 });
@@ -263,7 +262,7 @@ test('requires a new account number when the saved encrypted number cannot be re
   expect(accountNumberInput).toHaveAttribute('placeholder', 'Enter account number');
 });
 
-test('explains that Chapa confirms external transfers before they are marked executed', async () => {
+test('keeps the active bank status without helper copy', async () => {
   axios.get.mockImplementation((url) => (
     Promise.resolve({
       data: {
@@ -274,9 +273,9 @@ test('explains that Chapa confirms external transfers before they are marked exe
   ));
   render(<LandlordBankInformation />);
 
-  expect(await screen.findByText(
-    'Verified live rent payments are submitted to this bank account through Chapa. Sandbox requests are simulations and do not move real bank funds. A transfer is marked executed only after Chapa confirms a live transfer.'
-  )).toBeInTheDocument();
+  expect(await screen.findByText('Your bank account is active')).toBeInTheDocument();
+  expect(document.querySelector('.bank-account-status')).toHaveTextContent('Active');
+  expect(document.querySelector('.bank-account-active-banner p')).toBeNull();
   expect(screen.queryByText(
     'Verified rent payments are credited to your internal balance, not transferred to this bank account.'
   )).not.toBeInTheDocument();

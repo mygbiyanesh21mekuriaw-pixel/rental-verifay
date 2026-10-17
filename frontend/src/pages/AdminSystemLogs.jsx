@@ -141,7 +141,7 @@ const AdminSystemLogs = () => {
   };
 
   return (
-    <div className="system-logs-page max-w-7xl mx-auto px-4 py-8">
+    <div className="system-logs-page w-full min-w-0 max-w-none px-0 py-4">
       <BackToDashboard dashboardRoute="/admin-dashboard" />
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-2">

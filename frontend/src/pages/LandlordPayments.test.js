@@ -72,6 +72,8 @@ test('Rent Payments keeps payment and landlord credit details without external t
   );
 
   await expectRentPaymentTableColumns();
+  expect(screen.getByText('Payments received for your properties.')).toBeInTheDocument();
+  expect(document.querySelector('.payment-page > p.payment-muted')).toBeNull();
   expect(screen.getAllByText('Tenant Example')).toHaveLength(3);
   expect(screen.getAllByText('Rental Home')).toHaveLength(3);
   expect(screen.getAllByText('ETB 3,000')).toHaveLength(3);
@@ -80,7 +82,6 @@ test('Rent Payments keeps payment and landlord credit details without external t
   expect(screen.getAllByText('chapa')).toHaveLength(3);
   expect(screen.getAllByText('Not verified')).toHaveLength(3);
   expect(screen.getAllByText('CREDITED')).toHaveLength(3);
-  expect(screen.getByText(/EXECUTED only after Chapa confirms a live transfer/i)).toBeInTheDocument();
 });
 
 test('Rent Payments hides external transfer status and reasons without changing payment data', async () => {

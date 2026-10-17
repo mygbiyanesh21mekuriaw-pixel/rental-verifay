@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 
 jest.mock('axios', () => ({
   get: jest.fn(),
+  post: jest.fn(),
   delete: jest.fn(),
 }));
 
@@ -45,6 +46,7 @@ const CurrentPath = () => {
 beforeEach(() => {
   localStorage.setItem('token', 'platform-token');
   axios.get.mockReset().mockResolvedValue({ data: users });
+  axios.post.mockReset().mockResolvedValue({ data: { message: 'Admin account created successfully' } });
   axios.delete.mockReset().mockResolvedValue({ data: { message: 'User deleted successfully' } });
   useAuth.mockReturnValue({ user: platformAdmin });
   window.confirm = jest.fn(() => true);
@@ -73,6 +75,32 @@ test.each([
     expect(screen.getByTestId('current-path')).toHaveTextContent('/admin-dashboard');
   },
 );
+
+test('shows and hides the create-admin password and resets it after submission', async () => {
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  const passwordInput = await screen.findByPlaceholderText('Password');
+  expect(passwordInput).toHaveAttribute('type', 'password');
+  fireEvent.change(passwordInput, { target: { value: 'AreaAdmin123' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
+  expect(passwordInput).toHaveAttribute('type', 'text');
+  expect(passwordInput).toHaveValue('AreaAdmin123');
+
+  fireEvent.change(screen.getByPlaceholderText('Full name'), { target: { value: 'Area Admin' } });
+  fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'area@example.com' } });
+  fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'area-admin' } });
+  fireEvent.change(screen.getByPlaceholderText('Assigned Area'), { target: { value: 'North' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create Admin' }));
+
+  await waitFor(() => expect(axios.post).toHaveBeenCalled());
+  expect(await screen.findByRole('button', { name: 'Show password' })).toBeInTheDocument();
+  expect(passwordInput).toHaveAttribute('type', 'password');
+  expect(passwordInput).toHaveValue('');
+});
 
 test.each([
   ['verified', 'verified'],

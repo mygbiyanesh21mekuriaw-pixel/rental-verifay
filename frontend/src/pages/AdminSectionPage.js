@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaTrash } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaTrash } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import BackToDashboard from '../components/BackToDashboard';
 import PropertyImage from '../components/PropertyImage';
@@ -65,6 +65,7 @@ const AdminSectionPage = ({ type }) => {
   const [adminFormError, setAdminFormError] = useState('');
   const [adminFormMessage, setAdminFormMessage] = useState('');
   const [adminFormLoading, setAdminFormLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [editingAdminId, setEditingAdminId] = useState(null);
   const [adminActionLoading, setAdminActionLoading] = useState(null);
   const [selectedRentalRequest, setSelectedRentalRequest] = useState(null);
@@ -190,6 +191,7 @@ const AdminSectionPage = ({ type }) => {
 
   const handleEditAdmin = (admin) => {
     setEditingAdminId(admin._id);
+    setShowPassword(false);
     setAdminForm({
       name: admin.name || '',
       email: admin.email || '',
@@ -205,6 +207,7 @@ const AdminSectionPage = ({ type }) => {
 
   const handleCancelAdminEdit = () => {
     setEditingAdminId(null);
+    setShowPassword(false);
     setAdminForm({ name: '', email: '', username: '', phone: '', password: '', adminType: 'area', area: '' });
     setAdminFormError('');
     setAdminFormMessage('');
@@ -343,7 +346,30 @@ const AdminSectionPage = ({ type }) => {
             <input name="email" type="email" value={adminForm.email} onChange={handleAdminFormChange} placeholder="Email" required className="admin-card-detail" />
             {!editingAdminId && <input name="username" value={adminForm.username} onChange={handleAdminFormChange} placeholder="Username" minLength={3} maxLength={30} pattern="[A-Za-z0-9._-]{3,30}" required className="admin-card-detail" />}
             <input name="phone" value={adminForm.phone} onChange={handleAdminFormChange} placeholder="Phone" className="admin-card-detail" />
-            {!editingAdminId && <input name="password" type="password" value={adminForm.password} onChange={handleAdminFormChange} placeholder="Password" minLength="6" required className="admin-card-detail" />}
+            {!editingAdminId && (
+              <div className="admin-password-field">
+                <input
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={adminForm.password}
+                  onChange={handleAdminFormChange}
+                  placeholder="Password"
+                  minLength="6"
+                  required
+                  className="admin-card-detail"
+                />
+                <button
+                  type="button"
+                  className="admin-password-toggle"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => setShowPassword((current) => !current)}
+                >
+                  {showPassword ? <FaEyeSlash aria-hidden="true" /> : <FaEye aria-hidden="true" />}
+                </button>
+              </div>
+            )}
             <input
               name="area"
               value={adminForm.area}
@@ -552,7 +578,7 @@ const AdminSectionPage = ({ type }) => {
       )}
 
       {type !== 'paymentPeriod' && !isAdminManagementPage && type !== 'rentalRequests' && (
-        <section className={`admin-detail-section admin-dedicated-content${isUserListPage ? ' admin-user-list-panel' : ''}`}>
+        <section className={`admin-detail-section admin-dedicated-content${isUserListPage ? ' admin-user-list-panel' : ''}${type === 'allProperties' && isPlatformAdmin ? ' admin-platform-properties-panel' : ''}`}>
           {loading ? (
             <div className="admin-loading-small">Loading...</div>
           ) : loadError ? (

@@ -263,7 +263,7 @@ const LandlordBankInformation = () => {
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">LANDLORD WORKSPACE</p>
           <h1 className="m-0 text-2xl font-bold text-slate-800">Bank Information</h1>
-          <span className="text-sm text-slate-600">Manage your saved bank details and view rent credits. Transfers are sent through Chapa and confirmed before they are marked executed.</span>
+          <span className="text-sm text-slate-600">Manage your saved bank details and view rent credits.</span>
         </div>
       </header>
 
@@ -292,9 +292,9 @@ const LandlordBankInformation = () => {
               <span aria-hidden="true">{account.bankAccountNeedsUpdate ? '!' : '✓'}</span>
               <div>
                 <strong>{account.bankAccountNeedsUpdate ? 'Please update your bank account number' : 'Your bank account is active'}</strong>
-                <p>{account.bankAccountNeedsUpdate
-                  ? 'The saved account number can no longer be securely read. Enter your bank account number again to restore payouts. Your internal rent credits are not affected.'
-                  : 'Verified live rent payments are submitted to this bank account through Chapa. Sandbox requests are simulations and do not move real bank funds. A transfer is marked executed only after Chapa confirms a live transfer.'}</p>
+                {account.bankAccountNeedsUpdate && (
+                  <p>The saved account number can no longer be securely read. Enter your bank account number again to restore payouts. Your internal rent credits are not affected.</p>
+                )}
               </div>
               <span className="bank-account-status">{account.bankAccountNeedsUpdate ? 'Update needed' : 'Active'}</span>
             </div>
@@ -308,9 +308,6 @@ const LandlordBankInformation = () => {
                 <div><dt>Status</dt><dd className={account.bankAccountNeedsUpdate ? '' : 'bank-account-active-text'}>{account.bankAccountNeedsUpdate ? 'Update needed' : 'Active'}</dd></div>
                 <div><dt>Internal Available Balance</dt><dd>{account.currency || 'ETB'} {Number(account.balance || 0).toLocaleString()}</dd></div>
               </dl>
-              <p className="bank-account-field-help">
-                This is your internal platform balance, not the balance in your {account.bankName} account. External transfers appear only after Chapa confirms them.
-              </p>
             </div>
 
             <button

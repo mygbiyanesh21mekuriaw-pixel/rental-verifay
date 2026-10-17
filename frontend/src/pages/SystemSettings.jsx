@@ -206,7 +206,7 @@ const SystemSettings = () => {
   };
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-8">
+    <section className="w-full min-w-0 max-w-none px-0 py-4">
       <Link to="/admin-dashboard" className="mb-5 inline-flex font-semibold text-blue-700 hover:text-blue-900">
         Back to Dashboard
       </Link>

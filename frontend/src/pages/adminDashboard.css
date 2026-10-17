@@ -706,9 +706,10 @@
 }
 
 .admin-contact-page {
-  width: min(100%, 1100px);
-  margin: 0 auto;
-  padding: 24px 20px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 16px 0 24px;
   box-sizing: border-box;
 }
 
@@ -1459,6 +1460,8 @@
 
 .admin-payment-period-panel {
   background: #fff;
+  backdrop-filter: none;
+  border-color: #e5e7eb;
 }
 
 .admin-detail-header {
@@ -1664,6 +1667,24 @@
   border-color: rgba(59, 130, 246, 0.2);
 }
 
+.admin-platform-properties-panel {
+  background: #fff;
+  backdrop-filter: none;
+  border-color: #e5e7eb;
+}
+
+.admin-platform-properties-panel .admin-card {
+  background: #fff;
+  backdrop-filter: none;
+  border-color: #e5e7eb;
+}
+
+.admin-payment-period-panel .admin-card {
+  background: #fff;
+  backdrop-filter: none;
+  border-color: #e5e7eb;
+}
+
 .admin-user-list-panel,
 .admin-user-list-panel .admin-user-list-card {
   background: #fff;
@@ -1784,6 +1805,37 @@
   font-size: 14px;
   color: #4b5563;
   margin-bottom: 3px;
+}
+
+.admin-password-field {
+  position: relative;
+  min-width: 0;
+}
+
+.admin-password-field input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.admin-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.admin-password-toggle:hover {
+  background: transparent;
+  color: #374151;
 }
 
 .admin-card-link {

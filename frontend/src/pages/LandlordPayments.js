@@ -43,9 +43,6 @@ const LandlordPayments = () => {
         <h1 className="m-0 text-2xl font-bold text-slate-800">Rent Payments</h1>
         <p className="mt-1 text-sm text-slate-600">{propertyId ? 'Payments for this rented property.' : 'Payments received for your properties.'}</p>
       </div>
-      <p className="payment-muted">
-        Verified live payments are credited and submitted to your registered bank through Chapa. Sandbox requests use Chapa's test simulation and never move real bank funds. A transfer is marked EXECUTED only after Chapa confirms a live transfer.
-      </p>
       <section className="payment-card payment-table-card">
         {loading ? <p className="payment-muted">Loading payments...</p> : payments.length === 0 ? <p className="payment-muted">No rent payments have been submitted yet.</p> : (
           <div className="payment-table-wrap">
