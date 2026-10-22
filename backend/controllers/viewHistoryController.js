@@ -23,7 +23,7 @@ const recordPropertyView = async (req, res) => {
     const view = await ViewHistory.findOneAndUpdate(
       { property: property._id, viewer: req.user.id },
       { $set: { viewedAt: new Date() } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
     );
 
     res.status(201).json({ message: 'Property view recorded', view });

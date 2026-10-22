@@ -37,14 +37,14 @@ const getNextSequence = async (bankCode) => {
     return await DemoBankAccountSequence.findOneAndUpdate(
       { _id: sequenceId },
       { $inc: { sequence: 1 } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
     );
   } catch (error) {
     if (error.code !== 11000) throw error;
     return DemoBankAccountSequence.findOneAndUpdate(
       { _id: sequenceId },
       { $inc: { sequence: 1 } },
-      { new: true }
+      { returnDocument: 'after' }
     );
   }
 };
@@ -160,7 +160,7 @@ const creditDemoAccountForPayment = async (payment) => {
         },
       },
     },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
 
   if (updatedAccount) {

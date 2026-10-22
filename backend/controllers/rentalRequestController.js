@@ -21,7 +21,7 @@ const activateRentalRelationship = async (propertyId, tenantId) => {
       rentedBy: tenantId,
       rentedAt: new Date(),
     },
-    { new: true },
+    { returnDocument: 'after' },
   );
 };
 

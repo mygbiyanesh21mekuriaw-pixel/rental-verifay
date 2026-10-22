@@ -177,7 +177,7 @@ const updateSystemSettings = async (req, res) => {
         $set: updates,
         $setOnInsert: { key: 'global' },
       },
-      { new: true, returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
+      { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
     return res.json({
       message: 'System settings saved.',
@@ -214,7 +214,7 @@ const uploadWebsiteLogo = async (req, res) => {
         },
         $setOnInsert: { key: 'global' },
       },
-      { new: true, returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
+      { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
     return res.json({
       message: 'Website logo updated.',

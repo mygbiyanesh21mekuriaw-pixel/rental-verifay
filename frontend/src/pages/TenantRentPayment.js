@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -164,14 +164,14 @@ const TenantRentPayment = () => {
   const [returnCountdown, setReturnCountdown] = useState(PAYMENT_SUCCESS_DELAY_SECONDS);
   const [printingReceiptId, setPrintingReceiptId] = useState(null);
 
-  const handleUnauthorized = (requestError) => {
+  const handleUnauthorized = useCallback((requestError) => {
     if (requestError.response?.status !== 401) return false;
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     logout?.();
     navigate('/login', { replace: true, state: { sessionExpired: true } });
     return true;
-  };
+  }, [logout, navigate]);
 
   useEffect(() => {
     const handleAfterPrint = () =>setPrintingReceiptId(null);
@@ -333,7 +333,7 @@ const TenantRentPayment = () => {
       if (returnPollTimer) window.clearTimeout(returnPollTimer);
       window.removeEventListener('focus', handleFocusRefresh);
     };
-  }, [location.key, logout, navigate, propertyId]);
+  }, [handleUnauthorized, location.key, logout, navigate, propertyId]);
 
   const submitPayment = async (event) => {
     event.preventDefault();

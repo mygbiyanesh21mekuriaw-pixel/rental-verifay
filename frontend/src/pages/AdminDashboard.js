@@ -60,12 +60,6 @@ export const buildMonthlyPropertySeries = (properties, now = new Date()) => {
   });
 };
 
-const formatDate = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString();
-};
-
 const getAssignedAreaName = (adminAreas) => {
   if (!Array.isArray(adminAreas) || adminAreas.length === 0) return '';
   return adminAreas

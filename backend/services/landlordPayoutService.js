@@ -174,7 +174,7 @@ const recoverUnsubmittedLegacyMismatch = async (payout) => {
       providerRequestResponse: null,
     },
     { $set: { status: 'PENDING', failureReason: '' } },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   return recovered || await Payout.findById(payout._id);
 };
@@ -183,7 +183,7 @@ const setPayoutStatus = async (payout, status, fields = {}) => {
   const updatedPayout = await Payout.findOneAndUpdate(
     { _id: payout._id, status: { $nin: ['PAID', 'FAILED', 'REVERTED', 'SIMULATED'] } },
     { $set: { status, ...fields } },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   if (!updatedPayout) {
     const currentPayout = await Payout.findById(payout._id);
@@ -308,7 +308,7 @@ const reserveLandlordBalance = async (payout) => {
         },
       },
     },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   if (updatedLandlord) return true;
 
@@ -336,7 +336,7 @@ const releaseLandlordBalance = async (payout) => {
       $inc: { internalBalance: Number(payout.amount) },
       $set: { 'internalPayoutReferences.$.status': 'REFUNDED' },
     },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
 };
 
@@ -352,7 +352,7 @@ const settleLandlordBalance = async (payout) => {
       },
     },
     { $set: { 'internalPayoutReferences.$.status': 'EXECUTED' } },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   if (settledLandlord) return;
 
@@ -448,7 +448,7 @@ const processLandlordPayout = async (payment) => {
             status: 'PENDING',
           },
         },
-        { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true }
       );
     } catch (error) {
       if (error.code !== 11000) throw error;
@@ -604,7 +604,7 @@ const processLandlordPayout = async (payment) => {
         destinationAccountNumber: encryptBankAccountNumber(accountNumber),
       },
     },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   if (!claimedPayout) {
     const currentPayout = await Payout.findById(payout._id);

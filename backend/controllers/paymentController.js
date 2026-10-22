@@ -278,7 +278,7 @@ const createPayment = async (req, res) => {
             checkoutUrl: 1,
           },
         },
-        { new: true, runValidators: true }
+        { returnDocument: 'after', runValidators: true }
       );
       if (!payment) {
         const currentPayment = await Payment.findOne({ tenant: req.user.id, property: propertyId, paymentPeriod: period });
@@ -356,7 +356,7 @@ const createPayment = async (req, res) => {
           checkoutUrl: providerResult.providerCheckoutUrl,
         },
       },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
     if (!initializedPayment) {
       return res.status(409).json({ message: 'Payment attempt changed while checkout was being initialized. Please reload the payment page.' });
@@ -402,7 +402,7 @@ const applyChapaVerification = async (payment, verification, req) => {
         $set: { status: 'pending', verifiedAt: null },
         $unset: { checkoutUrl: 1 },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!downgradedPayment) {
       return await Payment.findById(payment._id) || payment;
@@ -452,7 +452,7 @@ const applyChapaVerification = async (payment, verification, req) => {
       status: 'pending',
     },
     update,
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   );
   if (!updatedPayment) {
     return await Payment.findById(payment._id) || payment;

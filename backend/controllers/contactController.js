@@ -79,7 +79,7 @@ const markContactMessageRead = async (req, res) => {
     const contactMessage = await ContactMessage.findByIdAndUpdate(
       req.params.id,
       { $set: { read: true } },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
     if (!contactMessage) return res.status(404).json({ message: 'Contact message not found.' });
     res.json(contactMessage);

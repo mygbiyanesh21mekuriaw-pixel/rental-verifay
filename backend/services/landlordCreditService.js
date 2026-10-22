@@ -67,7 +67,7 @@ const saveLedgerState = async (payment, landlord, status, reason = '') =>
       $set: toLedgerEntry(payment, landlord, status, reason),
       $setOnInsert: { externalTransferStatus: 'NOT_EXECUTED' },
     },
-    { upsert: true, new: true, runValidators: true }
+    { upsert: true, returnDocument: 'after', runValidators: true }
   );
 
 const creditLandlordForPayment = async (payment) => {
@@ -146,7 +146,7 @@ const creditLandlordForPayment = async (payment) => {
           },
         },
       },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (updatedLandlord) {

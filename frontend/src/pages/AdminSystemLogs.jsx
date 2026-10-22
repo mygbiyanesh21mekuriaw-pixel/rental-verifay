@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import BackToDashboard from '../components/BackToDashboard';
@@ -83,7 +83,7 @@ const AdminSystemLogs = () => {
     return params.toString();
   }, [search, role, action, status, dateFrom, dateTo, page]);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -112,11 +112,11 @@ const AdminSystemLogs = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [buildQuery, navigate]);
 
   useEffect(() => {
     fetchLogs();
-  }, [buildQuery, navigate]);
+  }, [fetchLogs]);
 
   const handleSearch = () => {
     setPage(1);
