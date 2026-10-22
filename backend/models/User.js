@@ -36,6 +36,16 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  area: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  assignedArea: {
+    type: String,
+    trim: true,
+    default: '',
+  },
   profilePhoto: {
     type: String,
     default: '',

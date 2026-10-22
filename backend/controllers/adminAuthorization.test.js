@@ -4,7 +4,8 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const systemLogRoutes = require('../routes/systemLogRoutes');
 const { platformAdminOnly } = require('../middleware/auth');
-const { getAdminProperties } = require('./adminController');
+const { getAdminProperties, getAllUsers } = require('./adminController');
+const { requireRole } = require('../middleware/auth');
 
 const createResponse = () => ({
   statusCode: null,
@@ -59,4 +60,81 @@ test('system-log route requires platform-admin authorization', () => {
   assert.ok(route);
   assert.equal(route.route.stack[0].handle.name, 'auth');
   assert.equal(route.route.stack[1].handle, platformAdminOnly);
+});
+
+test('area-admin role is derived from legacy admin fields and exposes its assigned area', () => {
+  const middleware = requireRole('area_admin');
+  const req = { user: { role: 'admin', adminType: 'area', assignedArea: 'Mekelle' } };
+  let nextCalled = false;
+
+  middleware(req, createResponse(), () => { nextCalled = true; });
+
+  assert.equal(nextCalled, true);
+  assert.equal(req.user.accessRole, 'area_admin');
+});
+
+test('platform-admin role middleware rejects area admins', () => {
+  const middleware = requireRole('platform_admin');
+  const req = { user: { role: 'admin', adminType: 'area' } };
+  const response = createResponse();
+
+  middleware(req, response, () => assert.fail('Unauthorized role passed middleware'));
+
+  assert.equal(response.statusCode, 403);
+});
+
+test('area-admin user query is restricted to the assigned area', async () => {
+  const originalUserFind = User.find;
+  let query;
+  User.find = (filter) => {
+    query = filter;
+    return { select: async () => [] };
+  };
+  const response = createResponse();
+
+  try {
+    await getAllUsers({
+      user: { role: 'admin', adminType: 'area', assignedArea: 'Mekelle' },
+    }, response);
+
+    assert.deepEqual(query, { area: 'Mekelle' });
+    assert.deepEqual(response.body, []);
+  } finally {
+    User.find = originalUserFind;
+  }
+});
+
+test('area-admin property query matches only the assigned area', async () => {
+  const originalUserFindById = User.findById;
+  const originalPropertyFind = Property.find;
+  let propertyFilter;
+  User.findById = () => ({
+    select() {
+      return {
+        lean: async () => ({
+          adminType: 'area',
+          assignedArea: 'North',
+          adminAreas: [{ city: 'North' }],
+        }),
+      };
+    },
+  });
+  Property.find = (filter) => {
+    propertyFilter = filter;
+    return { sort: () => ({ lean: async () => [] }) };
+  };
+  const response = createResponse();
+
+  try {
+    await getAdminProperties(
+      { user: { id: '507f1f77bcf86cd799439011' }, query: { status: 'all' }, params: {} },
+      response,
+    );
+
+    assert.ok(propertyFilter.$and[0].$or.some((condition) => condition.area instanceof RegExp));
+    assert.deepEqual(response.body, []);
+  } finally {
+    User.findById = originalUserFindById;
+    Property.find = originalPropertyFind;
+  }
 });

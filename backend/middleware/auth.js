@@ -3,11 +3,28 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Property = require('../models/Property');
 
+const getAdministrativeRole = (user) => {
+  if (user?.role === 'platform_admin' || user?.role === 'area_admin') return user.role;
+  if (user?.role !== 'admin') return user?.role;
+  return user.adminType === 'area' || (!user.adminType && (user.adminAreas || []).length > 0)
+    ? 'area_admin'
+    : 'platform_admin';
+};
+
+const getLegacyAssignedArea = (adminAreas) => {
+  const firstArea = Array.isArray(adminAreas) ? adminAreas[0] : null;
+  if (typeof firstArea === 'string') return firstArea.trim();
+  if (!firstArea || typeof firstArea !== 'object') return '';
+  return ['city', 'region', 'zone', 'wereda', 'subCity']
+    .map((field) => String(firstArea[field] || '').trim())
+    .find(Boolean) || '';
+};
+
 const resolveAuthenticatedUser = async (decoded) => {
   if (!mongoose.isValidObjectId(decoded?.id)) return null;
 
   const user = await User.findById(decoded.id)
-    .select('_id role adminType adminAreas')
+    .select('_id role adminType adminAreas assignedArea area')
     .lean();
   if (!user) return null;
 
@@ -19,6 +36,8 @@ const resolveAuthenticatedUser = async (decoded) => {
       ? user.adminType || (adminAreas.length > 0 ? 'area' : 'platform')
       : undefined,
     adminAreas,
+    assignedArea: user.assignedArea || getLegacyAssignedArea(adminAreas),
+    area: user.area || '',
   };
 };
 
@@ -77,46 +96,21 @@ const optionalAuth = async (req, res, next) => {
 };
 
 // Admin ብቻ መሆኑን ያረጋግጣል
-const adminOnly = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Access denied. Admin only.' });
+const requireRole = (...roles) => (req, res, next) => {
+  const role = getAdministrativeRole(req.user);
+  if (!roles.includes(role) && !(role === 'platform_admin' && roles.includes('admin'))) {
+    const message = roles.length === 1 && roles[0] === 'platform_admin'
+      ? 'Platform Admin permission required.'
+      : 'Access denied. Insufficient permissions.';
+    return res.status(403).json({ message });
   }
+  req.user.accessRole = role;
   next();
 };
 
-const areaAdminOnly = async (req, res, next) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Access denied. Admin only.' });
-    }
-    const user = await User.findById(req.user.id).select('role adminType adminAreas');
-    const isAreaAdmin = user && user.role === 'admin' && user.adminType === 'area';
-    if (!isAreaAdmin) {
-      return res.status(403).json({ message: 'Area Admin permission required.' });
-    }
-    next();
-  } catch (error) {
-    res.status(500).json({ message: 'Unable to verify area admin permission' });
-  }
-};
-
-const platformAdminOnly = async (req, res, next) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Access denied. Admin only.' });
-    }
-    const user = await User.findById(req.user.id).select('role adminType adminAreas');
-    const isPlatformAdmin = user && user.role === 'admin' && (
-      user.adminType === 'platform' || (!user.adminType && (!user.adminAreas || user.adminAreas.length === 0))
-    );
-    if (!isPlatformAdmin) {
-      return res.status(403).json({ message: 'Platform Admin permission required.' });
-    }
-    next();
-  } catch (error) {
-    res.status(500).json({ message: 'Unable to verify platform admin permission' });
-  }
-};
+const adminOnly = requireRole('platform_admin', 'area_admin');
+const areaAdminOnly = requireRole('area_admin');
+const platformAdminOnly = requireRole('platform_admin');
 
 // Landlord ብቻ መሆኑን ያረጋግጣል
 const landlordOnly = (req, res, next) => {
@@ -162,6 +156,8 @@ module.exports = {
   auth,
   optionalAuth,
   adminOnly,
+  requireRole,
+  getAdministrativeRole,
   areaAdminOnly,
   platformAdminOnly,
   landlordOnly,

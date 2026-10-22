@@ -27,6 +27,7 @@ import LandlordDashboard, { LandlordLayout } from './pages/LandlordDashboard';
 import LandlordSectionPage from './pages/LandlordSectionPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminAnalytics from './pages/AdminAnalytics';
+import AdminPlaces from './pages/AdminPlaces';
 import AdminSectionPage from './pages/AdminSectionPage';
 import AdminNotifications from './pages/AdminNotifications';
 import AdminContactMessages from './pages/AdminContactMessages';
@@ -503,7 +504,7 @@ function AppContent() {
             <Route path="/admin-dashboard/verified" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="verified" /></PrivateRoute>} />
             <Route path="/admin-dashboard/rejected" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="rejected" /></PrivateRoute>} />
             <Route path="/admin-dashboard/notifications" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminNotifications /></PrivateRoute>} />
-            <Route path="/admin-dashboard/contact-messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminContactMessages /></PrivateRoute>} />
+            <Route path="/admin-dashboard/contact-messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminContactMessages /></PrivateRoute>} />
             <Route path="/admin-dashboard/profile" element={<PrivateRoute allowedRoles={['admin']}><AdminProfile /></PrivateRoute>} />
             <Route path="/admin-dashboard/messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminMessages /></PrivateRoute>} />
             <Route path="/admin-dashboard/system-logs" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSystemLogs /></PrivateRoute>} />
@@ -512,8 +513,9 @@ function AppContent() {
             <Route path="/admin-dashboard/properties-awaiting-verification" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['area']}><AdminSectionPage type="awaitingVerification" /></PrivateRoute>} />
             <Route path="/admin-dashboard/review-properties" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="reviewProperties" /></PrivateRoute>} />
             <Route path="/admin-dashboard/all-properties" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="allProperties" /></PrivateRoute>} />
-            <Route path="/admin-dashboard/all-users" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="allUsers" /></PrivateRoute>} />
+            <Route path="/admin-dashboard/all-users" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="allUsers" /></PrivateRoute>} />
             <Route path="/admin-dashboard/admin-management" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="adminManagement" /></PrivateRoute>} />
+            <Route path="/admin-dashboard/places" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminPlaces /></PrivateRoute>} />
             <Route path="/admin-dashboard/payment-period" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="paymentPeriod" /></PrivateRoute>} />
             <Route path="/admin-dashboard/demo-bank-accounts" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="demoBankAccounts" /></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />

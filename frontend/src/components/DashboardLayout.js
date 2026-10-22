@@ -14,6 +14,7 @@ import {
   FaHome,
   FaHourglassHalf,
   FaMoneyBill,
+  FaMap,
   FaPlus,
   FaSearch,
   FaShieldAlt,
@@ -84,6 +85,7 @@ export const getDashboardMenuGroups = (user, t) => {
         dashboard,
         group('Management', [
           item('Admin Management', '/admin-dashboard/admin-management', FaShieldAlt),
+          item('Ethiopia Places', '/admin-dashboard/places', FaMap),
           item('Users', '/admin-dashboard/all-users', FaUsers),
           item('Properties', '/admin-dashboard/all-properties', FaBuilding),
           item('Admin Analytics', '/admin-dashboard/analytics', FaChartBar),
@@ -107,6 +109,10 @@ export const getDashboardMenuGroups = (user, t) => {
         item('Under Review', '/admin-dashboard/pending', FaHourglassHalf),
         item('Verified', '/admin-dashboard/verified', FaCheck),
         item('Rejected', '/admin-dashboard/rejected', FaTimes),
+      ]),
+      group('Management', [
+        item('Users', '/admin-dashboard/all-users', FaUsers),
+        item('Contact Messages', '/admin-dashboard/contact-messages', FaEnvelope),
       ]),
       group('Rentals', [
         item('Rental Requests', '/admin-dashboard/rental-requests', FaClipboardList),

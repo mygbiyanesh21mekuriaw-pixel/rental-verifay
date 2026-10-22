@@ -177,6 +177,35 @@ test('area admin may access only proofs within an assigned area', async () => {
   });
 });
 
+test('area admin can access proof for a property stored with only its canonical area', async () => {
+  await withCloudinaryConfig(async () => {
+    const originalFetch = global.fetch;
+    global.fetch = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: (name) => (name === 'content-type' ? 'image/png' : '1') },
+      arrayBuffer: async () => Uint8Array.from([1]).buffer,
+    });
+    try {
+      await withMocks(privateProperty({ city: '', area: 'North' }), async () => {
+        const response = createResponse();
+        await getOwnershipProof({
+          params: { id: propertyId },
+          user: {
+            id: '507f1f77bcf86cd799439015',
+            role: 'admin',
+            adminType: 'area',
+            assignedArea: 'North',
+          },
+        }, response);
+        assert.equal(response.contentType, 'image/png');
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});
+
 test('platform admin is authorized to access the proof', async () => {
   await withCloudinaryConfig(async () => {
     const originalFetch = global.fetch;

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const SystemSettings = require('../models/SystemSettings');
 const User = require('../models/User');
+const Area = require('../models/Area');
 const Notification = require('../models/Notification');
 const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
@@ -23,6 +24,21 @@ const {
   buildAdminAreaQuery,
 } = require('../utils/adminArea');
 
+const resolvePropertyArea = async (requestedArea, address) => {
+  const areaName = String(requestedArea || '').trim();
+  if (areaName) {
+    const area = await Area.findOne({ normalizedName: areaName.toLowerCase() }).select('name').lean();
+    return area?.name || null;
+  }
+
+  const candidates = ['city', 'wereda', 'zone', 'region', 'subCity']
+    .map((field) => String(address[field] || '').trim().toLowerCase())
+    .filter(Boolean);
+  if (candidates.length === 0) return '';
+  const area = await Area.findOne({ normalizedName: { $in: candidates } }).select('name').lean();
+  return area?.name || '';
+};
+
 const canViewVerificationDocument = (user, property) => {
   if (!user) return false;
 
@@ -31,6 +47,9 @@ const canViewVerificationDocument = (user, property) => {
   if (user.role !== 'admin') return false;
   if (user.adminType === 'platform') return true;
 
+  if (user.assignedArea) {
+    return propertyMatchesAdminAreas(property, [user.assignedArea]);
+  }
   const adminAreas = (user.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
   return adminAreas.length > 0 && propertyMatchesAdminAreas(property, adminAreas);
 };
@@ -81,7 +100,7 @@ const getOwnershipProof = async (req, res) => {
       return res.status(404).json({ message: 'Property not found' });
     }
     const property = await Property.findById(req.params.id)
-      .select('_id landlord region zone wereda city subCity verificationDocument verificationDocumentAsset');
+      .select('_id landlord area region zone wereda city subCity verificationDocument verificationDocumentAsset');
     if (!property) return res.status(404).json({ message: 'Property not found' });
     if (!canViewVerificationDocument(req.user, property)) {
       return res.status(404).json({ message: 'Ownership proof not found' });
@@ -215,6 +234,8 @@ const createProperty = async (req, res) => {
   try {
     const { title, description, price, bedrooms, latitude, longitude } = req.body;
     const address = normalizeAddress(req.body);
+    const areaName = await resolvePropertyArea(req.body.area, address);
+    if (areaName === null) return res.status(400).json({ message: 'Select an existing area.' });
     const landlord = await User.findOne({ _id: req.user.id, role: 'landlord' }).select('_id');
 
     if (!landlord) {
@@ -258,6 +279,7 @@ const createProperty = async (req, res) => {
       description,
       price,
       location: address.location,
+      area: areaName,
       region: address.region,
       zone: address.zone,
       wereda: address.wereda,
@@ -656,11 +678,14 @@ const updateProperty = async (req, res) => {
 
     const { title, description, price, bedrooms, latitude, longitude } = req.body;
     const address = normalizeAddress(req.body);
+    const areaName = await resolvePropertyArea(req.body.area, address);
+    if (areaName === null) return res.status(400).json({ message: 'Select an existing area.' });
 
     property.title = title || property.title;
     property.description = description || property.description;
     property.price = price || property.price;
     Object.assign(property, address);
+    property.area = areaName;
     property.bedrooms = bedrooms || property.bedrooms;
 
     if (req.files && req.files.images && req.files.images.length > 0) {

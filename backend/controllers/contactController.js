@@ -1,5 +1,7 @@
 const ContactMessage = require('../models/ContactMessage');
 const User = require('../models/User');
+const Area = require('../models/Area');
+const { getAdministrativeRole } = require('../middleware/auth');
 const sendEmail = require('../utils/email');
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,15 +33,18 @@ const submitContactMessage = async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const subject = String(req.body.subject || '').trim();
     const message = String(req.body.message || '').trim();
+    const areaName = String(req.body.area || '').trim();
 
-    if (!name || !email || !subject || !message) {
-      return res.status(400).json({ message: 'Name, email, subject and message are required.' });
+    if (!name || !email || !subject || !message || !areaName) {
+      return res.status(400).json({ message: 'Name, email, subject, message and area are required.' });
     }
     if (!emailPattern.test(email)) return res.status(400).json({ message: 'Enter a valid email address.' });
     if (name.length > 120 || email.length > 254 || subject.length > 180 || message.length > 5000) {
       return res.status(400).json({ message: 'One or more fields exceed the maximum length.' });
     }
-    const contactMessage = await ContactMessage.create({ name, email, subject, message });
+    const area = await Area.findOne({ normalizedName: areaName.toLowerCase() }).select('name').lean();
+    if (!area) return res.status(400).json({ message: 'Select an existing area.' });
+    const contactMessage = await ContactMessage.create({ name, email, subject, message, area: area.name });
     try {
       const adminEmail = await getPlatformAdminEmail();
       if (adminEmail && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
@@ -66,7 +71,12 @@ const submitContactMessage = async (req, res) => {
 
 const getPlatformContactMessages = async (req, res) => {
   try {
-    const messages = await ContactMessage.find().sort({ createdAt: -1 }).lean();
+    const filter = {};
+    if (getAdministrativeRole(req.user) === 'area_admin') {
+      if (req.user.assignedArea) filter.area = req.user.assignedArea;
+      else filter._id = null;
+    }
+    const messages = await ContactMessage.find(filter).sort({ createdAt: -1 }).lean();
     res.json(messages);
   } catch (error) {
     console.error('Contact inbox error:', error);
@@ -76,8 +86,13 @@ const getPlatformContactMessages = async (req, res) => {
 
 const markContactMessageRead = async (req, res) => {
   try {
-    const contactMessage = await ContactMessage.findByIdAndUpdate(
-      req.params.id,
+    const filter = { _id: req.params.id };
+    if (getAdministrativeRole(req.user) === 'area_admin') {
+      if (req.user.assignedArea) filter.area = req.user.assignedArea;
+      else filter._id = null;
+    }
+    const contactMessage = await ContactMessage.findOneAndUpdate(
+      filter,
       { $set: { read: true } },
       { returnDocument: 'after', runValidators: true }
     );

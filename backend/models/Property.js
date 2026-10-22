@@ -22,6 +22,11 @@ const PropertySchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  area: {
+    type: String,
+    trim: true,
+    default: '',
+  },
   region: {
     type: String,
     trim: true,

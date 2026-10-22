@@ -111,6 +111,8 @@ test('auth uses the current database role instead of a stale elevated JWT role',
       role: 'tenant',
       adminType: undefined,
       adminAreas: [],
+      assignedArea: '',
+      area: '',
     });
 
     const adminResponse = createResponse();

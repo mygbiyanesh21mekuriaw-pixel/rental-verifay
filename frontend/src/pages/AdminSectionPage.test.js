@@ -15,6 +15,10 @@ jest.mock('../context/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../context/LanguageContext', () => ({
+  useLanguage: () => ({ t: (text) => text }),
+}));
+
 const platformAdmin = {
   _id: 'platform-admin-id',
   name: 'Platform Admin',
@@ -31,6 +35,7 @@ const users = [
   },
   platformAdmin,
 ];
+const areas = [{ _id: 'north', name: 'North' }];
 
 const renderUsersPage = () => render(
   <MemoryRouter>
@@ -45,7 +50,9 @@ const CurrentPath = () => {
 
 beforeEach(() => {
   localStorage.setItem('token', 'platform-token');
-  axios.get.mockReset().mockResolvedValue({ data: users });
+  axios.get.mockReset().mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? areas : users,
+  }));
   axios.post.mockReset().mockResolvedValue({ data: { message: 'Admin account created successfully' } });
   axios.delete.mockReset().mockResolvedValue({ data: { message: 'User deleted successfully' } });
   useAuth.mockReturnValue({ user: platformAdmin });
@@ -84,6 +91,10 @@ test('shows and hides the create-admin password and resets it after submission',
   );
 
   const passwordInput = await screen.findByPlaceholderText('Password');
+  expect(axios.get).toHaveBeenCalledWith(
+    expect.stringMatching(/\/api\/areas$/),
+    expect.objectContaining({ headers: { Authorization: 'Bearer platform-token' } }),
+  );
   expect(passwordInput).toHaveAttribute('type', 'password');
   fireEvent.change(passwordInput, { target: { value: 'AreaAdmin123' } });
   fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
@@ -93,13 +104,49 @@ test('shows and hides the create-admin password and resets it after submission',
   fireEvent.change(screen.getByPlaceholderText('Full name'), { target: { value: 'Area Admin' } });
   fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'area@example.com' } });
   fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'area-admin' } });
-  fireEvent.change(screen.getByPlaceholderText('Assigned Area'), { target: { value: 'North' } });
+  fireEvent.change(screen.getByRole('combobox', { name: '' }), { target: { value: 'North' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create Admin' }));
 
   await waitFor(() => expect(axios.post).toHaveBeenCalled());
   expect(await screen.findByRole('button', { name: 'Show password' })).toBeInTheDocument();
   expect(passwordInput).toHaveAttribute('type', 'password');
   expect(passwordInput).toHaveValue('');
+});
+
+test('shows the area API status and message when loading areas fails', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/api/areas')) {
+      return Promise.reject({
+        response: { status: 503, data: { message: 'Area database unavailable.' } },
+      });
+    }
+    return Promise.resolve({ data: users });
+  });
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'HTTP 503: Area database unavailable.',
+  );
+});
+
+test('links to Ethiopia Places when no places have been registered', async () => {
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? [] : users,
+  }));
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  const placesLink = await screen.findByRole('link', { name: 'Ethiopia Places' });
+  expect(placesLink).toHaveAttribute('href', '/admin-dashboard/places');
+  expect(screen.getByRole('combobox')).toHaveTextContent('No places registered yet');
 });
 
 test.each([

@@ -10,6 +10,7 @@ jest.mock('axios');
 
 beforeEach(() => {
   localStorage.clear();
+  axios.get.mockResolvedValue({ data: [{ _id: 'north', name: 'North' }] });
   axios.post.mockResolvedValue({
     data: {
       token: 'test-token',

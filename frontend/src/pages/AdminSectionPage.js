@@ -7,6 +7,8 @@ import BackToDashboard from '../components/BackToDashboard';
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
 import { getPropertyImages } from '../utils/propertyMedia';
+import { apiUrl } from '../utils/apiUrl';
+import { useLanguage } from '../context/LanguageContext';
 import './adminDashboard.css';
 
 const sectionConfig = {
@@ -41,6 +43,7 @@ const AdminSectionPage = ({ type }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user: currentUser } = useAuth();
+  const { t } = useLanguage();
   const config = sectionConfig[type];
   const isAdminManagementPage = type === 'adminManagement';
   const isUserListPage = type === 'allUsers';
@@ -65,6 +68,8 @@ const AdminSectionPage = ({ type }) => {
   const [adminFormError, setAdminFormError] = useState('');
   const [adminFormMessage, setAdminFormMessage] = useState('');
   const [adminFormLoading, setAdminFormLoading] = useState(false);
+  const [areas, setAreas] = useState([]);
+  const [areaError, setAreaError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [editingAdminId, setEditingAdminId] = useState(null);
   const [adminActionLoading, setAdminActionLoading] = useState(null);
@@ -81,6 +86,26 @@ const AdminSectionPage = ({ type }) => {
     && currentUser?.adminType === 'area'
     && (type === 'pending' || type === 'reviewProperties' || type === 'awaitingVerification');
   const canManageRentalRequests = currentUser?.role === 'admin' && currentUser?.adminType === 'area';
+
+  const fetchAreas = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await Promise.resolve().then(() => axios.get(apiUrl('/api/areas'), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }));
+      setAreas(Array.isArray(response.data) ? response.data : []);
+      setAreaError('');
+    } catch (error) {
+      console.error('Unable to load areas:', error);
+      const status = error.response?.status;
+      const message = error.response?.data?.message || error.message || 'Unknown error.';
+      setAreaError(`${status ? `HTTP ${status}: ` : ''}${message}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAdminManagementPage && isPlatformAdmin) fetchAreas();
+  }, [fetchAreas, isAdminManagementPage, isPlatformAdmin]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -199,7 +224,7 @@ const AdminSectionPage = ({ type }) => {
       phone: admin.phone || '',
       password: '',
       adminType: 'area',
-      area: getAdminAreaValue(admin.adminAreas),
+      area: admin.assignedArea || getAdminAreaValue(admin.adminAreas),
     });
     setAdminFormError('');
     setAdminFormMessage('');
@@ -223,8 +248,7 @@ const AdminSectionPage = ({ type }) => {
         name: adminForm.name,
         email: adminForm.email,
         phone: adminForm.phone,
-        adminType: 'area',
-        adminAreas: [adminForm.area],
+        assignedArea: adminForm.area,
       };
       if (!editingAdminId) {
         payload.username = adminForm.username;
@@ -341,16 +365,17 @@ const AdminSectionPage = ({ type }) => {
           <p className="admin-subtitle">Only the Platform Admin can create area-specific admin accounts.</p>
           {adminFormError && <div className="admin-empty-text">{adminFormError}</div>}
           {adminFormMessage && <div className="admin-empty-text">{adminFormMessage}</div>}
-          <form onSubmit={handleAdminSubmit} className="admin-grid">
-            <input name="name" value={adminForm.name} onChange={handleAdminFormChange} placeholder="Full name" required className="admin-card-detail" />
-            <input name="email" type="email" value={adminForm.email} onChange={handleAdminFormChange} placeholder="Email" required className="admin-card-detail" />
-            {!editingAdminId && <input name="username" value={adminForm.username} onChange={handleAdminFormChange} placeholder="Username" minLength={3} maxLength={30} pattern="[A-Za-z0-9._-]{3,30}" required className="admin-card-detail" />}
-            <input name="phone" value={adminForm.phone} onChange={handleAdminFormChange} placeholder="Phone" className="admin-card-detail" />
+          <form onSubmit={handleAdminSubmit} className="admin-grid" autoComplete="off">
+            <input name="name" autoComplete="off" value={adminForm.name} onChange={handleAdminFormChange} placeholder="Full name" required className="admin-card-detail" />
+            <input name="email" type="email" autoComplete="off" value={adminForm.email} onChange={handleAdminFormChange} placeholder="Email" required className="admin-card-detail" />
+            {!editingAdminId && <input name="username" autoComplete="off" value={adminForm.username} onChange={handleAdminFormChange} placeholder="Username" minLength={3} maxLength={30} pattern="[A-Za-z0-9._-]{3,30}" required className="admin-card-detail" />}
+            <input name="phone" type="tel" autoComplete="off" value={adminForm.phone} onChange={handleAdminFormChange} placeholder="09XXXXXXXX or +2519XXXXXXXX" pattern="(?:\+2519[0-9]{8}|09[0-9]{8})" title="Use +2519XXXXXXXX or 09XXXXXXXX." className="admin-card-detail" />
             {!editingAdminId && (
               <div className="admin-password-field">
                 <input
                   name="password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="off"
                   value={adminForm.password}
                   onChange={handleAdminFormChange}
                   placeholder="Password"
@@ -370,14 +395,15 @@ const AdminSectionPage = ({ type }) => {
                 </button>
               </div>
             )}
-            <input
-              name="area"
-              value={adminForm.area}
-              onChange={handleAdminFormChange}
-              placeholder="Assigned Area"
-              required
-              className="admin-card-detail"
-            />
+            <select name="area" autoComplete="off" value={adminForm.area} onChange={handleAdminFormChange} required className="admin-card-detail">
+              <option value="" disabled>{areas.length ? t('Select an assigned area') : t('No places registered yet')}</option>
+              {areas.map((area) => <option key={area._id} value={area.name}>{area.name}</option>)}
+            </select>
+            {areas.length === 0 && (
+              <p className="admin-card-detail">
+                {t('No places registered yet')}. <Link to="/admin-dashboard/places">{t('Ethiopia Places')}</Link>
+              </p>
+            )}
             <div className="admin-card-detail" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Admin Type: <strong style={{ marginLeft: 8 }}>Area Admin</strong>
             </div>
             <button type="submit" disabled={adminFormLoading} className="admin-btn admin-btn-primary">
@@ -385,6 +411,7 @@ const AdminSectionPage = ({ type }) => {
             </button>
             {editingAdminId && <button type="button" onClick={handleCancelAdminEdit} className="admin-btn">Cancel</button>}
           </form>
+          {areaError && <p className="admin-empty-text" role="alert">{areaError}</p>}
         </section>
       )}
 

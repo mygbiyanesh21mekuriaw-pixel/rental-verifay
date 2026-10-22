@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Area = require('../models/Area');
 const SystemSettings = require('../models/SystemSettings');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -43,8 +44,12 @@ const serializeUser = (user) => {
     phone: user.phone || '',
     profilePhoto: user.profilePhoto || '',
     role: user.role,
+    area: user.area || '',
     adminType: user.role === 'admin'
       ? user.adminType || (user.adminAreas?.length ? 'area' : 'platform')
+      : undefined,
+    assignedArea: user.role === 'admin'
+      ? user.assignedArea || ''
       : undefined,
     adminAreas: user.role === 'admin' ? user.adminAreas || [] : undefined,
     bankAccountName: isLandlord ? user.bankAccountName || '' : undefined,
@@ -74,6 +79,7 @@ const serializeUser = (user) => {
 const register = async (req, res) => {
   try {
     const { name, email, username, password, phone, profilePhoto, role } = req.body;
+    const requestedArea = String(req.body.area || '').trim();
     const normalizedName = String(name || '').trim();
     const normalizedEmail = normalizeAccountEmail(email);
     const normalizedUsername = username === undefined || username === null || username === ''
@@ -81,7 +87,7 @@ const register = async (req, res) => {
       : String(username).trim().toLowerCase();
     const normalizedPhone = String(phone || '').trim();
 
-    if (!normalizedName || !normalizedEmail || !normalizedUsername || !password || !normalizedPhone || !role) {
+    if (!normalizedName || !normalizedEmail || !normalizedUsername || !normalizedPhone || !role || !password) {
       return res.status(400).json({ message: 'Name, email, username, phone, password and role are required.' });
     }
 
@@ -106,6 +112,10 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 8 characters.' });
     }
 
+    if (!requestedArea) return res.status(400).json({ message: 'Area is required.' });
+    const area = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+    if (!area) return res.status(400).json({ message: 'Select an existing area.' });
+
     // ተጠቃሚው አስቀድሞ መኖሩን ያረጋግጡ
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
@@ -129,6 +139,7 @@ const register = async (req, res) => {
       username: normalizedUsername,
       password: hashedPassword,
       phone: normalizedPhone,
+      area: area.name,
       profilePhoto: profilePhoto?.trim() || '',
       role,
     });

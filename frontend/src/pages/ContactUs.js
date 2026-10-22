@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useLanguage } from '../context/LanguageContext';
 import { useSystemStatus } from '../context/SystemStatusContext';
@@ -9,10 +9,25 @@ const Contact = () => {
   const { status } = useSystemStatus();
   const { t } = useLanguage();
   const { websiteName, contactEmail, contactPhone, contactAddress } = status.branding;
-  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '', area: '' });
+  const [areas, setAreas] = useState([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [submissionMessage, setSubmissionMessage] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    Promise.resolve()
+      .then(() => axios.get(apiUrl('/api/public/areas')))
+      .then((response) => {
+        if (active) setAreas(Array.isArray(response.data) ? response.data : []);
+      })
+      .catch((areaError) => {
+        console.error('Unable to load contact form areas:', areaError);
+        if (active) setError('Unable to load areas. Please refresh the page.');
+      });
+    return () => { active = false; };
+  }, []);
 
   const updateField = (event) => {
     const { name, value } = event.target;
@@ -30,7 +45,7 @@ const Contact = () => {
     setSubmissionMessage('');
     try {
       const response = await axios.post(apiUrl('/api/contact'), form);
-      setForm({ name: '', email: '', subject: '', message: '' });
+      setForm({ name: '', email: '', subject: '', message: '', area: '' });
       setSubmissionMessage(response.data?.message || 'Your message was saved in the Platform Admin contact inbox.');
     } catch (submitError) {
       console.error('Unable to submit contact message:', submitError);
@@ -81,6 +96,19 @@ const Contact = () => {
                     onChange={updateField}
                     required
                   />
+                </label>
+                <label className="grid gap-1.5 text-sm font-semibold text-slate-700 sm:col-span-2">
+                  {t('Area')}
+                  <select
+                    className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal text-slate-900 outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-600/20"
+                    name="area"
+                    value={form.area}
+                    onChange={updateField}
+                    required
+                  >
+                    <option value="" disabled>{t('Select an area')}</option>
+                    {areas.map((area) => <option key={area._id} value={area.name}>{area.name}</option>)}
+                  </select>
                 </label>
                 <label className="grid gap-1.5 text-sm font-semibold text-slate-700 sm:col-span-2">
                   {t('Subject')}

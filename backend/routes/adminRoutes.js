@@ -17,20 +17,20 @@ const {
 } = require('../controllers/adminController');
 const { getSystemLogs } = require('../controllers/systemLogController');
 const { getAllDemoAccounts } = require('../controllers/bankAccountController');
-const { auth, adminOnly, areaAdminOnly, platformAdminOnly } = require('../middleware/auth');
+const { auth, adminOnly, areaAdminOnly, platformAdminOnly, requireRole } = require('../middleware/auth');
 
 // ሁሉም አስተዳዳሪ ተግባራት (Admin ብቻ)
 router.get('/pending-properties', auth, areaAdminOnly, getPendingProperties);
 router.get('/properties', auth, adminOnly, getAdminProperties);
 router.put('/verify-property/:id', auth, areaAdminOnly, verifyProperty);
 router.put('/reject-property/:id', auth, areaAdminOnly, rejectProperty);
-router.get('/users', auth, platformAdminOnly, getAllUsers);
+router.get('/users', auth, requireRole('platform_admin', 'area_admin'), getAllUsers);
 router.get('/stats', auth, platformAdminOnly, getStats);
 router.get('/analytics', auth, platformAdminOnly, getAnalytics);
-router.get('/system-logs', auth, platformAdminOnly, getSystemLogs);
+router.get('/system-logs', auth, requireRole('platform_admin'), getSystemLogs);
 router.get('/payment-periods', auth, platformAdminOnly, getAdminPaymentPeriods);
 router.get('/demo-bank-accounts', auth, platformAdminOnly, getAllDemoAccounts);
-router.delete('/users/:id', auth, platformAdminOnly, deleteUser);
+router.delete('/users/:id', auth, requireRole('platform_admin', 'area_admin'), deleteUser);
 router.post('/users/admin', auth, platformAdminOnly, createAdminAccount);
 router.put('/users/admin/:id', auth, platformAdminOnly, updateAreaAdminAccount);
 router.delete('/users/admin/:id', auth, platformAdminOnly, deleteAreaAdminAccount);

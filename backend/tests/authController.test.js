@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const Area = require('../models/Area');
 const SystemLog = require('../models/SystemLog');
 const { login, serializeUser } = require('../controllers/authController');
 const { encryptBankAccountNumber } = require('../utils/bankAccountCrypto');
@@ -271,6 +272,7 @@ test('registration rejects usernames outside the 3-20 letter, number, underscore
           email: 'tenant@example.com',
           username,
           phone: '0912345678',
+          area: 'North',
           password: 'secure-password',
           role: 'tenant',
         },
@@ -310,6 +312,7 @@ test('login rejects ambiguous case-insensitive email matches', async () => {
 
 test('registration rejects usernames already in use without changing password handling', async () => {
   const originalFindOne = User.findOne;
+  const originalAreaFindOne = Area.findOne;
   const { register } = require('../controllers/authController');
   const response = createResponse();
   const queries = [];
@@ -317,6 +320,9 @@ test('registration rejects usernames already in use without changing password ha
     queries.push(query);
     return query.username ? { _id: 'existing-user' } : null;
   };
+  Area.findOne = () => ({
+    select: () => ({ lean: async () => ({ name: 'North' }) }),
+  });
 
   try {
     await register({
@@ -325,6 +331,7 @@ test('registration rejects usernames already in use without changing password ha
         email: 'tenant@example.com',
         username: 'Taken_Name',
         phone: '0912345678',
+        area: 'North',
         password: 'secure-password',
         role: 'tenant',
       },
@@ -338,6 +345,7 @@ test('registration rejects usernames already in use without changing password ha
     ]);
   } finally {
     User.findOne = originalFindOne;
+    Area.findOne = originalAreaFindOne;
   }
 });
 

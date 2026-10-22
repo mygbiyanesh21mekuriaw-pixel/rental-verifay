@@ -5,6 +5,9 @@ const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
+const Area = require('../models/Area');
+const { buildAssignedAreaQuery } = require('../utils/area');
+const { getAdministrativeRole } = require('../middleware/auth');
 const { isApprovedProperty } = require('../utils/propertyVerification');
 const {
   normalizeAdminAreaObject,
@@ -40,24 +43,37 @@ const buildTrendSeries = (records, key = 'month') => {
     .sort((left, right) => (left.key || '').localeCompare(right.key || ''));
 };
 
+const getAreaName = (area) => {
+  if (typeof area === 'string') return area.trim();
+  if (!area || typeof area !== 'object') return '';
+  return ['city', 'region', 'zone', 'wereda', 'subCity']
+    .map((field) => String(area[field] || '').trim())
+    .find(Boolean) || '';
+};
+
 const getAdminAreas = async (adminId) => {
-  const admin = await User.findById(adminId).select('adminAreas').lean();
+  const admin = await User.findById(adminId).select('adminAreas assignedArea').lean();
+  if (admin?.assignedArea) return [admin.assignedArea];
   return (admin?.adminAreas || [])
     .map((area) => normalizeAdminAreaObject(area))
     .filter(Boolean);
 };
 
-const getCanonicalAreaField = (area) => {
-  if (!area || typeof area !== 'object') return null;
-  return ['city', 'region', 'zone', 'wereda', 'subCity']
-    .find((field) => String(area[field] || '').trim()) || null;
-};
-
 const applyAdminAreaScope = async (adminId, filter = {}) => {
-  const admin = await User.findById(adminId).select('adminType adminAreas').lean();
+  const admin = await User.findById(adminId).select('adminType adminAreas assignedArea').lean();
   const isAreaAdmin = admin?.adminType === 'area'
     || (!admin?.adminType && (admin?.adminAreas || []).length > 0);
   if (!isAreaAdmin) return filter;
+
+  if (admin.assignedArea) {
+    return {
+      ...filter,
+      $and: [
+        ...(filter.$and || []),
+        buildAssignedAreaQuery(admin.assignedArea),
+      ],
+    };
+  }
 
   const areas = (admin.adminAreas || [])
     .map((area) => normalizeAdminAreaObject(area))
@@ -93,23 +109,14 @@ const normalizeAdminAreas = (areas) => {
   return normalizedAreas.length > 0 ? normalizedAreas : null;
 };
 
-const normalizeAreaAdminFields = (adminAreas) => {
-  const normalizedAreas = normalizeAdminAreas(adminAreas);
-  if (!normalizedAreas || normalizedAreas.length !== 1) return null;
-
-  const [area] = normalizedAreas;
-  const field = getCanonicalAreaField(area);
-  if (!field) return null;
-
-  return [{ [field]: area[field] }];
-};
-
 const createAdminAccount = async (req, res) => {
   try {
     const { name, email, username, phone, password, adminType = 'area', adminAreas = [] } = req.body;
     const normalizedName = String(name || '').trim();
     const normalizedEmail = String(email || '').trim().toLowerCase();
     const normalizedUsername = String(username || '').trim().toLowerCase();
+    const normalizedPhone = String(phone || '').trim();
+    const requestedArea = String(req.body.assignedArea || '').trim() || getAreaName(adminAreas[0]);
 
     if (!normalizedName || !normalizedEmail || !normalizedUsername || !password) {
       return res.status(400).json({ message: 'Name, email, username and password are required' });
@@ -120,13 +127,18 @@ const createAdminAccount = async (req, res) => {
     if (!['platform', 'area'].includes(adminType)) {
       return res.status(400).json({ message: 'Admin type must be platform or area' });
     }
+    if (normalizedPhone && !/^(?:\+2519\d{8}|09\d{8})$/.test(normalizedPhone)) {
+      return res.status(400).json({ message: 'Use +2519XXXXXXXX or 09XXXXXXXX for the phone number.' });
+    }
     if (String(password).length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
-    const normalizedAreas = normalizeAdminAreas(adminAreas);
-    if (adminType === 'area' && (!normalizedAreas || normalizedAreas.length === 0)) {
-      return res.status(400).json({ message: 'At least one assigned area is required for an area admin' });
+    let areaRecord = null;
+    if (adminType === 'area') {
+      if (!requestedArea) return res.status(400).json({ message: 'An assigned area is required for an area admin.' });
+      areaRecord = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+      if (!areaRecord) return res.status(400).json({ message: 'Select an existing area.' });
     }
 
     const existingUser = await User.findOne({ email: normalizedEmail });
@@ -144,11 +156,12 @@ const createAdminAccount = async (req, res) => {
       name: normalizedName,
       email: normalizedEmail,
       username: normalizedUsername,
-      phone: String(phone || '').trim(),
+      phone: normalizedPhone,
       password: await bcrypt.hash(String(password), 10),
       role: 'admin',
       adminType,
-      adminAreas: adminType === 'area' ? normalizedAreas : [],
+      assignedArea: adminType === 'area' ? areaRecord.name : '',
+      adminAreas: adminType === 'area' ? [{ city: areaRecord.name }] : [],
     });
 
     const safeAdmin = admin.toObject();
@@ -594,7 +607,12 @@ const rejectProperty = async (req, res) => {
 // ሁሉንም ተጠቃሚዎች ማግኘት (Admin ብቻ)
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const filter = {};
+    if (getAdministrativeRole(req.user) === 'area_admin') {
+      if (req.user.assignedArea) filter.area = req.user.assignedArea;
+      else filter._id = null;
+    }
+    const users = await User.find(filter).select('-password');
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -697,9 +715,17 @@ const deleteUser = async (req, res) => {
       return res.status(400).json({ message: 'You cannot delete yourself' });
     }
 
-    const user = await User.findById(id);
+    const filter = { _id: id };
+    if (getAdministrativeRole(req.user) === 'area_admin') {
+      if (req.user.assignedArea) filter.area = req.user.assignedArea;
+      else filter._id = null;
+    }
+    const user = await User.findOne(filter);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Admin accounts must be managed through Admin Management.' });
     }
 
     if (user.role === 'landlord') {
@@ -739,14 +765,27 @@ const changeUserRole = async (req, res) => {
       }
       user.adminAreas = normalizedAreas;
       user.adminType = adminType || (normalizedAreas.length > 0 ? 'area' : 'platform');
+      if (user.adminType === 'area') {
+        const requestedArea = String(req.body.assignedArea || '').trim() || getAreaName(normalizedAreas[0]);
+        const area = requestedArea
+          ? await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean()
+          : null;
+        if (!area) return res.status(400).json({ message: 'Select an existing area for an area admin.' });
+        user.assignedArea = area.name;
+        user.adminAreas = [{ city: area.name }];
+      } else {
+        user.assignedArea = '';
+      }
     } else if (role === 'admin' && adminType !== undefined) {
       if (!['platform', 'area'].includes(adminType)) {
         return res.status(400).json({ message: 'Admin type must be platform or area' });
       }
       user.adminType = adminType;
+      if (adminType === 'platform') user.assignedArea = '';
     } else if (role !== 'admin') {
       user.adminAreas = [];
       user.adminType = undefined;
+      user.assignedArea = '';
     }
     await user.save();
 
@@ -760,14 +799,20 @@ const changeUserRole = async (req, res) => {
 
 const updateAreaAdminAccount = async (req, res) => {
   try {
-    const { name, email, phone, adminAreas } = req.body;
+    const { name, email, phone } = req.body;
     const normalizedName = String(name || '').trim();
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    const normalizedAreas = normalizeAreaAdminFields(adminAreas);
+    const requestedArea = String(req.body.assignedArea || '').trim() || getAreaName(req.body.adminAreas?.[0]);
+    const normalizedPhone = String(phone || '').trim();
 
-    if (!normalizedName || !normalizedEmail || !normalizedAreas) {
-      return res.status(400).json({ message: 'Name, email and one valid assigned area are required' });
+    if (!normalizedName || !normalizedEmail || !requestedArea) {
+      return res.status(400).json({ message: 'Name, email and one valid assigned area are required.' });
     }
+    if (normalizedPhone && !/^(?:\+2519\d{8}|09\d{8})$/.test(normalizedPhone)) {
+      return res.status(400).json({ message: 'Use +2519XXXXXXXX or 09XXXXXXXX for the phone number.' });
+    }
+    const areaRecord = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+    if (!areaRecord) return res.status(400).json({ message: 'Select an existing area.' });
 
     const admin = await User.findById(req.params.id);
     if (!admin) return res.status(404).json({ message: 'Area Admin not found' });
@@ -781,10 +826,11 @@ const updateAreaAdminAccount = async (req, res) => {
     admin.set({
       name: normalizedName,
       email: normalizedEmail,
-      phone: String(phone || '').trim(),
+      phone: normalizedPhone,
       role: 'admin',
       adminType: 'area',
-      adminAreas: normalizedAreas,
+      assignedArea: areaRecord.name,
+      adminAreas: [{ city: areaRecord.name }],
     });
     await admin.save();
 
