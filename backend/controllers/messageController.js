@@ -1,6 +1,22 @@
 const Conversation = require('../models/Conversation');
 const RentalRequest = require('../models/RentalRequest');
 const Property = require('../models/Property');
+const User = require('../models/User');
+const { normalizeAdminAreaObject, buildAdminAreaQuery } = require('../utils/adminArea');
+
+const getCurrentAdminPropertyIds = async (userId) => {
+  const admin = await User.findById(userId)
+    .select('_id role adminType adminAreas assignedArea isActive')
+    .lean();
+  if (!admin || admin.isActive === false || admin.role !== 'admin' || admin.adminType !== 'area') return [];
+
+  const adminAreas = admin.assignedArea
+    ? [normalizeAdminAreaObject(admin.assignedArea)].filter(Boolean)
+    : (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+  if (adminAreas.length === 0) return [];
+  const properties = await Property.find(buildAdminAreaQuery(adminAreas)).select('_id').lean();
+  return properties.map((property) => String(property._id));
+};
 
 const conversationView = (query) => query
   .populate('tenant', 'name email')
@@ -103,6 +119,10 @@ const sendAdminMessage = async (req, res) => {
 
     const conversation = await Conversation.findById(req.params.id);
     if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
+    const adminPropertyIds = await getCurrentAdminPropertyIds(req.user.id);
+    if (!adminPropertyIds.includes(String(conversation.property))) {
+      return res.status(403).json({ message: 'This conversation is outside your assigned area.' });
+    }
     if (!recipientId || ![String(conversation.tenant), String(conversation.landlord)].includes(String(recipientId))) {
       return res.status(400).json({ message: 'Conversation participants are unavailable' });
     }
@@ -144,7 +164,11 @@ const getTenantConversations = async (req, res) => {
 
 const getAdminConversations = async (req, res) => {
   try {
-    const conversations = await conversationView(Conversation.find().sort({ updatedAt: -1 }));
+    const adminPropertyIds = await getCurrentAdminPropertyIds(req.user.id);
+    if (adminPropertyIds.length === 0) return res.json([]);
+    const conversations = await conversationView(
+      Conversation.find({ property: { $in: adminPropertyIds } }).sort({ updatedAt: -1 }),
+    );
     res.json(conversations);
   } catch (error) {
     console.error('Admin conversations error:', error);

@@ -4,7 +4,9 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const {
   auth,
+  optionalAuth,
   adminOnly,
+  areaAdminOnly,
   platformAdminOnly,
   landlordOwnerOrPlatformAdmin,
 } = require('./auth');
@@ -44,8 +46,11 @@ const createPropertyQuery = (property) => ({
   },
 });
 
-const makeRequest = (token) => ({
+const makeRequest = (token, { method = 'GET', path = '/api/protected', baseUrl = '' } = {}) => ({
   header: () => token ? `Bearer ${token}` : undefined,
+  method,
+  path,
+  baseUrl,
   params: { id: 'property-id' },
 });
 
@@ -90,6 +95,29 @@ test('auth rejects a deleted account even when its JWT is still valid', async ()
   }
 });
 
+test('auth rejects a deactivated Area Admin even when their JWT is still valid', async () => {
+  const originalFindById = User.findById;
+  const inactiveAdmin = {
+    _id: '507f1f77bcf86cd799439018',
+    role: 'admin',
+    adminType: 'area',
+    assignedArea: 'Bahirdar',
+    isActive: false,
+  };
+  User.findById = () => createUserQuery(inactiveAdmin);
+  const token = jwt.sign({ id: inactiveAdmin._id, role: 'admin', adminType: 'area' }, process.env.JWT_SECRET);
+  const response = createResponse();
+  let nextCalled = false;
+
+  try {
+    await auth(makeRequest(token), response, () => { nextCalled = true; });
+    assert.equal(response.statusCode, 401);
+    assert.equal(nextCalled, false);
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
 test('auth uses the current database role instead of a stale elevated JWT role', async () => {
   const originalFindById = User.findById;
   const tenant = {
@@ -98,7 +126,7 @@ test('auth uses the current database role instead of a stale elevated JWT role',
     adminAreas: [],
   };
   User.findById = () => createUserQuery(tenant);
-  const token = jwt.sign({ id: tenant._id, role: 'admin' }, process.env.JWT_SECRET);
+  const token = jwt.sign({ id: tenant._id, role: 'admin', adminType: 'area' }, process.env.JWT_SECRET);
   const response = createResponse();
   let nextCalled = false;
 
@@ -113,11 +141,98 @@ test('auth uses the current database role instead of a stale elevated JWT role',
       adminAreas: [],
       assignedArea: '',
       area: '',
+      mustChangePassword: false,
+      isActive: true,
     });
 
     const adminResponse = createResponse();
     adminOnly(request, adminResponse, () => {});
     assert.equal(adminResponse.statusCode, 403);
+    const areaAdminResponse = createResponse();
+    areaAdminOnly(request, areaAdminResponse, () => {});
+    assert.equal(areaAdminResponse.statusCode, 403);
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
+test('auth blocks protected routes for a pending password change with a stable error code', async () => {
+  const originalFindById = User.findById;
+  const areaAdmin = {
+    _id: '507f1f77bcf86cd799439013',
+    role: 'admin',
+    adminType: 'area',
+    adminAreas: [],
+    mustChangePassword: true,
+  };
+  User.findById = () => createUserQuery(areaAdmin);
+  const token = jwt.sign({ id: areaAdmin._id }, process.env.JWT_SECRET);
+  const response = createResponse();
+  let nextCalled = false;
+
+  try {
+    await auth(makeRequest(token), response, () => { nextCalled = true; });
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.body.code, 'PASSWORD_CHANGE_REQUIRED');
+    assert.equal(nextCalled, false);
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
+test('auth allows only change-password, logout, and current-user requests during password change', async () => {
+  const originalFindById = User.findById;
+  const areaAdmin = {
+    _id: '507f1f77bcf86cd799439014',
+    role: 'admin',
+    adminType: 'area',
+    adminAreas: [],
+    mustChangePassword: true,
+  };
+  User.findById = () => createUserQuery(areaAdmin);
+  const token = jwt.sign({ id: areaAdmin._id }, process.env.JWT_SECRET);
+
+  try {
+    for (const [method, path, baseUrl] of [
+      ['POST', '/change-password', '/api'],
+      ['POST', '/logout', '/api/auth'],
+      ['POST', '/logout', '/api'],
+      ['GET', '/me', '/api/auth'],
+    ]) {
+      const response = createResponse();
+      let nextCalled = false;
+      await auth(makeRequest(token, { method, path, baseUrl }), response, () => { nextCalled = true; });
+      assert.equal(response.statusCode, null, `${method} ${path}`);
+      assert.equal(nextCalled, true, `${method} ${path}`);
+    }
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
+test('optionalAuth also blocks pending users on protected-by-token requests', async () => {
+  const originalFindById = User.findById;
+  const areaAdmin = {
+    _id: '507f1f77bcf86cd799439017',
+    role: 'admin',
+    adminType: 'area',
+    adminAreas: [],
+    mustChangePassword: true,
+  };
+  User.findById = () => createUserQuery(areaAdmin);
+  const token = jwt.sign({ id: areaAdmin._id }, process.env.JWT_SECRET);
+  const response = createResponse();
+  let nextCalled = false;
+
+  try {
+    await optionalAuth(
+      makeRequest(token, { method: 'GET', baseUrl: '/api/properties', path: '/some-id' }),
+      response,
+      () => { nextCalled = true; },
+    );
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.body.code, 'PASSWORD_CHANGE_REQUIRED');
+    assert.equal(nextCalled, false);
   } finally {
     User.findById = originalFindById;
   }

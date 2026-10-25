@@ -3,8 +3,6 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const { normalizeAdminAreaObject } = require('./adminArea');
 
-const legacyAreaNames = ['Bahirdar', 'Dessie', 'Gimba'];
-
 const formatAreaName = (value) => String(value || '').trim()
   .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 
@@ -54,14 +52,6 @@ const migrateLegacyAdminAreas = async () => {
           adminAreas: canonicalArea ? [{ city: canonicalArea.name }] : [],
         },
       },
-    );
-  }
-
-  for (const name of legacyAreaNames) {
-    await Area.updateOne(
-      { normalizedName: name.toLowerCase() },
-      { $set: { name, normalizedName: name.toLowerCase() } },
-      { upsert: true },
     );
   }
 

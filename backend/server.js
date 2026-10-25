@@ -7,6 +7,7 @@ const createAdmin = require('./create-admin');
 const { migrateLegacyBankAccountNumbers } = require('./utils/bankAccountCrypto');
 const reportInvalidUsernames = require('./utils/reportInvalidUsernames');
 const migrateLegacyAdminAreas = require('./utils/migrateLegacyAdminAreas');
+const { ensureSingleAreaAdminIndex } = require('./utils/areaAdminUniqueness');
 const { startPayoutReconciliation } = require('./services/payoutReconciliation');
 
 // የአካባቢ ተለዋዋጮችን ጫን
@@ -60,6 +61,7 @@ const startServer = async () => {
   await migrateLegacyBankAccountNumbers();
   await createAdmin();
   await migrateLegacyAdminAreas();
+  await ensureSingleAreaAdminIndex();
   await reportInvalidUsernames();
 
   const PORT = process.env.PORT || 5000;

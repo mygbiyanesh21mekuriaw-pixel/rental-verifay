@@ -73,6 +73,33 @@ test('login accepts a username without email-format validation', async () => {
   });
 });
 
+test('login redirects admins who must change their password to the change-password page', async () => {
+  axios.post.mockResolvedValue({
+    data: {
+      token: 'temporary-admin-token',
+      mustChangePassword: true,
+      user: { role: 'admin', adminType: 'area', mustChangePassword: true },
+    },
+  });
+
+  render(
+    <MemoryRouter initialEntries={['/login']}>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/change-password" element={<h1>Change Password</h1>} />
+        </Routes>
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+
+  fireEvent.change(screen.getByLabelText('Email or Username'), { target: { value: 'area_admin' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'temporary-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+  expect(await screen.findByRole('heading', { name: 'Change Password' })).toBeInTheDocument();
+});
+
 test('login explains when an expired session requires signing in again', () => {
   render(
     <MemoryRouter initialEntries={[{ pathname: '/login', state: { sessionExpired: true } }]}>

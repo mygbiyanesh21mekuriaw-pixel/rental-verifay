@@ -6,11 +6,40 @@ const Notification = require('../models/Notification');
 const { isApprovedProperty } = require('../utils/propertyVerification');
 const { createSystemLog } = require('./systemLogController');
 const { normalizeAdminAreaObject, propertyMatchesAdminAreas, buildAdminAreaQuery } = require('../utils/adminArea');
+const { appendAdminDecision } = require('../utils/adminHandlingHistory');
+const { getAdministrativeRole } = require('../middleware/auth');
 
 const getAreaAdminAreas = async (adminId) => {
-  const admin = await User.findById(adminId).select('role adminType adminAreas').lean();
-  if (!admin || admin.role !== 'admin' || admin.adminType !== 'area') return null;
+  const admin = await User.findById(adminId).select('role adminType adminAreas assignedArea isActive').lean();
+  if (!admin || admin.isActive === false || admin.role !== 'admin' || admin.adminType !== 'area') return null;
+  if (admin.assignedArea) return [normalizeAdminAreaObject(admin.assignedArea)].filter(Boolean);
   return (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+};
+
+const addRentalHistoryHandlerStatus = async (requests) => {
+  const handlerIds = [...new Set(requests.flatMap((request) => (
+    (request.history || []).map((entry) => String(entry.byId || '')).filter((id) => mongoose.isValidObjectId(id))
+  )))];
+  const handlers = handlerIds.length
+    ? await User.find({ _id: { $in: handlerIds } })
+      .select('role adminType assignedArea adminAreas isActive')
+      .lean()
+    : [];
+  const handlerById = new Map(handlers.map((handler) => [String(handler._id), handler]));
+
+  requests.forEach((request) => {
+    request.history = (request.history || []).map((entry) => {
+      const handler = handlerById.get(String(entry.byId || ''));
+      const handlerAreas = handler?.assignedArea
+        ? [handler.assignedArea]
+        : (handler?.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+      const isCurrentAreaAdmin = getAdministrativeRole(handler) === 'area_admin'
+        && handler.isActive !== false
+        && handlerAreas.length > 0
+        && propertyMatchesAdminAreas(request.property, handlerAreas);
+      return { ...entry, isFormerAdmin: Boolean(entry.byId) && !isCurrentAreaAdmin };
+    });
+  });
 };
 
 const activateRentalRelationship = async (propertyId, tenantId) => {
@@ -27,19 +56,9 @@ const activateRentalRelationship = async (propertyId, tenantId) => {
 
 const getAdminRentalRequests = async (req, res) => {
   try {
-    const admin = await User.findById(req.user.id).select('role adminType adminAreas').lean();
-    if (!admin || admin.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin permission required.' });
-    }
-
-    let propertyFilter = {};
-    if (admin.adminType === 'area') {
-      const adminAreas = (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
-      if (adminAreas.length === 0) return res.json([]);
-      propertyFilter = buildAdminAreaQuery(adminAreas);
-    } else if (admin.adminType !== 'platform') {
-      return res.status(403).json({ message: 'Admin permission required.' });
-    }
+    const adminAreas = await getAreaAdminAreas(req.user.id);
+    if (!adminAreas || adminAreas.length === 0) return res.json([]);
+    const propertyFilter = buildAdminAreaQuery(adminAreas);
 
     const properties = Object.keys(propertyFilter).length === 0
       ? await Property.find().select('_id').lean()
@@ -50,7 +69,7 @@ const getAdminRentalRequests = async (req, res) => {
     if (propertyIds.length === 0) return res.json([]);
 
     const requests = await RentRequest.find({ property: { $in: propertyIds } })
-      .populate('property', 'title location region zone wereda city subCity kebele houseNumber images propertyImages image verificationDocument verificationDocumentAsset')
+      .populate('property', 'title location area region zone wereda city subCity kebele houseNumber images propertyImages image verificationDocument verificationDocumentAsset')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
@@ -66,6 +85,7 @@ const getAdminRentalRequests = async (req, res) => {
       }
       return safeRequest;
     });
+    await addRentalHistoryHandlerStatus(safeRequests);
     res.json(safeRequests);
   } catch (error) {
     console.error('Error fetching admin rental requests:', error);
@@ -82,6 +102,10 @@ const adminRespondToRentalRequest = async (req, res) => {
 
     const adminAreas = await getAreaAdminAreas(req.user.id);
     if (!adminAreas || adminAreas.length === 0) {
+      return res.status(403).json({ message: 'Area Admin permission required.' });
+    }
+    const admin = await User.findById(req.user.id).select('name role adminType isActive').lean();
+    if (!admin || getAdministrativeRole(admin) !== 'area_admin' || admin.isActive === false) {
       return res.status(403).json({ message: 'Area Admin permission required.' });
     }
 
@@ -122,10 +146,12 @@ const adminRespondToRentalRequest = async (req, res) => {
       }
     }
 
+    const handledAt = new Date();
     request.status = status;
     request.adminComment = message || '';
     request.reviewedBy = req.user.id;
-    request.reviewedAt = new Date();
+    request.reviewedAt = handledAt;
+    appendAdminDecision(request, admin, status === 'approved' ? 'verified' : 'rejected', message || '', handledAt);
     await request.save();
 
     if (status === 'approved') {

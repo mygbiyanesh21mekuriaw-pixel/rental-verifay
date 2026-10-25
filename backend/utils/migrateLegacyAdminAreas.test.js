@@ -22,15 +22,15 @@ test('legacy area-admin migration preserves platform admins and canonicalizes as
       select: () => ({
         lean: async () => [{
           _id: 'legacy-admin',
-          assignedArea: 'bahirdar',
-          adminAreas: [{ city: 'bahirdar' }],
+          assignedArea: 'north ridge',
+          adminAreas: [{ city: 'north ridge' }],
         }],
       }),
     };
   };
   Area.updateOne = async (filter, update) => { areaUpdates.push({ filter, update }); };
   Area.findOne = () => ({
-    select: () => ({ lean: async () => ({ name: 'Bahirdar' }) }),
+    select: () => ({ lean: async () => ({ name: 'North Ridge' }) }),
   });
   User.updateOne = async (filter, update) => { userUpdate = { filter, update }; };
   Area.find = () => ({
@@ -42,19 +42,17 @@ test('legacy area-admin migration preserves platform admins and canonicalizes as
     await migrateLegacyAdminAreas();
 
     assert.deepEqual(adminFilter.$or[1], { 'adminAreas.0': { $exists: true } });
-    for (const name of ['Bahirdar', 'Dessie', 'Gimba']) {
-      assert.ok(areaUpdates.some(({ filter, update }) => (
-        filter.normalizedName === name.toLowerCase()
-        && update.$set.name === name
-      )));
-    }
+    assert.deepEqual(areaUpdates, [{
+      filter: { normalizedName: 'north ridge' },
+      update: { $set: { name: 'North Ridge', normalizedName: 'north ridge' } },
+    }]);
     assert.deepEqual(userUpdate, {
       filter: { _id: 'legacy-admin' },
       update: {
         $set: {
           adminType: 'area',
-          assignedArea: 'Bahirdar',
-          adminAreas: [{ city: 'Bahirdar' }],
+          assignedArea: 'North Ridge',
+          adminAreas: [{ city: 'North Ridge' }],
         },
       },
     });

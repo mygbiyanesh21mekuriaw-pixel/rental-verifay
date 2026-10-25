@@ -1,5 +1,32 @@
 const mongoose = require('mongoose');
 
+const AdminHandlingHistorySchema = new mongoose.Schema({
+  action: {
+    type: String,
+    enum: ['verified', 'rejected', 'returned'],
+    required: true,
+  },
+  byId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
+  byName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  at: {
+    type: Date,
+    required: true,
+  },
+  note: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+}, { _id: false });
+
 const PropertySchema = new mongoose.Schema({
   landlord: {
     type: mongoose.Schema.Types.ObjectId,
@@ -106,6 +133,34 @@ const PropertySchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending',
+  },
+  handledBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
+  handledByName: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  handledByRole: {
+    type: String,
+    enum: ['area_admin'],
+    default: null,
+  },
+  handledAt: {
+    type: Date,
+    default: null,
+  },
+  decision: {
+    type: String,
+    enum: ['verified', 'rejected', 'returned'],
+    default: null,
+  },
+  history: {
+    type: [AdminHandlingHistorySchema],
+    default: [],
   },
   availabilityStatus: {
     type: String,

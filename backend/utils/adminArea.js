@@ -1,16 +1,9 @@
 const adminAreaFields = ['city', 'region', 'zone', 'wereda', 'subCity'];
 
-const areaAliases = {
-  'a.a': 'Addis Ababa',
-  'aa': 'Addis Ababa',
-  'addis ababa': 'Addis Ababa',
-};
-
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const normalizeAreaValue = (value) => {
-  const trimmed = String(value || '').trim();
-  return areaAliases[trimmed.toLowerCase()] || trimmed;
+  return String(value || '').trim();
 };
 
 const normalizeAdminAreaObject = (area) => {
@@ -24,10 +17,6 @@ const normalizeAdminAreaObject = (area) => {
   const normalized = Object.fromEntries(
     adminAreaFields.map((field) => [field, normalizeAreaValue(area[field])])
   );
-
-  if (normalized.region.toLowerCase() === 'addis ababa') {
-    return { city: 'Addis Ababa' };
-  }
 
   const field = adminAreaFields.find((candidate) => normalized[candidate]);
   return field ? { [field]: normalized[field] } : null;

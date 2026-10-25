@@ -113,7 +113,7 @@ const Login = () => {
   useEffect(() => {
     if (user?.role) {
       navigate(
-        dashboardPaths[user.role] || '/',
+        user.mustChangePassword ? '/change-password' : dashboardPaths[user.role] || '/',
         {
           replace: true,
         }
@@ -162,7 +162,7 @@ const Login = () => {
         const role = result.user?.role;
 
         navigate(
-          dashboardPaths[role] || '/',
+          result.user?.mustChangePassword ? '/change-password' : dashboardPaths[role] || '/',
           {
             replace: true,
           }

@@ -155,6 +155,13 @@ const AdminPlaces = () => {
               <div key={place._id} className="admin-card">
                 <h3 className="admin-card-title">{place.name}</h3>
                 {place.region && <p className="admin-card-detail">{t('Region')}: {place.region}</p>}
+                {place.hasNoActiveAdminWithWaitingItems && (
+                  <p className="admin-area-warning-badge" role="status">
+                    {t('Area {area} has no active Area Admin; {count} items are waiting.')
+                      .replace('{area}', place.name)
+                      .replace('{count}', String(place.waitingItemCount))}
+                  </p>
+                )}
                 <div className="admin-card-actions">
                   <button type="button" onClick={() => handleEdit(place)} className="admin-btn admin-management-edit-btn">
                     {t('Edit')}

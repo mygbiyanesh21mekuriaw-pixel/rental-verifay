@@ -22,6 +22,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  mustChangePassword: {
+    type: Boolean,
+    default: false,
+  },
   passwordResetTokenHash: {
     type: String,
     default: undefined,
@@ -77,6 +81,15 @@ const UserSchema = new mongoose.Schema({
     enum: ['user', 'tenant', 'landlord', 'admin'],
     default: 'tenant',
   },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  replacedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
   adminType: {
     type: String,
     enum: ['platform', 'area'],
@@ -93,8 +106,21 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-});
+}, { autoIndex: false });
 
 UserSchema.index({ username: 1 }, { unique: true, sparse: true });
+UserSchema.index(
+  { assignedArea: 1 },
+  {
+    name: 'one_area_admin_per_area',
+    unique: true,
+    partialFilterExpression: {
+      role: 'admin',
+      adminType: 'area',
+      assignedArea: { $type: 'string', $gt: '' },
+    },
+    collation: { locale: 'en', strength: 2 },
+  },
+);
 
 module.exports = mongoose.model('User', UserSchema);

@@ -3,6 +3,8 @@ const Area = require('../models/Area');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const ContactMessage = require('../models/ContactMessage');
+const RentalRequest = require('../models/RentalRequest');
+const { buildAssignedAreaQuery } = require('../utils/area');
 
 const normalizePlaceFields = (body = {}) => ({
   name: typeof body.name === 'string' ? body.name.trim() : '',
@@ -21,18 +23,45 @@ const validatePlaceFields = ({ name, region }, res) => {
   return true;
 };
 
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const buildAdminAssignmentFilter = (name) => {
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedName = escapeRegex(name);
   const exactName = new RegExp(`^${escapedName}$`, 'i');
+  const assignedAreaIsEmpty = {
+    $or: [
+      { assignedArea: { $exists: false } },
+      { assignedArea: '' },
+      { assignedArea: null },
+    ],
+  };
   return {
     role: 'admin',
-    $or: [
-      { assignedArea: exactName },
-      { 'adminAreas.region': exactName },
-      { 'adminAreas.zone': exactName },
-      { 'adminAreas.wereda': exactName },
-      { 'adminAreas.city': exactName },
-      { 'adminAreas.subCity': exactName },
+    $and: [
+      { $or: [
+        { adminType: 'area' },
+        { adminType: { $exists: false }, adminAreas: { $ne: [] } },
+        { adminType: null, adminAreas: { $ne: [] } },
+      ] },
+      {
+        $or: [
+          { assignedArea: exactName },
+          {
+            $and: [
+              assignedAreaIsEmpty,
+              {
+                $or: [
+                  { 'adminAreas.region': exactName },
+                  { 'adminAreas.zone': exactName },
+                  { 'adminAreas.wereda': exactName },
+                  { 'adminAreas.city': exactName },
+                  { 'adminAreas.subCity': exactName },
+                ],
+              },
+            ],
+          },
+        ],
+      },
     ],
   };
 };
@@ -40,7 +69,32 @@ const buildAdminAssignmentFilter = (name) => {
 const getAreas = async (req, res) => {
   try {
     const areas = await Area.find().select('name region').sort({ name: 1 }).lean();
-    res.json(areas);
+    const areaSummaries = await Promise.all(areas.map(async (area) => {
+      const propertyFilter = buildAssignedAreaQuery(area.name);
+      const properties = await Property.find(propertyFilter).select('_id').lean();
+      const propertyIds = properties.map((property) => property._id);
+      const [activeAdminCount, pendingPropertyCount, pendingRentalRequestCount, unreadMessageCount] = await Promise.all([
+        User.countDocuments({ ...buildAdminAssignmentFilter(area.name), isActive: { $ne: false } }),
+        Property.countDocuments({ ...propertyFilter, verificationStatus: 'pending', isVerified: false }),
+        propertyIds.length
+          ? RentalRequest.countDocuments({ property: { $in: propertyIds }, status: 'pending' })
+          : 0,
+        ContactMessage.countDocuments({
+          area: new RegExp(`^${escapeRegex(area.name)}$`, 'i'),
+          read: false,
+        }),
+      ]);
+      const waitingItemCount = pendingPropertyCount + pendingRentalRequestCount + unreadMessageCount;
+
+      return {
+        ...area,
+        activeAdminCount,
+        waitingItemCount,
+        hasNoActiveAdminWithWaitingItems: activeAdminCount === 0 && waitingItemCount > 0,
+      };
+    }));
+
+    res.json(areaSummaries);
   } catch (error) {
     console.error('Area list lookup failed:', error);
     res.status(500).json({ message: 'Unable to load areas.' });

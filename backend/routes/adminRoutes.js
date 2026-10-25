@@ -14,6 +14,7 @@ const {
   createAdminAccount,
   updateAreaAdminAccount,
   deleteAreaAdminAccount,
+  setAreaAdminActive,
 } = require('../controllers/adminController');
 const { getSystemLogs } = require('../controllers/systemLogController');
 const { getAllDemoAccounts } = require('../controllers/bankAccountController');
@@ -34,6 +35,7 @@ router.delete('/users/:id', auth, requireRole('platform_admin', 'area_admin'), d
 router.post('/users/admin', auth, platformAdminOnly, createAdminAccount);
 router.put('/users/admin/:id', auth, platformAdminOnly, updateAreaAdminAccount);
 router.delete('/users/admin/:id', auth, platformAdminOnly, deleteAreaAdminAccount);
+router.patch('/users/admin/:id/active', auth, platformAdminOnly, setAreaAdminActive);
 router.put('/users/:id/role', auth, platformAdminOnly, changeUserRole);
 
 module.exports = router;

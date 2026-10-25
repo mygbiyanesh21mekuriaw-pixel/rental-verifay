@@ -5,12 +5,14 @@ const {
   getAllProperties,
   getPropertyById,
   getOwnershipProof,
+  getPropertyHistory,
   updateProperty,
   deleteProperty,
 } = require('../controllers/propertyController');
 const {
   auth,
   optionalAuth,
+  areaAdminOnly,
   landlordOnly,
   landlordCreateOnly,
   landlordOwnerOrPlatformAdmin,
@@ -20,6 +22,7 @@ const { upload, handleMulterError } = require('../middleware/upload');
 
 // ሁሉም ሰው የተረጋገጡ ንብረቶችን ማየት ይችላል
 router.get('/', optionalAuth, getAllProperties);
+router.get('/:id/history', auth, areaAdminOnly, getPropertyHistory);
 router.get('/:id/ownership-proof', auth, getOwnershipProof);
 router.get('/:id', optionalAuth, getPropertyById);
 

@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Area = require('../models/Area');
 const SystemLog = require('../models/SystemLog');
-const { login, serializeUser } = require('../controllers/authController');
+const { login, serializeUser, changePasswordOnFirstLogin } = require('../controllers/authController');
 const { encryptBankAccountNumber } = require('../utils/bankAccountCrypto');
 const { planMissingUsernames } = require('../migrate-missing-usernames');
 
@@ -23,6 +23,12 @@ test('username field is optional, normalized, and protected by a sparse unique i
   assert.equal(usernameIndex[1].unique, true);
   assert.equal(usernameIndex[1].sparse, true);
   assert.equal(user.username, 'tenant_1');
+});
+
+test('mustChangePassword defaults to false for existing and newly constructed users', () => {
+  const user = new User({ name: 'Existing User', email: 'existing@example.com', password: 'hash' });
+  assert.equal(User.schema.path('mustChangePassword').options.default, false);
+  assert.equal(user.mustChangePassword, false);
 });
 
 const createResponse = () => ({
@@ -121,6 +127,42 @@ test('login accepts registered emails for tenant, landlord, and admin roles', as
         email: { $regex: `^${escapedEmail}$`, $options: 'i' },
       });
     }
+  } finally {
+    User.find = originals.find;
+    SystemLog.create = originals.createSystemLog;
+    if (originals.jwtSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = originals.jwtSecret;
+  }
+});
+
+test('login returns mustChangePassword for pending Area Admins', async () => {
+  const originals = {
+    find: User.find,
+    createSystemLog: SystemLog.create,
+    jwtSecret: process.env.JWT_SECRET,
+  };
+  const hashedPassword = await bcrypt.hash('temporary-password', 4);
+  User.find = () => ({
+    limit: () => ({
+      select: async () => [{
+        _id: { toString: () => 'pending-area-admin' },
+        name: 'Area Admin',
+        email: 'area@example.com',
+        password: hashedPassword,
+        role: 'admin',
+        adminType: 'area',
+        mustChangePassword: true,
+      }],
+    }),
+  });
+  SystemLog.create = async () => null;
+  process.env.JWT_SECRET = 'test-jwt-secret';
+  const response = createResponse();
+
+  try {
+    await login({ body: { identifier: 'area_admin', password: 'temporary-password' } }, response);
+    assert.equal(response.body.mustChangePassword, true);
+    assert.equal(response.body.user.mustChangePassword, true);
   } finally {
     User.find = originals.find;
     SystemLog.create = originals.createSystemLog;
@@ -435,4 +477,52 @@ test('landlord serialization allows dashboard login when saved bank encryption k
     if (previousJwtSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = previousJwtSecret;
   }
+});
+
+test('first-login password change rejects temporary-password reuse and clears the flag after saving', async () => {
+  const originalFindById = User.findById;
+  const user = {
+    _id: 'area-admin-id',
+    password: await bcrypt.hash('temporary-password', 4),
+    mustChangePassword: true,
+    async save() {},
+  };
+  User.findById = async () => user;
+
+  try {
+    const samePasswordResponse = createResponse();
+    await changePasswordOnFirstLogin({
+      user: { id: 'area-admin-id' },
+      body: { newPassword: 'temporary-password' },
+    }, samePasswordResponse);
+    assert.equal(samePasswordResponse.statusCode, 400);
+    assert.deepEqual(samePasswordResponse.body, {
+      message: 'New password must be different from the temporary password.',
+    });
+
+    const response = createResponse();
+    await changePasswordOnFirstLogin({
+      user: { id: 'area-admin-id' },
+      body: { newPassword: 'permanent-password' },
+    }, response);
+    assert.equal(response.statusCode, null);
+    assert.equal(response.body.mustChangePassword, false);
+    assert.equal(user.mustChangePassword, false);
+    assert.equal(await bcrypt.compare('permanent-password', user.password), true);
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
+test('user serialization includes the first-login password-change flag', () => {
+  const user = serializeUser({
+    _id: { toString: () => 'area-admin-id' },
+    name: 'Area Admin',
+    email: 'area@example.com',
+    role: 'admin',
+    adminType: 'area',
+    mustChangePassword: true,
+  });
+
+  assert.equal(user.mustChangePassword, true);
 });

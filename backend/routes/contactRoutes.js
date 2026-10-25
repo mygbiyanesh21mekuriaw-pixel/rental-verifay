@@ -11,7 +11,7 @@ const router = express.Router();
 
 router.get('/details', getContactDetails);
 router.post('/', submitContactMessage);
-router.get('/platform-admin/inbox', auth, requireRole('platform_admin', 'area_admin'), getPlatformContactMessages);
-router.put('/platform-admin/inbox/:id/read', auth, requireRole('platform_admin', 'area_admin'), markContactMessageRead);
+router.get('/platform-admin/inbox', auth, requireRole('area_admin'), getPlatformContactMessages);
+router.put('/platform-admin/inbox/:id/read', auth, requireRole('area_admin'), markContactMessageRead);
 
 module.exports = router;

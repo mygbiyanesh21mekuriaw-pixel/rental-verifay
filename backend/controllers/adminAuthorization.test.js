@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const systemLogRoutes = require('../routes/systemLogRoutes');
+const adminRoutes = require('../routes/adminRoutes');
 const { platformAdminOnly } = require('../middleware/auth');
 const { getAdminProperties, getAllUsers } = require('./adminController');
 const { requireRole } = require('../middleware/auth');
@@ -56,6 +57,14 @@ test('legacy area admins remain scoped when loading administrative properties', 
 
 test('system-log route requires platform-admin authorization', () => {
   const route = systemLogRoutes.stack.find((layer) => layer.route?.path === '/system-logs');
+
+  assert.ok(route);
+  assert.equal(route.route.stack[0].handle.name, 'auth');
+  assert.equal(route.route.stack[1].handle, platformAdminOnly);
+});
+
+test('role changes are restricted to Platform Admins', () => {
+  const route = adminRoutes.stack.find((layer) => layer.route?.path === '/users/:id/role');
 
   assert.ok(route);
   assert.equal(route.route.stack[0].handle.name, 'auth');

@@ -30,7 +30,8 @@ test('area admins only load contact messages assigned to their area', async () =
       user: { role: 'admin', adminType: 'area', assignedArea: 'North' },
     }, response);
 
-    assert.deepEqual(filter, { area: 'North' });
+    assert.equal(filter.area.test('North'), true);
+    assert.equal(filter.area.test('South'), false);
     assert.deepEqual(response.body, []);
   } finally {
     ContactMessage.find = originalFind;
@@ -52,9 +53,28 @@ test('area admins cannot mark another area contact message as read', async () =>
       user: { role: 'admin', adminType: 'area', assignedArea: 'North' },
     }, response);
 
-    assert.deepEqual(filter, { _id: '507f1f77bcf86cd799439011', area: 'North' });
+    assert.equal(filter._id, '507f1f77bcf86cd799439011');
+    assert.equal(filter.area.test('North'), true);
+    assert.equal(filter.area.test('South'), false);
     assert.equal(response.statusCode, 404);
   } finally {
     ContactMessage.findOneAndUpdate = originalFindOneAndUpdate;
+  }
+});
+
+test('Platform Admin receives no Area Admin contact inbox messages', async () => {
+  const originalFind = ContactMessage.find;
+  let findCalled = false;
+  ContactMessage.find = () => { findCalled = true; throw new Error('Platform inbox must not query area messages'); };
+  const response = createResponse();
+
+  try {
+    await getPlatformContactMessages({
+      user: { role: 'admin', adminType: 'platform' },
+    }, response);
+    assert.deepEqual(response.body, []);
+    assert.equal(findCalled, false);
+  } finally {
+    ContactMessage.find = originalFind;
   }
 });

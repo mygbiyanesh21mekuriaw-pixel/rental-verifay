@@ -6,9 +6,11 @@ const { normalizeAdminAreaObject, buildAdminAreaQuery } = require('../utils/admi
 const getUserId = (user) => user.id || user._id;
 
 const getAdminPropertyIds = async (user) => {
-  if (user.adminType !== 'area') return null;
+  if (user.role !== 'admin' || user.adminType !== 'area' || user.isActive === false) return [];
 
-  const adminAreas = (user.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+  const adminAreas = user.assignedArea
+    ? [normalizeAdminAreaObject(user.assignedArea)].filter(Boolean)
+    : (user.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
   if (adminAreas.length === 0) return [];
 
   const properties = await Property.find(buildAdminAreaQuery(adminAreas)).select('_id').lean();

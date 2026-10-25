@@ -16,6 +16,20 @@ const {
 } = require('../utils/adminArea');
 const { createLandlordNotification } = require('./notificationController');
 const { createSystemLog } = require('./systemLogController');
+const { clearUnfinishedAreaAdminAssignments, getAdminAreaNames } = require('../utils/areaAdminHandover');
+const { appendAdminDecision } = require('../utils/adminHandlingHistory');
+const {
+  getAreaAdminConflict,
+  getAreaAdminConflictMessage,
+  isAreaAdminDuplicateKeyError,
+} = require('../utils/areaAdminUniqueness');
+
+const respondAreaAdminConflict = async (res, areaName, excludeAdminId = null) => {
+  const conflictingAdmin = await getAreaAdminConflict(areaName, excludeAdminId);
+  return res.status(409).json({
+    message: getAreaAdminConflictMessage(areaName, conflictingAdmin?.name),
+  });
+};
 
 const buildMonthLabel = (monthKey) => {
   if (!monthKey) return 'N/A';
@@ -99,6 +113,30 @@ const sanitizeAdminProperty = (property) => {
   return sanitized;
 };
 
+const addHandlerStatus = async (properties) => {
+  const handledByIds = [...new Set(properties
+    .map((property) => String(property.handledBy || ''))
+    .filter((id) => mongoose.isValidObjectId(id)))];
+  const handlers = handledByIds.length
+    ? await User.find({ _id: { $in: handledByIds } })
+      .select('role adminType assignedArea adminAreas isActive')
+      .lean()
+    : [];
+  const handlerById = new Map(handlers.map((handler) => [String(handler._id), handler]));
+
+  properties.forEach((property) => {
+    const handler = handlerById.get(String(property.handledBy || ''));
+    const handlerAreas = handler?.assignedArea
+      ? [handler.assignedArea]
+      : (handler?.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+    const isCurrentAreaAdmin = getAdministrativeRole(handler) === 'area_admin'
+      && handler.isActive !== false
+      && handlerAreas.length > 0
+      && propertyMatchesAdminAreas(property, handlerAreas);
+    property.handledByIsFormerAdmin = Boolean(property.handledBy) && !isCurrentAreaAdmin;
+  });
+};
+
 const normalizeAdminAreas = (areas) => {
   if (!Array.isArray(areas)) return null;
 
@@ -110,19 +148,23 @@ const normalizeAdminAreas = (areas) => {
 };
 
 const createAdminAccount = async (req, res) => {
+  let requestedAreaName = '';
   try {
-    const { name, email, username, phone, password, adminType = 'area', adminAreas = [] } = req.body;
-    const normalizedName = String(name || '').trim();
+    const { fullName, name, email, username, phone, password, adminType = 'area', adminAreas = [] } = req.body;
+    const normalizedName = String(fullName || name || '').trim();
     const normalizedEmail = String(email || '').trim().toLowerCase();
     const normalizedUsername = String(username || '').trim().toLowerCase();
     const normalizedPhone = String(phone || '').trim();
-    const requestedArea = String(req.body.assignedArea || '').trim() || getAreaName(adminAreas[0]);
+    const requestedArea = String(req.body.area || req.body.assignedArea || '').trim() || getAreaName(adminAreas[0]);
 
-    if (!normalizedName || !normalizedEmail || !normalizedUsername || !password) {
-      return res.status(400).json({ message: 'Name, email, username and password are required' });
+    if (!normalizedName || !normalizedEmail || !normalizedUsername || typeof password !== 'string' || !password) {
+      return res.status(400).json({ message: 'Full name, email, username and temporary password are required.' });
     }
-    if (!/^[a-z0-9._-]{3,30}$/.test(normalizedUsername)) {
-      return res.status(400).json({ message: 'Username must be 3-30 characters and use letters, numbers, periods, underscores, or hyphens.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ message: 'Enter a valid email address.' });
+    }
+    if (!/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
+      return res.status(400).json({ message: 'Username must be 3-20 characters and use only letters, numbers, or underscores.' });
     }
     if (!['platform', 'area'].includes(adminType)) {
       return res.status(400).json({ message: 'Admin type must be platform or area' });
@@ -130,8 +172,8 @@ const createAdminAccount = async (req, res) => {
     if (normalizedPhone && !/^(?:\+2519\d{8}|09\d{8})$/.test(normalizedPhone)) {
       return res.status(400).json({ message: 'Use +2519XXXXXXXX or 09XXXXXXXX for the phone number.' });
     }
-    if (String(password).length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
     }
 
     let areaRecord = null;
@@ -139,6 +181,13 @@ const createAdminAccount = async (req, res) => {
       if (!requestedArea) return res.status(400).json({ message: 'An assigned area is required for an area admin.' });
       areaRecord = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
       if (!areaRecord) return res.status(400).json({ message: 'Select an existing area.' });
+      requestedAreaName = areaRecord.name;
+      const conflictingAdmin = await getAreaAdminConflict(areaRecord.name);
+      if (conflictingAdmin) {
+        return res.status(409).json({
+          message: getAreaAdminConflictMessage(areaRecord.name, conflictingAdmin.name),
+        });
+      }
     }
 
     const existingUser = await User.findOne({ email: normalizedEmail });
@@ -157,7 +206,8 @@ const createAdminAccount = async (req, res) => {
       email: normalizedEmail,
       username: normalizedUsername,
       phone: normalizedPhone,
-      password: await bcrypt.hash(String(password), 10),
+      password: await bcrypt.hash(password, 10),
+      mustChangePassword: adminType === 'area',
       role: 'admin',
       adminType,
       assignedArea: adminType === 'area' ? areaRecord.name : '',
@@ -166,8 +216,17 @@ const createAdminAccount = async (req, res) => {
 
     const safeAdmin = admin.toObject();
     delete safeAdmin.password;
-    res.status(201).json({ message: 'Admin account created successfully', user: safeAdmin });
+    const message = adminType === 'area'
+      ? 'Admin created. Please give the temporary password to the admin directly. They must change it on first login.'
+      : 'Admin account created successfully.';
+    res.status(201).json({ message, user: safeAdmin });
   } catch (error) {
+    if (isAreaAdminDuplicateKeyError(error)) {
+      return respondAreaAdminConflict(res, error.keyValue?.assignedArea || requestedAreaName);
+    }
+    if (error?.code === 11000 && error?.keyPattern?.email) {
+      return res.status(409).json({ message: 'A user with this email already exists' });
+    }
     if (error?.code === 11000 && error?.keyPattern?.username) {
       return res.status(409).json({ message: 'That username is already in use.' });
     }
@@ -391,8 +450,10 @@ const getPendingProperties = async (req, res) => {
       isVerified: false,
     });
     const pendingProperties = await Property.find(filter)
-      .populate('landlord', 'name email phone profilePhoto role');
+      .populate('landlord', 'name email phone profilePhoto role')
+      .lean();
 
+    await addHandlerStatus(pendingProperties);
     res.json(pendingProperties.map(sanitizeAdminProperty));
   } catch (error) {
     console.error('Verify property failed', { propertyId: req.params.id, adminId: req.user?.id, message: error.message });
@@ -406,8 +467,10 @@ const getAdminProperties = async (req, res) => {
     const allowedStatuses = ['all', 'approved', 'pending', 'rejected'];
     const requestedStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
     const status = allowedStatuses.includes(requestedStatus) ? requestedStatus : 'all';
+    const isAreaAdmin = getAdministrativeRole(req.user) === 'area_admin';
+    if (!isAreaAdmin && status === 'pending') return res.json([]);
     let filter = status === 'all'
-      ? {}
+      ? (isAreaAdmin ? {} : { verificationStatus: { $ne: 'pending' } })
       : status === 'approved'
         ? { verificationStatus: 'approved', isVerified: true }
         : { verificationStatus: status, isVerified: false };
@@ -463,6 +526,7 @@ const getAdminProperties = async (req, res) => {
       });
     }
 
+    await addHandlerStatus(properties);
     res.json(properties.map(sanitizeAdminProperty));
   } catch (error) {
     console.error('Reject property failed', { propertyId: req.params.id, adminId: req.user?.id, message: error.message });
@@ -482,7 +546,7 @@ const verifyProperty = async (req, res) => {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    const admin = await User.findById(req.user.id).select('adminType adminAreas').lean();
+    const admin = await User.findById(req.user.id).select('name adminType adminAreas assignedArea').lean();
     if (!admin || admin.adminType !== 'area') {
       return res.status(403).json({ message: 'Platform Admins are read-only and cannot verify properties.' });
     }
@@ -495,6 +559,7 @@ const verifyProperty = async (req, res) => {
     property.isVerified = true;
     property.verificationStatus = 'approved';
     property.availabilityStatus = property.availabilityStatus || 'available';
+    appendAdminDecision(property, admin, 'verified');
     await property.save();
 
     // የማረጋገጫ ጥያቄውን አዘምን
@@ -549,7 +614,7 @@ const rejectProperty = async (req, res) => {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    const admin = await User.findById(req.user.id).select('adminType adminAreas').lean();
+    const admin = await User.findById(req.user.id).select('name adminType adminAreas assignedArea').lean();
     if (!admin || admin.adminType !== 'area') {
       return res.status(403).json({ message: 'Platform Admins are read-only and cannot reject properties.' });
     }
@@ -561,6 +626,7 @@ const rejectProperty = async (req, res) => {
 
     property.isVerified = false;
     property.verificationStatus = 'rejected';
+    appendAdminDecision(property, admin, 'rejected', comment || 'Documentation insufficient');
     await property.save();
 
     // የማረጋገጫ ጥያቄውን አዘምን
@@ -744,11 +810,12 @@ const deleteUser = async (req, res) => {
 
 // የተጠቃሚ ሚና መቀየር (Admin ብቻ)
 const changeUserRole = async (req, res) => {
+  let requestedAreaName = '';
   try {
     const { id } = req.params;
-    const { role, adminAreas, adminType } = req.body;
+    const { role, assignedArea, confirmExistingAccount, existingAccountId } = req.body;
 
-    if (!['tenant', 'landlord', 'admin'].includes(role)) {
+    if (!['tenant', 'landlord', 'area_admin', 'deactivate'].includes(role)) {
       return res.status(400).json({ message: 'Unknown role' });
     }
 
@@ -757,47 +824,140 @@ const changeUserRole = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.role = role;
-    if (role === 'admin' && adminAreas !== undefined) {
-      const normalizedAreas = normalizeAdminAreas(adminAreas);
-      if (!normalizedAreas) {
-        return res.status(400).json({ message: 'adminAreas must be an array of area objects' });
-      }
-      user.adminAreas = normalizedAreas;
-      user.adminType = adminType || (normalizedAreas.length > 0 ? 'area' : 'platform');
-      if (user.adminType === 'area') {
-        const requestedArea = String(req.body.assignedArea || '').trim() || getAreaName(normalizedAreas[0]);
-        const area = requestedArea
-          ? await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean()
-          : null;
-        if (!area) return res.status(400).json({ message: 'Select an existing area for an area admin.' });
-        user.assignedArea = area.name;
-        user.adminAreas = [{ city: area.name }];
-      } else {
-        user.assignedArea = '';
-      }
-    } else if (role === 'admin' && adminType !== undefined) {
-      if (!['platform', 'area'].includes(adminType)) {
-        return res.status(400).json({ message: 'Admin type must be platform or area' });
-      }
-      user.adminType = adminType;
-      if (adminType === 'platform') user.assignedArea = '';
-    } else if (role !== 'admin') {
-      user.adminAreas = [];
-      user.adminType = undefined;
-      user.assignedArea = '';
+    const currentRole = getAdministrativeRole(user);
+    if (currentRole === 'platform_admin') {
+      return res.status(403).json({ message: 'Platform Admin cannot be changed with this action.' });
     }
+
+    if (role === 'area_admin') {
+      if (!['tenant', 'landlord'].includes(user.role)) {
+        return res.status(400).json({ message: 'Only Landlords and Tenants can be promoted to Area Admin.' });
+      }
+      const requestedArea = String(assignedArea || '').trim();
+      if (!requestedArea) {
+        return res.status(400).json({ message: 'Select an area for the Area Admin.' });
+      }
+      const area = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+      if (!area) return res.status(400).json({ message: 'Select an existing area for the Area Admin.' });
+      requestedAreaName = area.name;
+      const conflictingAdmin = await getAreaAdminConflict(area.name, user._id);
+      if (conflictingAdmin) {
+        return res.status(409).json({
+          message: getAreaAdminConflictMessage(area.name, conflictingAdmin.name),
+        });
+      }
+
+      user.role = 'admin';
+      user.adminType = 'area';
+      user.assignedArea = area.name;
+      user.adminAreas = [{ city: area.name }];
+      user.isActive = true;
+      user.replacedBy = null;
+      await user.save();
+      const safeUser = user.toObject();
+      delete safeUser.password;
+      return res.json({ message: 'Area Admin promotion successful.', user: safeUser });
+    }
+
+    if (currentRole !== 'area_admin') {
+      return res.status(400).json({ message: 'Only Area Admin accounts can be demoted or deactivated here.' });
+    }
+
+    const previousAreas = getAdminAreaNames(user);
+
+    if (role === 'deactivate') {
+      await clearUnfinishedAreaAdminAssignments(user);
+      user.isActive = false;
+      user.replacedBy = null;
+      await user.save();
+      await createSystemLog({
+        user: user._id,
+        role: 'admin',
+        action: 'AREA_ADMIN_DEACTIVATED',
+        description: `Area Admin ${user.name} was deactivated from ${previousAreas.join(', ') || 'their area'}.`,
+        status: 'success',
+        ipAddress: req.ip || '',
+      });
+      const safeUser = user.toObject();
+      delete safeUser.password;
+      return res.json({ message: 'Area Admin deactivated successfully.', user: safeUser });
+    }
+
+    const existingAccount = await User.findOne({
+      email: String(user.email || '').trim().toLowerCase(),
+      _id: { $ne: user._id },
+      role: { $in: ['tenant', 'landlord'] },
+    }).select('_id name email role').lean();
+
+    if (existingAccount && existingAccount.role !== role) {
+      return res.status(409).json({
+        code: 'EXISTING_ACCOUNT_ROLE_MISMATCH',
+        existingAccountRole: existingAccount.role,
+        message: `An existing ${existingAccount.role} account uses this email. Select ${existingAccount.role} to use that account.`,
+      });
+    }
+    if (existingAccount && (
+      confirmExistingAccount !== true ||
+      String(existingAccountId || '') !== String(existingAccount._id)
+    )) {
+      return res.status(409).json({
+        code: 'EXISTING_ACCOUNT_CONFIRMATION_REQUIRED',
+        existingAccountId: String(existingAccount._id),
+        existingAccountRole: existingAccount.role,
+        message: `An existing ${existingAccount.role} account uses this email. Confirm to deactivate this Area Admin and use the existing account.`,
+      });
+    }
+
+    await clearUnfinishedAreaAdminAssignments(user);
+    if (existingAccount) {
+      user.isActive = false;
+      user.replacedBy = existingAccount._id;
+      user.assignedArea = '';
+      user.adminAreas = [];
+      await user.save();
+      await createSystemLog({
+        user: user._id,
+        role: 'admin',
+        action: 'AREA_ADMIN_LINKED_EXISTING_ACCOUNT',
+        description: `Area Admin ${user.name} was linked to existing ${existingAccount.role} account ${existingAccount._id} after leaving ${previousAreas.join(', ') || 'their area'}.`,
+        status: 'success',
+        ipAddress: req.ip || '',
+      });
+      return res.json({
+        message: `Existing ${existingAccount.role} account selected. The Area Admin account is deactivated.`,
+        user: { id: String(existingAccount._id), role: existingAccount.role },
+      });
+    }
+
+    user.role = role;
+    user.adminType = undefined;
+    user.adminAreas = [];
+    user.assignedArea = '';
+    user.isActive = true;
+    user.replacedBy = null;
     await user.save();
+    await createSystemLog({
+      user: user._id,
+      role: 'admin',
+      action: 'AREA_ADMIN_DEMOTED',
+      description: `Area Admin ${user.name} was demoted from ${previousAreas.join(', ') || 'their area'} to ${role}.`,
+      status: 'success',
+      ipAddress: req.ip || '',
+    });
 
     const safeUser = user.toObject();
     delete safeUser.password;
-    res.json({ message: 'Role changed successfully', user: safeUser });
+    res.json({ message: `Area Admin demoted to ${role}.`, user: safeUser });
   } catch (error) {
+    if (isAreaAdminDuplicateKeyError(error)) {
+      return respondAreaAdminConflict(res, error.keyValue?.assignedArea || requestedAreaName, req.params.id);
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };
 
 const updateAreaAdminAccount = async (req, res) => {
+  let requestedAreaName = '';
   try {
     const { name, email, phone } = req.body;
     const normalizedName = String(name || '').trim();
@@ -813,15 +973,28 @@ const updateAreaAdminAccount = async (req, res) => {
     }
     const areaRecord = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
     if (!areaRecord) return res.status(400).json({ message: 'Select an existing area.' });
+    requestedAreaName = areaRecord.name;
 
     const admin = await User.findById(req.params.id);
     if (!admin) return res.status(404).json({ message: 'Area Admin not found' });
     if (admin.role !== 'admin' || admin.adminType !== 'area') {
       return res.status(403).json({ message: 'Only Area Admin accounts can be edited here' });
     }
+    if (String(admin.assignedArea || '').trim().toLowerCase() !== areaRecord.name.toLowerCase()) {
+      const conflictingAdmin = await getAreaAdminConflict(areaRecord.name, admin._id);
+      if (conflictingAdmin) {
+        return res.status(409).json({
+          message: getAreaAdminConflictMessage(areaRecord.name, conflictingAdmin.name),
+        });
+      }
+    }
 
     const existingUser = await User.findOne({ email: normalizedEmail, _id: { $ne: admin._id } });
     if (existingUser) return res.status(409).json({ message: 'A user with this email already exists' });
+
+    if (String(admin.assignedArea || '').trim().toLowerCase() !== areaRecord.name.toLowerCase()) {
+      await clearUnfinishedAreaAdminAssignments(admin);
+    }
 
     admin.set({
       name: normalizedName,
@@ -838,6 +1011,9 @@ const updateAreaAdminAccount = async (req, res) => {
     delete safeAdmin.password;
     res.json({ message: 'Area Admin updated successfully', user: safeAdmin });
   } catch (error) {
+    if (isAreaAdminDuplicateKeyError(error)) {
+      return respondAreaAdminConflict(res, error.keyValue?.assignedArea || requestedAreaName, req.params.id);
+    }
     res.status(500).json({ message: 'Unable to update Area Admin' });
   }
 };
@@ -861,6 +1037,69 @@ const deleteAreaAdminAccount = async (req, res) => {
   }
 };
 
+const setAreaAdminActive = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid Area Admin ID.' });
+    }
+    if (typeof req.body?.isActive !== 'boolean') {
+      return res.status(400).json({ message: 'isActive must be a boolean.' });
+    }
+    const admin = await User.findById(req.params.id);
+    if (!admin || admin.role !== 'admin' || admin.adminType !== 'area') {
+      return res.status(404).json({ message: 'Area Admin not found.' });
+    }
+    if (admin.isActive === req.body.isActive) {
+      return res.json({ message: req.body.isActive ? 'Area Admin is already active.' : 'Area Admin is already inactive.' });
+    }
+
+    const areaNames = getAdminAreaNames(admin);
+    if (!req.body.isActive) {
+      await clearUnfinishedAreaAdminAssignments(admin);
+    }
+    admin.isActive = req.body.isActive;
+    await admin.save();
+
+    if (!req.body.isActive) {
+      await createSystemLog({
+        user: admin._id,
+        role: 'admin',
+        action: 'AREA_ADMIN_DEACTIVATED',
+        description: `Area Admin ${admin.name} was deactivated for ${areaNames.join(', ') || 'their area'}.`,
+        status: 'success',
+        ipAddress: req.ip || '',
+      });
+    }
+    return res.json({ message: req.body.isActive ? 'Area Admin activated successfully.' : 'Area Admin deactivated successfully.' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Unable to update Area Admin status.' });
+  }
+};
+
+const resetAreaAdminPassword = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid Area Admin ID.' });
+    }
+    const { temporaryPassword } = req.body || {};
+    if (typeof temporaryPassword !== 'string' || temporaryPassword.length < 8 || temporaryPassword.length > 1024) {
+      return res.status(400).json({ message: 'Temporary password must be at least 8 characters.' });
+    }
+
+    const admin = await User.findById(req.params.id);
+    if (!admin || admin.role !== 'admin' || admin.adminType !== 'area') {
+      return res.status(404).json({ message: 'Area Admin not found.' });
+    }
+
+    admin.password = await bcrypt.hash(temporaryPassword, 10);
+    admin.mustChangePassword = true;
+    await admin.save();
+    return res.json({ message: 'Area Admin temporary password reset successfully.' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Unable to reset Area Admin password.' });
+  }
+};
+
 module.exports = {
   getPendingProperties,
   getAdminProperties,
@@ -875,4 +1114,6 @@ module.exports = {
   createAdminAccount,
   updateAreaAdminAccount,
   deleteAreaAdminAccount,
+  setAreaAdminActive,
+  resetAreaAdminPassword,
 };

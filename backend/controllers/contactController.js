@@ -18,6 +18,29 @@ const getPlatformAdminEmail = async () => {
   return String(platformAdmin?.email || process.env.ADMIN_EMAIL || '').trim();
 };
 
+const getAreaAdminEmails = async (areaName) => {
+  const escapedArea = String(areaName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const exactArea = new RegExp(`^${escapedArea}$`, 'i');
+  const admins = await User.find({
+    role: 'admin',
+    isActive: { $ne: false },
+    $and: [
+      { $or: [{ adminType: 'area' }, { adminType: { $exists: false }, adminAreas: { $ne: [] } }] },
+      {
+        $or: [
+          { assignedArea: exactArea },
+          { 'adminAreas.region': exactArea },
+          { 'adminAreas.zone': exactArea },
+          { 'adminAreas.wereda': exactArea },
+          { 'adminAreas.city': exactArea },
+          { 'adminAreas.subCity': exactArea },
+        ],
+      },
+    ],
+  }).select('email').lean();
+  return [...new Set(admins.map((admin) => String(admin.email || '').trim()).filter(Boolean))];
+};
+
 const getContactDetails = async (req, res) => {
   try {
     res.json({ email: await getPlatformAdminEmail() });
@@ -46,14 +69,14 @@ const submitContactMessage = async (req, res) => {
     if (!area) return res.status(400).json({ message: 'Select an existing area.' });
     const contactMessage = await ContactMessage.create({ name, email, subject, message, area: area.name });
     try {
-      const adminEmail = await getPlatformAdminEmail();
-      if (adminEmail && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        await sendEmail({
+      const areaAdminEmails = await getAreaAdminEmails(area.name);
+      if (areaAdminEmails.length && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        await Promise.all(areaAdminEmails.map((adminEmail) => sendEmail({
           to: adminEmail,
           subject: `Contact Us: ${subject}`,
           text: `From: ${name} <${email}>\n\n${message}`,
           html: `<p><strong>From:</strong> ${escapeHtml(name)} &lt;${escapeHtml(email)}&gt;</p><p><strong>Subject:</strong> ${escapeHtml(subject)}</p><p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>`,
-        });
+        })));
       }
     } catch (emailError) {
       console.error('Contact message was saved, but email notification to the Platform Admin failed:', emailError);
@@ -71,11 +94,11 @@ const submitContactMessage = async (req, res) => {
 
 const getPlatformContactMessages = async (req, res) => {
   try {
-    const filter = {};
-    if (getAdministrativeRole(req.user) === 'area_admin') {
-      if (req.user.assignedArea) filter.area = req.user.assignedArea;
-      else filter._id = null;
+    if (getAdministrativeRole(req.user) !== 'area_admin' || !req.user.assignedArea) {
+      return res.json([]);
     }
+    const escapedArea = req.user.assignedArea.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const filter = { area: new RegExp(`^${escapedArea}$`, 'i') };
     const messages = await ContactMessage.find(filter).sort({ createdAt: -1 }).lean();
     res.json(messages);
   } catch (error) {
@@ -86,11 +109,12 @@ const getPlatformContactMessages = async (req, res) => {
 
 const markContactMessageRead = async (req, res) => {
   try {
-    const filter = { _id: req.params.id };
-    if (getAdministrativeRole(req.user) === 'area_admin') {
-      if (req.user.assignedArea) filter.area = req.user.assignedArea;
-      else filter._id = null;
+    if (getAdministrativeRole(req.user) !== 'area_admin' || !req.user.assignedArea) {
+      return res.status(403).json({ message: 'Area Admin permission required.' });
     }
+    const filter = { _id: req.params.id };
+    const escapedArea = req.user.assignedArea.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.area = new RegExp(`^${escapedArea}$`, 'i');
     const contactMessage = await ContactMessage.findOneAndUpdate(
       filter,
       { $set: { read: true } },

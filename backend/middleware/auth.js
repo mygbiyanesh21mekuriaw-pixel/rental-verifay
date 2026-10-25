@@ -24,9 +24,9 @@ const resolveAuthenticatedUser = async (decoded) => {
   if (!mongoose.isValidObjectId(decoded?.id)) return null;
 
   const user = await User.findById(decoded.id)
-    .select('_id role adminType adminAreas assignedArea area')
+    .select('_id role adminType adminAreas assignedArea area mustChangePassword isActive')
     .lean();
-  if (!user) return null;
+  if (!user || user.isActive === false) return null;
 
   const adminAreas = user.adminAreas || [];
   return {
@@ -38,6 +38,8 @@ const resolveAuthenticatedUser = async (decoded) => {
     adminAreas,
     assignedArea: user.assignedArea || getLegacyAssignedArea(adminAreas),
     area: user.area || '',
+      mustChangePassword: user.mustChangePassword === true,
+    isActive: user.isActive !== false,
   };
 };
 
@@ -70,6 +72,16 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'User account is not available' });
     }
     req.user = user;
+      const requestPath = `${req.baseUrl || ''}${req.path || ''}`;
+      const isAllowedDuringPasswordChange = (
+        req.method === 'POST' && ['/api/change-password', '/api/logout', '/api/auth/logout'].includes(requestPath)
+      ) || (req.method === 'GET' && requestPath === '/api/auth/me');
+      if (user.mustChangePassword && !isAllowedDuringPasswordChange) {
+        return res.status(403).json({
+          code: 'PASSWORD_CHANGE_REQUIRED',
+          message: 'Change your temporary password before continuing.',
+        });
+      }
     next();
   } catch (error) {
     console.error('Authentication user lookup failed:', error);
@@ -88,6 +100,16 @@ const optionalAuth = async (req, res, next) => {
       return res.status(401).json({ message: 'User account is not available' });
     }
     req.user = user;
+    const requestPath = `${req.baseUrl || ''}${req.path || ''}`;
+    const isAllowedDuringPasswordChange = (
+      req.method === 'POST' && ['/api/change-password', '/api/logout', '/api/auth/logout'].includes(requestPath)
+    ) || (req.method === 'GET' && requestPath === '/api/auth/me');
+    if (user.mustChangePassword && !isAllowedDuringPasswordChange) {
+      return res.status(403).json({
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: 'Change your temporary password before continuing.',
+      });
+    }
     next();
   } catch (error) {
     console.error('Optional authentication user lookup failed:', error);

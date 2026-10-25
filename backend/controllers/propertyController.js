@@ -18,6 +18,7 @@ const {
 } = require('../utils/uploadMedia');
 const cloudinary = require('../config/cloudinary');
 const { downloadPrivateProof, validateCloudinaryAsset } = require('../services/privateOwnershipProof');
+const { getAdministrativeRole } = require('../middleware/auth');
 const {
   normalizeAdminAreaObject,
   propertyMatchesAdminAreas,
@@ -62,6 +63,12 @@ const propertyResponse = (property, user) => {
   );
   delete result.verificationDocument;
   delete result.verificationDocumentAsset;
+  delete result.handledBy;
+  delete result.handledByName;
+  delete result.handledByRole;
+  delete result.handledAt;
+  delete result.decision;
+  delete result.history;
   return result;
 };
 
@@ -585,6 +592,64 @@ const getAllProperties = async (req, res) => {
   }
 };
 
+const getPropertyHistory = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    const admin = await User.findById(req.user.id)
+      .select('role adminType assignedArea adminAreas isActive')
+      .lean();
+    if (!admin || admin.isActive === false || getAdministrativeRole(admin) !== 'area_admin') {
+      return res.status(403).json({ message: 'Area Admin permission required.' });
+    }
+
+    const adminAreas = admin.assignedArea
+      ? [admin.assignedArea]
+      : (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+    if (adminAreas.length === 0) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    const areaFilter = buildAdminAreaQuery(adminAreas);
+    const property = await Property.findOne({
+      _id: req.params.id,
+      $and: [areaFilter],
+    }).select('_id area region zone wereda city subCity history');
+    if (!property) return res.status(404).json({ message: 'Property not found' });
+
+    const handlerIds = [...new Set((property.history || [])
+      .map((entry) => String(entry.byId || ''))
+      .filter((id) => mongoose.isValidObjectId(id)))];
+    const handlers = handlerIds.length
+      ? await User.find({ _id: { $in: handlerIds } })
+        .select('role adminType assignedArea adminAreas isActive')
+        .lean()
+      : [];
+    const handlerById = new Map(handlers.map((handler) => [String(handler._id), handler]));
+    const history = (property.history || [])
+      .map((entry) => {
+        const item = typeof entry.toObject === 'function' ? entry.toObject() : { ...entry };
+        const handler = handlerById.get(String(item.byId || ''));
+        const handlerAreas = handler?.assignedArea
+          ? [handler.assignedArea]
+          : (handler?.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+        const isCurrentAreaAdmin = getAdministrativeRole(handler) === 'area_admin'
+          && handler.isActive !== false
+          && handlerAreas.length > 0
+          && propertyMatchesAdminAreas(property, handlerAreas);
+        return { ...item, isFormerAdmin: Boolean(item.byId) && !isCurrentAreaAdmin };
+      })
+      .sort((left, right) => new Date(right.at) - new Date(left.at));
+
+    res.json(history);
+  } catch (error) {
+    console.error('Unable to load property handling history:', error);
+    res.status(500).json({ message: 'Unable to load property history' });
+  }
+};
+
 // አንድ ንብረት ማግኘት
 const getPropertyById = async (req, res) => {
   try {
@@ -798,6 +863,7 @@ module.exports = {
   getAllProperties,
   getPropertyById,
   getOwnershipProof,
+  getPropertyHistory,
   updateProperty,
   deleteProperty,
 };

@@ -12,7 +12,13 @@ jest.mock('axios', () => ({
   delete: jest.fn(),
 }));
 
-const place = { _id: 'place-1', name: 'North', region: 'Amhara' };
+const place = {
+  _id: 'place-1',
+  name: 'North',
+  region: 'Amhara',
+  hasNoActiveAdminWithWaitingItems: true,
+  waitingItemCount: 3,
+};
 
 const renderPage = () => render(
   <LanguageProvider>
@@ -35,6 +41,7 @@ test('lists places and edits name and region', async () => {
   renderPage();
 
   expect(await screen.findByText('North')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Area North has no active Area Admin; 3 items are waiting.');
   expect(axios.get).toHaveBeenCalledWith('/api/areas', {
     headers: { Authorization: 'Bearer platform-token' },
   });
@@ -49,7 +56,7 @@ test('lists places and edits name and region', async () => {
     { name: 'South', region: 'Oromia' },
     { headers: { Authorization: 'Bearer platform-token' } },
   ));
-  expect(await screen.findByRole('status')).toHaveTextContent('Place updated successfully.');
+  expect(await screen.findByText('Place updated successfully.')).toBeInTheDocument();
 });
 
 test('creates a place and displays a server error when names conflict', async () => {
@@ -75,5 +82,5 @@ test('deletes a place after confirmation', async () => {
   await waitFor(() => expect(axios.delete).toHaveBeenCalledWith('/api/areas/place-1', {
     headers: { Authorization: 'Bearer platform-token' },
   }));
-  expect(await screen.findByRole('status')).toHaveTextContent('Place deleted successfully.');
+  expect(await screen.findByText('Place deleted successfully.')).toBeInTheDocument();
 });

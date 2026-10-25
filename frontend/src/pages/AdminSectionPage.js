@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash, FaTrash } from 'react-icons/fa';
@@ -43,7 +43,7 @@ const AdminSectionPage = ({ type }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user: currentUser } = useAuth();
-  const { t } = useLanguage();
+  const { t, formatDate } = useLanguage();
   const config = sectionConfig[type];
   const isAdminManagementPage = type === 'adminManagement';
   const isUserListPage = type === 'allUsers';
@@ -67,12 +67,22 @@ const AdminSectionPage = ({ type }) => {
   });
   const [adminFormError, setAdminFormError] = useState('');
   const [adminFormMessage, setAdminFormMessage] = useState('');
+  const [adminNotice, setAdminNotice] = useState('');
+  const [adminNoticeType, setAdminNoticeType] = useState('success');
+  const adminNoticeTimeout = useRef(null);
   const [adminFormLoading, setAdminFormLoading] = useState(false);
   const [areas, setAreas] = useState([]);
   const [areaError, setAreaError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [resetAdminId, setResetAdminId] = useState(null);
+  const [resetTemporaryPassword, setResetTemporaryPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [editingAdminId, setEditingAdminId] = useState(null);
   const [adminActionLoading, setAdminActionLoading] = useState(null);
+  const [demotionAdmin, setDemotionAdmin] = useState(null);
+  const [demotionRole, setDemotionRole] = useState('');
+  const [promotionUser, setPromotionUser] = useState(null);
+  const [promotionArea, setPromotionArea] = useState('');
   const [selectedRentalRequest, setSelectedRentalRequest] = useState(null);
   const [rentalRequestFeedback, setRentalRequestFeedback] = useState('');
   const isPlatformAdmin = currentUser?.role === 'admin'
@@ -86,6 +96,48 @@ const AdminSectionPage = ({ type }) => {
     && currentUser?.adminType === 'area'
     && (type === 'pending' || type === 'reviewProperties' || type === 'awaitingVerification');
   const canManageRentalRequests = currentUser?.role === 'admin' && currentUser?.adminType === 'area';
+
+  useEffect(() => () => {
+    if (adminNoticeTimeout.current) {
+      window.clearTimeout(adminNoticeTimeout.current);
+    }
+  }, []);
+
+  const showAdminNotice = (message, type = 'success') => {
+    if (adminNoticeTimeout.current) {
+      window.clearTimeout(adminNoticeTimeout.current);
+    }
+    setAdminNoticeType(type);
+    setAdminNotice(message);
+    adminNoticeTimeout.current = window.setTimeout(() => {
+      setAdminNotice('');
+      adminNoticeTimeout.current = null;
+    }, 8000);
+  };
+
+  const dismissAdminNotice = () => {
+    if (adminNoticeTimeout.current) {
+      window.clearTimeout(adminNoticeTimeout.current);
+      adminNoticeTimeout.current = null;
+    }
+    setAdminNotice('');
+  };
+
+  const getAreaHandoverConfirmation = (admin) => {
+    const areaName = admin.assignedArea || getAdminAreaValue(admin.adminAreas);
+    const area = areas.find((entry) => String(entry.name).toLowerCase() === String(areaName).toLowerCase());
+    const count = Number(area?.waitingItemCount || 0);
+    return t('{count} unfinished items will stay in {area} until a new admin is assigned. Completed work stays in history.')
+      .replace('{count}', String(count))
+      .replace('{area}', areaName || 'their area');
+  };
+
+  const getAreaAdminFor = (areaName, ignoredAdminId = null) => items.find((admin) => {
+    if (!admin || admin.role !== 'admin' || admin.adminType !== 'area') return false;
+    if (ignoredAdminId && String(admin._id) === String(ignoredAdminId)) return false;
+    const assignedArea = admin.assignedArea || getAdminAreaValue(admin.adminAreas);
+    return String(assignedArea).trim().toLowerCase() === String(areaName).trim().toLowerCase();
+  });
 
   const fetchAreas = useCallback(async () => {
     try {
@@ -104,8 +156,8 @@ const AdminSectionPage = ({ type }) => {
   }, []);
 
   useEffect(() => {
-    if (isAdminManagementPage && isPlatformAdmin) fetchAreas();
-  }, [fetchAreas, isAdminManagementPage, isPlatformAdmin]);
+    if ((isAdminManagementPage || isUserListPage) && isPlatformAdmin) fetchAreas();
+  }, [fetchAreas, isAdminManagementPage, isPlatformAdmin, isUserListPage]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -245,14 +297,17 @@ const AdminSectionPage = ({ type }) => {
     setAdminFormLoading(true);
     try {
       const payload = {
-        name: adminForm.name,
         email: adminForm.email,
         phone: adminForm.phone,
-        assignedArea: adminForm.area,
       };
       if (!editingAdminId) {
+        payload.fullName = adminForm.name;
+        payload.area = adminForm.area;
         payload.username = adminForm.username;
         payload.password = adminForm.password;
+      } else {
+        payload.name = adminForm.name;
+        payload.assignedArea = adminForm.area;
       }
       const token = localStorage.getItem('token');
       const endpoint = editingAdminId
@@ -261,11 +316,11 @@ const AdminSectionPage = ({ type }) => {
       const response = editingAdminId
         ? await axios.put(endpoint, payload, { headers: { Authorization: `Bearer ${token}` } })
         : await axios.post(endpoint, payload, { headers: { Authorization: `Bearer ${token}` } });
-      const successMessage = response.data?.message || (editingAdminId
-        ? 'Area Admin updated successfully.'
-        : 'Admin account created successfully.');
+      const wasEditing = Boolean(editingAdminId);
+      const successMessage = response.data?.message || 'Area Admin updated successfully.';
       handleCancelAdminEdit();
-      setAdminFormMessage(successMessage);
+      if (wasEditing) setAdminFormMessage(successMessage);
+      else showAdminNotice(t('Admin created. Please give the temporary password to the admin directly. They must change it on first login.'));
       await fetchItems();
     } catch (error) {
       setAdminFormError(error.response?.data?.message || 'Unable to create admin account.');
@@ -276,23 +331,141 @@ const AdminSectionPage = ({ type }) => {
 
   const handleDeleteAdmin = async (admin) => {
     const confirmed = window.confirm(
-      `Delete Area Admin ${admin.name} (${admin.email})? This action cannot be undone.`,
+      `${getAreaHandoverConfirmation(admin)}\n\nDelete Area Admin ${admin.name} (${admin.email})? This action cannot be undone.`,
     );
     if (!confirmed) return;
 
     setAdminActionLoading(admin._id);
-    setAdminFormError('');
-    setAdminFormMessage('');
+    dismissAdminNotice();
     try {
       const token = localStorage.getItem('token');
       const response = await axios.delete(`${process.env.REACT_APP_API_URL}/api/admin/users/admin/${admin._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setAdminFormMessage(response.data?.message || 'Area Admin deleted successfully.');
+      showAdminNotice(response.data?.message || t('Area Admin deleted successfully.'));
       if (editingAdminId === admin._id) handleCancelAdminEdit();
       await fetchItems();
     } catch (error) {
-      setAdminFormError(error.response?.data?.message || 'Unable to delete Area Admin.');
+      showAdminNotice(error.response?.data?.message || t('Unable to delete Area Admin.'), 'error');
+    } finally {
+      setAdminActionLoading(null);
+    }
+  };
+
+  const handleSetAdminActive = async (admin, isActive) => {
+    if (!isActive && !window.confirm(
+      `${getAreaHandoverConfirmation(admin)}\n\n${t('Deactivate')} ${admin.name}?`,
+    )) return;
+
+    setAdminActionLoading(admin._id);
+    dismissAdminNotice();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.patch(
+        apiUrl(`/api/admin/users/admin/${admin._id}/active`),
+        { isActive },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      showAdminNotice(response.data?.message || t(isActive ? 'Area Admin activated successfully.' : 'Area Admin deactivated successfully.'));
+      await fetchItems();
+    } catch (error) {
+      showAdminNotice(error.response?.data?.message || t('Unable to update Area Admin status.'), 'error');
+    } finally {
+      setAdminActionLoading(null);
+    }
+  };
+
+  const handleDemoteAdmin = async () => {
+    if (!demotionAdmin || !demotionRole) return;
+    const admin = demotionAdmin;
+    setAdminActionLoading(admin._id);
+    dismissAdminNotice();
+    try {
+      const token = localStorage.getItem('token');
+      const endpoint = apiUrl(`/api/admin/users/${admin._id}/role`);
+      const headers = { headers: { Authorization: `Bearer ${token}` } };
+      const payload = { role: demotionRole };
+      let response;
+      try {
+        response = await axios.put(endpoint, payload, headers);
+      } catch (error) {
+        const duplicate = error.response?.data;
+        if (duplicate?.code === 'EXISTING_ACCOUNT_ROLE_MISMATCH') {
+          const existingRole = t(duplicate.existingAccountRole === 'landlord' ? 'Landlord' : 'Tenant');
+          showAdminNotice(t('This email belongs to an existing {role} account. Select {role} to use that account.')
+            .replace(/\{role\}/g, existingRole), 'error');
+          return;
+        }
+        const existingRole = t(duplicate?.existingAccountRole === 'landlord' ? 'Landlord' : 'Tenant');
+        const confirmationMessage = t('An existing {role} account uses this email. Confirm to deactivate this Area Admin and use the existing account.')
+          .replace(/\{role\}/g, existingRole);
+        if (duplicate?.code !== 'EXISTING_ACCOUNT_CONFIRMATION_REQUIRED'
+          || !window.confirm(confirmationMessage)) {
+          throw error;
+        }
+        response = await axios.put(endpoint, {
+          ...payload,
+          confirmExistingAccount: true,
+          existingAccountId: duplicate.existingAccountId,
+        }, headers);
+      }
+      const successMessage = demotionRole === 'deactivate'
+        ? 'Area Admin deactivated successfully.'
+        : response.data?.user?.id
+          ? 'Existing {role} account selected. The Area Admin account is deactivated.'
+          : `Area Admin demoted to ${demotionRole === 'landlord' ? 'Landlord' : 'Tenant'}.`;
+      showAdminNotice(t(successMessage).replace('{role}', t(demotionRole === 'landlord' ? 'Landlord' : 'Tenant')));
+      setDemotionAdmin(null);
+      setDemotionRole('');
+      await fetchItems();
+    } catch (error) {
+      showAdminNotice(error.response?.data?.message || t('Unable to demote Area Admin.'), 'error');
+    } finally {
+      setAdminActionLoading(null);
+    }
+  };
+
+  const handlePromoteUser = async () => {
+    if (!promotionUser || !promotionArea) return;
+    const user = promotionUser;
+    setAdminActionLoading(user._id);
+    dismissAdminNotice();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        apiUrl(`/api/admin/users/${user._id}/role`),
+        { role: 'area_admin', assignedArea: promotionArea },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      showAdminNotice(response.data?.message || t('Area Admin promotion successful.'));
+      setPromotionUser(null);
+      setPromotionArea('');
+      await fetchItems();
+    } catch (error) {
+      showAdminNotice(error.response?.data?.message || t('Unable to promote user to Area Admin.'), 'error');
+    } finally {
+      setAdminActionLoading(null);
+    }
+  };
+
+  const handleResetAdminPassword = async (admin) => {
+    setAdminActionLoading(admin._id);
+    setAdminFormError('');
+    setAdminFormMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        apiUrl(`/api/admins/${admin._id}/reset-password`),
+        { temporaryPassword: resetTemporaryPassword },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      showAdminNotice(t('Password reset. Please give the new temporary password to the admin directly. They must change it on next login.'));
+      setResetAdminId(null);
+      setResetTemporaryPassword('');
+      setShowResetPassword(false);
+      await fetchItems();
+    } catch (error) {
+      showAdminNotice(error.response?.data?.message || t('Unable to reset Area Admin password.'), 'error');
     } finally {
       setAdminActionLoading(null);
     }
@@ -363,23 +536,33 @@ const AdminSectionPage = ({ type }) => {
         <section className="admin-detail-section admin-dedicated-content admin-management-panel">
           <h2 className="admin-card-title">{editingAdminId ? 'Edit Area Admin' : 'Create Area Admin Account'}</h2>
           <p className="admin-subtitle">Only the Platform Admin can create area-specific admin accounts.</p>
-          {adminFormError && <div className="admin-empty-text">{adminFormError}</div>}
-          {adminFormMessage && <div className="admin-empty-text">{adminFormMessage}</div>}
+          {adminFormError && <div className="admin-empty-text" role="alert">{adminFormError}</div>}
+          {adminFormMessage && <div className="admin-success-banner" role="status">{adminFormMessage}</div>}
+          {adminNotice && (
+            <div className={`admin-success-banner${adminNoticeType === 'error' ? ' admin-error-banner' : ''}`} role={adminNoticeType === 'error' ? 'alert' : 'status'} aria-live="polite">
+              <span>{adminNotice}</span>
+              <button type="button" onClick={dismissAdminNotice} aria-label={t('Dismiss message')}>
+                {t('Dismiss')}
+              </button>
+            </div>
+          )}
           <form onSubmit={handleAdminSubmit} className="admin-grid" autoComplete="off">
             <input name="name" autoComplete="off" value={adminForm.name} onChange={handleAdminFormChange} placeholder="Full name" required className="admin-card-detail" />
             <input name="email" type="email" autoComplete="off" value={adminForm.email} onChange={handleAdminFormChange} placeholder="Email" required className="admin-card-detail" />
-            {!editingAdminId && <input name="username" autoComplete="off" value={adminForm.username} onChange={handleAdminFormChange} placeholder="Username" minLength={3} maxLength={30} pattern="[A-Za-z0-9._-]{3,30}" required className="admin-card-detail" />}
+            {!editingAdminId && <input name="username" autoComplete="off" value={adminForm.username} onChange={handleAdminFormChange} placeholder="Username" minLength={3} maxLength={20} pattern="[A-Za-z0-9_]{3,20}" required className="admin-card-detail" />}
             <input name="phone" type="tel" autoComplete="off" value={adminForm.phone} onChange={handleAdminFormChange} placeholder="09XXXXXXXX or +2519XXXXXXXX" pattern="(?:\+2519[0-9]{8}|09[0-9]{8})" title="Use +2519XXXXXXXX or 09XXXXXXXX." className="admin-card-detail" />
             {!editingAdminId && (
               <div className="admin-password-field">
+                <label htmlFor="area-admin-temporary-password">{t('Temporary password')}</label>
                 <input
+                  id="area-admin-temporary-password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="off"
                   value={adminForm.password}
                   onChange={handleAdminFormChange}
-                  placeholder="Password"
-                  minLength="6"
+                  placeholder={t('Temporary password')}
+                  minLength="8"
                   required
                   className="admin-card-detail"
                 />
@@ -397,7 +580,18 @@ const AdminSectionPage = ({ type }) => {
             )}
             <select name="area" autoComplete="off" value={adminForm.area} onChange={handleAdminFormChange} required className="admin-card-detail">
               <option value="" disabled>{areas.length ? t('Select an assigned area') : t('No places registered yet')}</option>
-              {areas.map((area) => <option key={area._id} value={area.name}>{area.name}</option>)}
+              {areas.map((area) => {
+                const areaAdmin = getAreaAdminFor(area.name, editingAdminId);
+                return (
+                  <option
+                    key={area._id}
+                    value={area.name}
+                    disabled={Boolean(areaAdmin)}
+                  >
+                    {area.name}{areaAdmin ? ` ${t('(taken by {name})', { name: areaAdmin.name })}` : ''}
+                  </option>
+                );
+              })}
             </select>
             {areas.length === 0 && (
               <p className="admin-card-detail">
@@ -488,8 +682,79 @@ const AdminSectionPage = ({ type }) => {
                   <h4 className="admin-card-title"> {admin.name}</h4>
                   <p className="admin-card-detail"> {admin.email}</p>
                   {admin.phone && <p className="admin-card-detail"> {admin.phone}</p>}
-                  <p className="admin-card-detail">Area: {(admin.adminAreas?.[0]?.city || admin.adminAreas?.[0]?.region || admin.adminAreas?.[0]?.zone || admin.adminAreas?.[0]?.wereda || admin.adminAreas?.[0]?.subCity || 'Unassigned')}</p>
+                  <p className="admin-card-detail">Area: {admin.assignedArea || getAdminAreaValue(admin.adminAreas) || 'Unassigned'}</p>
+                  <p className="admin-card-detail">{t('Status')}: {admin.isActive === false ? t('Inactive') : t('Active')}</p>
+                  {resetAdminId === admin._id && (
+                    <div className="admin-password-field">
+                      <label htmlFor={`reset-admin-password-${admin._id}`}>{t('Temporary password')}</label>
+                      <input
+                        id={`reset-admin-password-${admin._id}`}
+                        type={showResetPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        minLength={8}
+                        value={resetTemporaryPassword}
+                        onChange={(event) => setResetTemporaryPassword(event.target.value)}
+                        className="admin-card-detail"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="admin-password-toggle"
+                        aria-label={showResetPassword ? t('Hide password') : t('Show password')}
+                        title={showResetPassword ? t('Hide password') : t('Show password')}
+                        onClick={() => setShowResetPassword((current) => !current)}
+                      >
+                        {showResetPassword ? <FaEyeSlash aria-hidden="true" /> : <FaEye aria-hidden="true" />}
+                      </button>
+                      <div className="admin-card-actions">
+                        <button type="button" className="admin-btn" onClick={() => {
+                          setResetAdminId(null);
+                          setResetTemporaryPassword('');
+                          setShowResetPassword(false);
+                        }}>{t('Cancel')}</button>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-primary"
+                          disabled={resetTemporaryPassword.length < 8 || adminActionLoading === admin._id}
+                          onClick={() => handleResetAdminPassword(admin)}
+                        >
+                          {adminActionLoading === admin._id ? t('Saving...') : t('Reset password')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="admin-card-actions">
+                    <button
+                      type="button"
+                      onClick={() => handleSetAdminActive(admin, admin.isActive === false)}
+                      disabled={adminActionLoading === admin._id}
+                      className="admin-btn"
+                    >{admin.isActive === false ? t('Activate') : t('Deactivate')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDemotionAdmin(admin);
+                        setDemotionRole('');
+                      }}
+                      disabled={adminActionLoading === admin._id}
+                      className="admin-btn"
+                    >{t('Demote')}
+                    </button>
+                    {resetAdminId !== admin._id && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResetAdminId(admin._id);
+                          setResetTemporaryPassword('');
+                          setShowResetPassword(false);
+                          setAdminFormError('');
+                          setAdminFormMessage('');
+                        }}
+                        className="admin-btn"
+                      >{t('Reset password')}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() =>handleEditAdmin(admin)}
@@ -571,6 +836,24 @@ const AdminSectionPage = ({ type }) => {
             <p className="admin-card-detail">Request: {selectedRentalRequest.message || 'No message provided'}</p>
             <p className="admin-card-detail">Requested: {selectedRentalRequest.createdAt ? new Date(selectedRentalRequest.createdAt).toLocaleString() : 'Date unavailable'}</p>
             <p className="admin-card-detail">Status: {selectedRentalRequest.status || 'pending'}</p>
+            <section className="admin-history-section" aria-labelledby="rental-request-history-title">
+              <h3 id="rental-request-history-title" className="admin-card-title">{t('History')}</h3>
+              {selectedRentalRequest.history?.length ? (
+                <ol className="admin-history-timeline">
+                  {[...selectedRentalRequest.history].sort((left, right) => new Date(right.at) - new Date(left.at)).map((entry, index) => (
+                    <li key={`${entry.byId || entry.byName}-${entry.at}-${index}`} className="admin-history-entry">
+                      <strong>{t(entry.action === 'verified' ? 'Verified' : entry.action === 'returned' ? 'Returned' : 'Rejected')}</strong>
+                      <span>
+                        {t('Handled by')}: {entry.byName || t('Unknown')}
+                        {entry.isFormerAdmin ? ` ${t('(former admin)')}` : ''}
+                      </span>
+                      <span>{entry.at ? new Date(entry.at).toLocaleString() : t('Date unavailable')}</span>
+                      {entry.note && <span>{t('Note')}: {entry.note}</span>}
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className="admin-card-detail">{t('No history recorded yet.')}</p>}
+            </section>
             <PropertyOwnershipProof
               propertyId={selectedRentalRequest.property?._id}
               hasProof={selectedRentalRequest.property?.hasVerificationDocument}
@@ -625,14 +908,21 @@ const AdminSectionPage = ({ type }) => {
                 {items.map((user) => {
                   const canDeleteUser = isPlatformAdmin
                     && String(user._id) !== String(currentUser?._id || currentUser?.id);
+                  const isAdminAccount = ['admin', 'area_admin', 'platform_admin'].includes(user.role);
+                  let displayRole = user.role;
+                  if (user.role === 'admin') {
+                    displayRole = user.adminType === 'area' || (!user.adminType && user.adminAreas?.length > 0)
+                      ? 'area_admin'
+                      : 'platform_admin';
+                  }
 
                   return (
                     <div key={user._id} className="admin-card admin-user-list-card">
                       <h4 className="admin-card-title">{user.name}</h4>
                       <p className="admin-card-detail">{user.email}</p>
-                      <p className="admin-card-detail">Role: {user.role}</p>
+                      <p className="admin-card-detail">Role: {displayRole}</p>
                       <p className="admin-card-detail">{user.phone || 'No phone provided'}</p>
-                      {user.role === 'admin' && (
+                      {isAdminAccount && (
                         <p className="admin-card-detail">
                           {user.adminType || 'platform'}
                           {user.adminAreas?.length
@@ -642,6 +932,19 @@ const AdminSectionPage = ({ type }) => {
                       )}
                       {canDeleteUser && (
                         <div className="admin-card-actions">
+                          {['tenant', 'landlord'].includes(user.role) && (
+                            <button
+                              type="button"
+                              className="admin-btn"
+                              onClick={() => {
+                                setPromotionUser(user);
+                                setPromotionArea('');
+                              }}
+                              disabled={adminActionLoading === user._id}
+                            >
+                              {t('Promote to Area Admin')}
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="admin-btn admin-user-delete-btn"
@@ -678,6 +981,22 @@ const AdminSectionPage = ({ type }) => {
                   <p className="admin-card-detail">Submitted: {property.createdAt ? new Date(property.createdAt).toLocaleDateString() : 'Date unavailable'}</p>
                   <p className="admin-card-detail">Status: {displayVerificationStatus(property)}
                   </p>
+                  {['verified', 'rejected', 'returned'].includes(property.decision) && (
+                    property.handledByName && property.handledByName !== 'Unknown (before history tracking)'
+                      ? (
+                        <p className="admin-card-detail">
+                          {t(`${property.decision === 'verified' ? 'Verified' : property.decision === 'rejected' ? 'Rejected' : 'Returned'} by {name} on {date}`, {
+                            name: property.handledByName,
+                            date: property.handledAt ? formatDate(property.handledAt, { dateStyle: 'medium' }) : t('Date unavailable'),
+                          })}
+                          {property.handledByIsFormerAdmin ? ` ${t('(former admin)')}` : ''}
+                        </p>
+                      )
+                      : <p className="admin-card-detail">{t('Handled before history tracking')}</p>
+                  )}
+                  {!property.decision && ['approved', 'rejected'].includes(property.verificationStatus) && (
+                    <p className="admin-card-detail">{t('Handled before history tracking')}</p>
+                  )}
                   <PropertyOwnershipProof
                     propertyId={property._id}
                     hasProof={property.hasVerificationDocument}
@@ -721,6 +1040,124 @@ const AdminSectionPage = ({ type }) => {
             </div>
           )}
         </section>
+      )}
+
+      {demotionAdmin && (
+        <div className="admin-request-modal-overlay" role="presentation">
+          <section
+            className="admin-request-modal admin-role-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="area-admin-demotion-title"
+          >
+            <h2 id="area-admin-demotion-title" className="admin-card-title">
+              {t('Change Area Admin role')}
+            </h2>
+            <p className="admin-card-detail">{getAreaHandoverConfirmation(demotionAdmin)}</p>
+            <fieldset className="admin-role-options">
+              <legend>{t('Choose what happens to {name}.').replace('{name}', demotionAdmin.name)}</legend>
+              {[
+                ['landlord', t('Landlord')],
+                ['tenant', t('Tenant')],
+                ['deactivate', t('Deactivate only (no role)')],
+              ].map(([value, label]) => (
+                <label key={value} className="admin-role-option">
+                  <input
+                    type="radio"
+                    name="area-admin-demotion-role"
+                    value={value}
+                    required
+                    checked={demotionRole === value}
+                    onChange={() => setDemotionRole(value)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+            <div className="admin-card-actions">
+              <button
+                type="button"
+                className="admin-btn"
+                onClick={() => {
+                  setDemotionAdmin(null);
+                  setDemotionRole('');
+                }}
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn-primary"
+                disabled={!demotionRole || adminActionLoading === demotionAdmin._id}
+                onClick={handleDemoteAdmin}
+              >
+                {adminActionLoading === demotionAdmin._id ? t('Saving...') : t('Confirm role change')}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {promotionUser && (
+        <div className="admin-request-modal-overlay" role="presentation">
+          <section
+            className="admin-request-modal admin-role-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="area-admin-promotion-title"
+          >
+            <h2 id="area-admin-promotion-title" className="admin-card-title">
+              {t('Promote to Area Admin')}
+            </h2>
+            <p className="admin-card-detail">
+              {t('Select an area for {name}.').replace('{name}', promotionUser.name)}
+            </p>
+            <label className="admin-role-area-label" htmlFor="promote-admin-area">
+              {t('Assigned area')}
+            </label>
+            <select
+              id="promote-admin-area"
+              value={promotionArea}
+              onChange={(event) => setPromotionArea(event.target.value)}
+              required
+              className="admin-card-detail"
+            >
+              <option value="" disabled>{t('Select an assigned area')}</option>
+              {areas.map((area) => {
+                const areaAdmin = getAreaAdminFor(area.name);
+                return (
+                  <option key={area._id} value={area.name} disabled={Boolean(areaAdmin)}>
+                    {area.name}{areaAdmin ? ` ${t('(taken by {name})', { name: areaAdmin.name })}` : ''}
+                  </option>
+                );
+              })}
+            </select>
+            {areaError && <p className="admin-empty-text" role="alert">{areaError}</p>}
+            {areas.length === 0 && !areaError && (
+              <p className="admin-empty-text">{t('No places registered yet')}</p>
+            )}
+            <div className="admin-card-actions">
+              <button
+                type="button"
+                className="admin-btn"
+                onClick={() => {
+                  setPromotionUser(null);
+                  setPromotionArea('');
+                }}
+              >
+                {t('Cancel')}
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn-primary"
+                disabled={!promotionArea || adminActionLoading === promotionUser._id}
+                onClick={handlePromoteUser}
+              >
+                {adminActionLoading === promotionUser._id ? t('Saving...') : t('Confirm promotion')}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

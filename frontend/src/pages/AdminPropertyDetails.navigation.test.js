@@ -15,6 +15,13 @@ jest.mock('../context/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../context/LanguageContext', () => ({
+  useLanguage: () => ({
+    t: (text) => text,
+    formatDate: (date) => new Date(date).toISOString(),
+  }),
+}));
+
 const areaAdmin = { _id: 'area-admin-id', role: 'admin', adminType: 'area' };
 const property = {
   _id: 'property-id',
@@ -60,7 +67,11 @@ test.each([
     const originatingUrl = `${route}?search=central&page=2&status=available`;
     const originatingState = { selectedFilter: 'approved-only' };
     render(
-      <MemoryRouter initialEntries={[{ pathname: originatingUrl, state: originatingState }]}>
+      <MemoryRouter initialEntries={[{
+        pathname: route,
+        search: '?search=central&page=2&status=available',
+        state: originatingState,
+      }]}>
         <Routes>
           <Route path={route} element={<AdminSectionPage type={type} />} />
           <Route path="/property/:id" element={<PropertyDetail />} />
@@ -78,6 +89,40 @@ test.each([
     }));
   },
 );
+
+test('Area Admin property details displays handling history with the original name and former-admin label', async () => {
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/api/properties/property-id/history')) {
+      return Promise.resolve({
+        data: [{
+          action: 'verified',
+          byId: 'former-admin-id',
+          byName: 'Admin A',
+          isFormerAdmin: true,
+          at: '2026-01-02T10:00:00.000Z',
+          note: 'Documents checked',
+        }],
+      });
+    }
+    if (url.endsWith('/api/properties/property-id')) {
+      return Promise.resolve({ data: { ...property, verificationStatus: 'approved', isVerified: true } });
+    }
+    return Promise.resolve({ data: [] });
+  });
+
+  render(
+    <MemoryRouter initialEntries={['/property/property-id']}>
+      <Routes>
+        <Route path="/property/:id" element={<PropertyDetail />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole('heading', { name: 'History' })).toBeInTheDocument();
+  expect(await screen.findByText(/Admin A/)).toBeInTheDocument();
+  expect(screen.getByText(/Admin A \(former admin\)/)).toBeInTheDocument();
+  expect(screen.getByText(/Documents checked/)).toBeInTheDocument();
+});
 
 test.each([
   ['pending', false, '/admin-dashboard/pending'],

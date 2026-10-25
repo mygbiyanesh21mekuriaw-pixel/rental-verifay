@@ -117,6 +117,9 @@ export const getDashboardMenuGroups = (user, t) => {
       group('Rentals', [
         item('Rental Requests', '/admin-dashboard/rental-requests', FaClipboardList),
       ]),
+      group('Management', [
+        item('Messages', '/admin-dashboard/messages', FaEnvelope),
+      ]),
       group('Account', [
         item('Account Settings', '/admin-dashboard/profile', FaUser),
       ]),

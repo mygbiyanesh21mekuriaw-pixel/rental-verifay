@@ -553,3 +553,23 @@ test('clears the session and redirects to login when logout is clicked', async (
     '/login'
   );
 });
+
+test('blocks a first-login Area Admin from the dashboard until the password is changed', async () => {
+  const areaAdmin = {
+    _id: 'area-admin-id',
+    name: 'Area Admin',
+    role: 'admin',
+    adminType: 'area',
+    mustChangePassword: true,
+  };
+  window.history.pushState({}, '', '/admin-dashboard');
+  localStorage.setItem('token', 'area-admin-token');
+  localStorage.setItem('user', JSON.stringify(areaAdmin));
+  axios.get.mockResolvedValue({ data: { user: areaAdmin } });
+
+  renderApp();
+
+  expect(await screen.findByRole('heading', { name: 'Change Password' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/change-password');
+  expect(screen.queryByText('Admin Dashboard')).not.toBeInTheDocument();
+});

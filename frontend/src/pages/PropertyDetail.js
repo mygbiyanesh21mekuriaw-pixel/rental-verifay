@@ -7,6 +7,7 @@ import { getFavoriteIds, toggleFavorite as toggleFavoriteStorage } from '../util
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
 import { getPropertyImages } from '../utils/propertyMedia';
+import { useLanguage } from '../context/LanguageContext';
 
 const PropertyDetail = () => {
   const { id } = useParams();
@@ -15,6 +16,7 @@ const PropertyDetail = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t, formatDate } = useLanguage();
   const adminPropertyListRoutes = [
     '/admin-dashboard/pending',
     '/admin-dashboard/verified',
@@ -29,6 +31,9 @@ const PropertyDetail = () => {
   const isAreaAdmin = user?.role === 'admin' && user?.adminType === 'area';
   const backButtonLabel = isAreaAdmin ? '← Back to Previous' : 'Back to search';
   const [property, setProperty] = useState(null);
+  const [handlingHistory, setHandlingHistory] = useState([]);
+  const [handlingHistoryLoading, setHandlingHistoryLoading] = useState(false);
+  const [handlingHistoryError, setHandlingHistoryError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -79,6 +84,8 @@ const PropertyDetail = () => {
   const fetchProperty = useCallback(async () => {
     setLoading(true);
     setError('');
+    setHandlingHistory([]);
+    setHandlingHistoryError('');
     try {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -89,6 +96,22 @@ const PropertyDetail = () => {
       );
       setProperty(res.data);
       setRentalRequest(null);
+
+      if (isAreaAdmin) {
+        setHandlingHistoryLoading(true);
+        try {
+          const historyResponse = await axios.get(
+            `${process.env.REACT_APP_API_URL}/api/properties/${id}/history`,
+            { headers },
+          );
+          setHandlingHistory(Array.isArray(historyResponse.data) ? historyResponse.data : []);
+        } catch (historyError) {
+          console.error('Unable to load property handling history:', historyError);
+          setHandlingHistoryError('Unable to load history.');
+        } finally {
+          setHandlingHistoryLoading(false);
+        }
+      }
 
       if (requestId && user?.role === 'tenant') {
         const requestResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/rent-requests/my-requests/${requestId}`, { headers });
@@ -124,7 +147,7 @@ const PropertyDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, location.state, requestId, user?.role]);
+  }, [id, isAreaAdmin, location.state, requestId, user?.role]);
 
   // =====    =====
   const checkIfFavorite = useCallback(async () => {
@@ -361,6 +384,43 @@ const PropertyDetail = () => {
           
           <h3 className="property-section-title">Description</h3>
           <p className="property-description">{property?.description}</p>
+
+          {isAreaAdmin && (
+            <>
+              <div className="property-divider"></div>
+              <section className="property-handling-history" aria-labelledby="property-history-title">
+                <h3 id="property-history-title" className="property-section-title">{t('History')}</h3>
+                {handlingHistoryLoading ? (
+                  <p>{t('Loading history...')}</p>
+                ) : handlingHistoryError ? (
+                  <p role="alert">{t(handlingHistoryError)}</p>
+                ) : handlingHistory.length > 0 ? (
+                  <ol className="property-history-timeline">
+                    {handlingHistory.map((entry, index) => {
+                      const isUnknownHandler = !entry.byName
+                        || entry.byName === 'Unknown (before history tracking)';
+                      const actionLabel = entry.action === 'verified'
+                        ? 'Verified'
+                        : entry.action === 'returned' ? 'Returned' : 'Rejected';
+                      return (
+                        <li key={`${entry.byId || entry.byName}-${entry.at}-${index}`} className="property-history-entry">
+                          <strong>{t(actionLabel)}</strong>
+                          <span>
+                            {t('Handled by')}: {isUnknownHandler ? t('Handled before history tracking') : entry.byName}
+                            {!isUnknownHandler && entry.isFormerAdmin ? ` ${t('(former admin)')}` : ''}
+                          </span>
+                          <time dateTime={entry.at}>{entry.at ? formatDate(entry.at, { dateStyle: 'medium', timeStyle: 'short' }) : t('Date unavailable')}</time>
+                          {entry.note && <span>{t('Note')}: {entry.note}</span>}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                ) : (
+                  <p>{t('No history recorded yet.')}</p>
+                )}
+              </section>
+            </>
+          )}
 
           <div className="property-divider"></div>
 

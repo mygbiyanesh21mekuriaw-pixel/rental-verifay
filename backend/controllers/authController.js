@@ -44,6 +44,7 @@ const serializeUser = (user) => {
     phone: user.phone || '',
     profilePhoto: user.profilePhoto || '',
     role: user.role,
+    mustChangePassword: user.mustChangePassword === true,
     area: user.area || '',
     adminType: user.role === 'admin'
       ? user.adminType || (user.adminAreas?.length ? 'area' : 'platform')
@@ -234,6 +235,7 @@ const login = async (req, res) => {
     res.json({
       message: 'Login successful',
       token,
+      mustChangePassword: user.mustChangePassword === true,
       user: serializeUser(user),
     });
   } catch (error) {
@@ -410,6 +412,32 @@ const changePassword = async (req, res) => {
   }
 };
 
+const changePasswordOnFirstLogin = async (req, res) => {
+  try {
+    const newPassword = req.body?.newPassword;
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 1024) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters.' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    if (user.mustChangePassword !== true) {
+      return res.status(409).json({ message: 'A first-login password change is not required.' });
+    }
+    if (await bcrypt.compare(newPassword, user.password)) {
+      return res.status(400).json({ message: 'New password must be different from the temporary password.' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.mustChangePassword = false;
+    await user.save();
+
+    return res.json({ message: 'Password changed successfully.', mustChangePassword: false });
+  } catch (error) {
+    return res.status(500).json({ message: 'Unable to change password.' });
+  }
+};
+
 const requestPasswordReset = async (req, res) => {
   const responseMessage = 'If an account exists for that email, password reset instructions will be sent.';
 
@@ -537,4 +565,4 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { register, login, getMe, updateProfile, updateProfilePhoto, changePassword, requestPasswordReset, resetPassword, logout, serializeUser };
+module.exports = { register, login, getMe, updateProfile, updateProfilePhoto, changePassword, changePasswordOnFirstLogin, requestPasswordReset, resetPassword, logout, serializeUser };

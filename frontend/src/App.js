@@ -22,6 +22,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import ChangePassword from './pages/ChangePassword';
 import Home from './pages/Home';
 import LandlordDashboard, { LandlordLayout } from './pages/LandlordDashboard';
 import LandlordSectionPage from './pages/LandlordSectionPage';
@@ -143,6 +144,7 @@ const dashboardPaths = {
 
 const PrivateRoute = ({ children, allowedRoles, allowedAdminTypes }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -155,6 +157,10 @@ const PrivateRoute = ({ children, allowedRoles, allowedAdminTypes }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (user.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
@@ -181,6 +187,7 @@ const PublicOnlyRoute = ({ children }) => {
   }
 
   if (user) {
+    if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
     return <Navigate to={dashboardPaths[user.role] || '/'} replace />;
   }
 
@@ -200,6 +207,7 @@ const AuthenticatedPublicRoute = ({ children }) => {
   }
 
   if (user) {
+    if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
     return <Navigate to={dashboardPaths[user.role] || '/'} replace />;
   }
 
@@ -219,6 +227,7 @@ const PublicAliasRoute = ({ target }) => {
   }
 
   if (user) {
+    if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
     return <Navigate to={dashboardPaths[user.role] || '/'} replace />;
   }
 
@@ -329,11 +338,12 @@ function AppContent() {
         <ApplySystemPreferences />
         <DashboardRouteShell maintenanceActive={maintenanceActive}>
           {maintenanceActive ? (
-            user ? (
+            user && !user.mustChangePassword ? (
               <MaintenancePage message={status.maintenance.message} onLogout={logout} />
             ) : (
               <Routes>
                 <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+                <Route path="/change-password" element={<PrivateRoute><ChangePassword /></PrivateRoute>} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="*" element={<MaintenancePage message={status.maintenance.message} />} />
@@ -355,6 +365,7 @@ function AppContent() {
             <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/change-password" element={<PrivateRoute><ChangePassword /></PrivateRoute>} />
 
             <Route 
               path="/landlord/add-property" 

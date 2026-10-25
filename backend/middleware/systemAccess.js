@@ -25,7 +25,10 @@ const getPlatformAdminFromRequest = async (req) => {
 
 const maintenanceMode = async (req, res, next) => {
   if (req.method === 'OPTIONS') return next();
-  if (/^\/api\/auth\/(login|forgot-password|reset-password)$/.test(req.path)) return next();
+  if (/^\/api\/auth\/(login|forgot-password|reset-password|logout)$/.test(req.path)) return next();
+  if (req.path === '/api/auth/me') return next();
+  if (req.path === '/api/logout') return next();
+  if (req.path === '/api/change-password') return next();
   if (req.path === '/api/chapa/transfer-approval') return next();
   if (req.path === '/api/admin/system-settings' || req.path === '/api/admin/system-settings/logo') return next();
 
