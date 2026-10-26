@@ -8,7 +8,7 @@ const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
 const fs = require('fs');
 const path = require('path');
-const { createSystemLog } = require('./systemLogController');
+const { logAudit } = require('../utils/auditLogger');
 const {
   hasCloudinaryCredentials,
   assertUploadConfiguration,
@@ -296,14 +296,10 @@ const createProperty = async (req, res) => {
 
     await property.save();
 
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
-      action: 'PROPERTY_CREATED',
-      description: `Landlord created property "${property.title}" and submitted it for verification.`,
-      property: property._id,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, action: 'PROPERTY_CREATED', module: 'properties',
+      targetType: 'property', targetId: property._id, targetLabel: property.title,
+      description: `Landlord ${req.user.name} added house "${property.title}".`,
     });
 
     // የማረጋገጫ ጥያቄ ይፍጠሩ
@@ -345,6 +341,16 @@ const createProperty = async (req, res) => {
 
 // ሁሉንም ንብረቶች ማግኘት (የተረጋገጡትን ብቻ ለTenant)
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const filterLandlordPropertiesByPermissions = (properties, permissions = {}) => properties.filter((property) => {
+  if (property.availabilityStatus === 'rented') return permissions.rentedProperties === true;
+  const featureKey = property.verificationStatus === 'approved'
+    ? 'verifiedProperties'
+    : property.verificationStatus === 'rejected'
+      ? 'rejectedProperties'
+      : 'underReview';
+  return permissions[featureKey] === true;
+});
 
 const getAllProperties = async (req, res) => {
   try {
@@ -573,7 +579,10 @@ const getAllProperties = async (req, res) => {
       });
     }
 
-    const responseProperties = properties.map((property) => propertyResponse(property, req.user));
+    const visibleProperties = req.user?.role === 'landlord'
+      ? filterLandlordPropertiesByPermissions(properties, req.user.permissions)
+      : properties;
+    const responseProperties = visibleProperties.map((property) => propertyResponse(property, req.user));
 
     res.json(responseProperties);
   } catch (error) {
@@ -737,6 +746,13 @@ const updateProperty = async (req, res) => {
     const address = normalizeAddress(req.body);
     const areaName = await resolvePropertyArea(address);
     const previousArea = property.area;
+    const previousValues = {
+      title: property.title,
+      description: property.description,
+      price: property.price,
+      bedrooms: property.bedrooms,
+      area: property.area,
+    };
 
     property.title = title || property.title;
     property.description = description || property.description;
@@ -782,25 +798,29 @@ const updateProperty = async (req, res) => {
 
     await property.save();
 
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
-      action: 'PROPERTY_UPDATED',
-      description: `Property "${property.title}" was updated and sent back for re-verification.`,
-      property: property._id,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, action: 'PROPERTY_UPDATED', module: 'properties',
+      targetType: 'property', targetId: property._id, targetLabel: property.title,
+      details: Object.fromEntries(
+        Object.entries({
+          title: property.title,
+          description: property.description,
+          price: property.price,
+          bedrooms: property.bedrooms,
+          area: property.area,
+        })
+          .filter(([field, value]) => previousValues[field] !== value)
+          .map(([field, value]) => [field, { from: previousValues[field], to: value }]),
+      ),
+      description: `${req.user.name} updated property "${property.title}" and submitted it for re-verification.`,
     });
 
     if (previousArea !== areaName) {
-      await createSystemLog({
-        user: req.user.id,
-        role: req.user.role,
-        action: 'PROPERTY_AREA_CHANGED',
+      await logAudit({
+        req, action: 'PROPERTY_AREA_CHANGED', module: 'properties',
+        targetType: 'property', targetId: property._id, targetLabel: property.title,
+        details: { area: { from: previousArea || UNASSIGNED_AREA, to: areaName } },
         description: `Property "${property.title}" area changed from "${previousArea || UNASSIGNED_AREA}" to "${areaName}" after an address update.`,
-        property: property._id,
-        status: 'success',
-        ipAddress: req.ip || '',
       });
     }
 
@@ -848,14 +868,10 @@ const deleteProperty = async (req, res) => {
     const propertyTitle = property.title;
     await property.deleteOne();
 
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
-      action: 'PROPERTY_DELETED',
-      description: `Property "${propertyTitle}" was deleted.`,
-      property: property._id,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, action: 'PROPERTY_DELETED', module: 'properties',
+      targetType: 'property', targetId: property._id, targetLabel: propertyTitle,
+      description: `${req.user.name} deleted property "${propertyTitle}".`,
     });
 
     res.json({ message: 'Property deleted successfully' });
@@ -867,6 +883,7 @@ const deleteProperty = async (req, res) => {
 module.exports = {
   createProperty,
   getAllProperties,
+  filterLandlordPropertiesByPermissions,
   getPropertyById,
   getOwnershipProof,
   getPropertyHistory,

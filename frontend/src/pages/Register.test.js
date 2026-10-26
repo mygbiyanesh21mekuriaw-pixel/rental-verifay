@@ -104,6 +104,8 @@ test.each(['landlord', 'tenant'])('registers a %s without an area field', async 
       role,
     },
   ));
+  expect(await screen.findByRole('status')).toHaveTextContent('Your account is waiting for Platform Admin approval.');
+  expect(localStorage.getItem('token')).toBeNull();
   expect(axios.get).not.toHaveBeenCalledWith(expect.stringContaining('/api/public/areas'));
 });
 

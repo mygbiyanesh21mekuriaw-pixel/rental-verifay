@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const RentRequest = require('../models/RentalRequest');
 const Review = require('../models/Review');
+const { logAudit } = require('../utils/auditLogger');
 
 const isCurrentTenant = async (propertyId, tenantId) => {
   const property = await Property.findOne({
@@ -97,6 +98,12 @@ const createReview = async (req, res) => {
     });
 
     const populatedReview = await Review.findById(review._id).populate('tenant', 'name').lean();
+    await logAudit({
+      req, action: 'REVIEW_CREATED', module: 'reviews',
+      targetType: 'review', targetId: review._id, targetLabel: property.title,
+      details: { rating: numericRating },
+      description: `Tenant ${req.user.name} reviewed "${property.title}".`,
+    });
     res.status(201).json({ message: 'Review submitted successfully.', review: populatedReview });
   } catch (error) {
     if (error.code === 11000) {

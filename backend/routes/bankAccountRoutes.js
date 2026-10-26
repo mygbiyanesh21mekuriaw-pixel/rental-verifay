@@ -1,5 +1,5 @@
 const express = require('express');
-const { auth } = require('../middleware/auth');
+const { auth, requirePermission } = require('../middleware/auth');
 const {
   getDemoBanks,
   createDemoAccount,
@@ -15,15 +15,15 @@ const {
 
 const router = express.Router();
 
-router.get('/banks', auth, getSupportedBanks);
-router.post('/', auth, createLandlordBankAccount);
-router.get('/me', auth, getMyBankAccount);
-router.get('/my-account', auth, getMyBankAccount);
-router.get('/my-account/transactions', auth, getMyBankTransactions);
-router.post('/my-account/transactions/:reference/verify', auth, retryMyPayoutVerification);
-router.get('/demo/banks', auth, getDemoBanks);
-router.post('/demo', auth, createDemoAccount);
-router.get('/demo/my-account', auth, getMyDemoAccount);
-router.get('/my-account/balance', auth, getMyDemoBalance);
+router.get('/banks', auth, requirePermission('bankInformation'), getSupportedBanks);
+router.post('/', auth, requirePermission('bankInformation'), createLandlordBankAccount);
+router.get('/me', auth, requirePermission('bankInformation'), getMyBankAccount);
+router.get('/my-account', auth, requirePermission('bankInformation'), getMyBankAccount);
+router.get('/my-account/transactions', auth, requirePermission('bankInformation'), getMyBankTransactions);
+router.post('/my-account/transactions/:reference/verify', auth, requirePermission('bankInformation'), retryMyPayoutVerification);
+router.get('/demo/banks', auth, requirePermission('bankInformation'), getDemoBanks);
+router.post('/demo', auth, requirePermission('bankInformation'), createDemoAccount);
+router.get('/demo/my-account', auth, requirePermission('bankInformation'), getMyDemoAccount);
+router.get('/my-account/balance', auth, requirePermission('bankInformation'), getMyDemoBalance);
 
 module.exports = router;

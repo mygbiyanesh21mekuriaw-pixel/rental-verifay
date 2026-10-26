@@ -27,6 +27,7 @@ const defaults = {
     enabled: false,
     message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
   },
+  auditRetention: { enabled: false, months: 12 },
 };
 
 test.beforeEach(() => {
@@ -129,6 +130,7 @@ test('the main Express app GET endpoint creates and returns defaults when no rec
         enabled: false,
         message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
       },
+      auditRetention: { enabled: false, months: 12 },
     });
     assert.equal(createCalls, 1);
   } finally {
@@ -152,6 +154,7 @@ test('the main Express app PUT endpoint persists settings and GET returns saved 
     },
     properties: { submissionsEnabled: false, requireAdminReview: false },
     maintenance: { enabled: false, message: defaults.maintenance.message },
+    auditRetention: { enabled: false, months: 12 },
   };
   SystemSettings.findOne = () => ({
     select() { return this; },

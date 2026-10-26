@@ -6,6 +6,8 @@ const dashboardPaths = {
   tenant: '/tenant-dashboard',
   landlord: '/landlord-dashboard',
   admin: '/admin-dashboard',
+  area_admin: '/admin-dashboard',
+  platform_admin: '/admin-dashboard',
 };
 
 const normalizeLoginEmail = (email) => {
@@ -111,9 +113,10 @@ const Login = () => {
   // REDIRECT IF ALREADY LOGGED IN
   // ==========================================
   useEffect(() => {
-    if (user?.role) {
+    const userRole = user?.effectiveRole || user?.role;
+    if (userRole) {
       navigate(
-        user.mustChangePassword ? '/change-password' : dashboardPaths[user.role] || '/',
+        user.mustChangePassword ? '/change-password' : dashboardPaths[userRole] || '/',
         {
           replace: true,
         }
@@ -159,7 +162,7 @@ const Login = () => {
       // SUCCESS
       // ========================================
       if (result?.success) {
-        const role = result.user?.role;
+        const role = result.user?.effectiveRole || result.user?.role;
 
         navigate(
           result.user?.mustChangePassword ? '/change-password' : dashboardPaths[role] || '/',

@@ -118,6 +118,33 @@ test('auth rejects a deactivated Area Admin even when their JWT is still valid',
   }
 });
 
+test('auth rejects existing tokens for pending and suspended accounts', async () => {
+  const originalFindById = User.findById;
+  try {
+    for (const [status, message] of [
+      ['pending', 'Your account is waiting for Platform Admin approval.'],
+      ['suspended', 'Your account is suspended.'],
+    ]) {
+      const account = {
+        _id: '507f1f77bcf86cd799439019',
+        role: 'tenant',
+        status,
+      };
+      User.findById = () => createUserQuery(account);
+      const token = jwt.sign({ id: account._id, role: 'tenant' }, process.env.JWT_SECRET);
+      const response = createResponse();
+      let nextCalled = false;
+
+      await auth(makeRequest(token), response, () => { nextCalled = true; });
+      assert.equal(response.statusCode, 403);
+      assert.deepEqual(response.body, { message });
+      assert.equal(nextCalled, false);
+    }
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
 test('auth rejects a previously issued landlord token after the database account is deactivated', async () => {
   const originalFindById = User.findById;
   const inactiveLandlord = {
@@ -167,6 +194,25 @@ test('auth uses the current database role instead of a stale elevated JWT role',
       area: '',
       mustChangePassword: false,
       isActive: true,
+      status: 'active',
+      name: undefined,
+      email: undefined,
+      sessionId: '',
+      permissions: {
+        dashboard: true,
+        verifiedProperties: true,
+        favorites: true,
+        rentalRequests: true,
+        rentedProperty: true,
+        rentPayments: true,
+        searchProperties: true,
+        recentlyViewed: true,
+        messages: true,
+        reviews: true,
+        notifications: true,
+        accountSettings: true,
+        changePassword: true,
+      },
     });
 
     const adminResponse = createResponse();

@@ -1,47 +1,32 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const router = require('./contactRoutes');
+const { platformAdminOnly } = require('../middleware/auth');
 
 const getRoute = (method, path) => router.stack
   .map((layer) => layer.route)
   .find((route) => route?.path === path && route.methods[method]);
 
-test('Area Admin contact inbox paths and legacy aliases use the same Area Admin-only handlers', () => {
-  const routePairs = [
-    ['get', '/area-admin/inbox', '/platform-admin/inbox'],
-    ['put', '/area-admin/inbox/:id/read', '/platform-admin/inbox/:id/read'],
-  ];
+test('Area Admin and Platform Admin contact inbox routes use their matching role guards', () => {
+  const areaRoute = getRoute('get', '/area-admin/inbox');
+  const platformRoute = getRoute('get', '/platform-admin/inbox');
+  assert.ok(areaRoute);
+  assert.ok(platformRoute);
 
-  routePairs.forEach(([method, currentPath, legacyPath]) => {
-    const currentRoute = getRoute(method, currentPath);
-    const legacyRoute = getRoute(method, legacyPath);
-    assert.ok(currentRoute);
-    assert.ok(legacyRoute);
-    assert.deepEqual(
-      currentRoute.stack.map((layer) => layer.handle),
-      legacyRoute.stack.map((layer) => layer.handle),
-    );
+  let areaNextCalled = false;
+  areaRoute.stack[1].handle(
+    { user: { role: 'admin', adminType: 'area' } },
+    { status: () => ({ json: () => {} }) },
+    () => { areaNextCalled = true; },
+  );
+  assert.equal(areaNextCalled, true);
 
-    const requireAreaAdmin = currentRoute.stack[1].handle;
-    let areaAdminNextCalled = false;
-    requireAreaAdmin(
-      { user: { role: 'admin', adminType: 'area' } },
-      { status: () => ({ json: () => {} }) },
-      () => { areaAdminNextCalled = true; },
-    );
-    assert.equal(areaAdminNextCalled, true);
-
-    let platformAdminStatus;
-    requireAreaAdmin(
-      { user: { role: 'admin', adminType: 'platform' } },
-      {
-        status(status) {
-          platformAdminStatus = status;
-          return { json: () => {} };
-        },
-      },
-      () => assert.fail('Platform Admin must not reach the inbox handler'),
-    );
-    assert.equal(platformAdminStatus, 403);
-  });
+  assert.equal(platformRoute.stack[1].handle, platformAdminOnly);
+  let platformNextCalled = false;
+  platformRoute.stack[1].handle(
+    { user: { role: 'admin', adminType: 'platform' } },
+    { status: () => ({ json: () => {} }) },
+    () => { platformNextCalled = true; },
+  );
+  assert.equal(platformNextCalled, true);
 });

@@ -102,8 +102,10 @@ test.each([
 );
 
 test('shows and hides the create-admin password and resets it after submission', async () => {
+  axios.post.mockResolvedValueOnce({ data: { message: 'Admin account created.', user: { _id: 'created-area-admin' } } });
   render(
     <MemoryRouter>
+      <CurrentPath />
       <AdminSectionPage type="adminManagement" />
     </MemoryRouter>,
   );
@@ -130,26 +132,20 @@ test('shows and hides the create-admin password and resets it after submission',
 
   await waitFor(() => expect(axios.post).toHaveBeenCalled());
   expect(axios.post).toHaveBeenCalledWith(
-    `${process.env.REACT_APP_API_URL}/api/admin/users/admin`,
+    `${process.env.REACT_APP_API_URL}/api/admin/area-admins`,
     {
       fullName: 'Area Admin',
       email: 'area@example.com',
       phone: '',
       area: 'North',
       username: 'area_admin',
-      password: 'AreaAdmin123',
+      tempPassword: 'AreaAdmin123',
     },
     { headers: { Authorization: 'Bearer platform-token' } },
   );
   expect(passwordInput).toHaveAttribute('minLength', '8');
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create Area Admin Account' })).not.toBeInTheDocument());
-  fireEvent.click(screen.getByRole('button', { name: '+ New Area Admin' }));
-  expect(await screen.findByLabelText('Temporary password')).toHaveValue('');
-  const successMessage = 'Admin created. Please give the temporary password to the admin directly. They must change it on first login.';
-  expect(screen.getByRole('status')).toHaveTextContent(successMessage);
-  expect(screen.getByRole('status').closest('.admin-success-banner')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Dismiss message' }));
-  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(screen.getByTestId('current-path')).toHaveTextContent('/admin-dashboard/users-permissions?userId=created-area-admin');
 });
 
 test('creates an Area Admin in a modal and refreshes the table on success', async () => {
@@ -169,11 +165,12 @@ test('creates an Area Admin in a modal and refreshes the table on success', asyn
   }));
   axios.post.mockImplementation(() => {
     created = true;
-    return Promise.resolve({ data: { message: 'Admin account created.' } });
+    return Promise.resolve({ data: { message: 'Admin account created.', user: { _id: 'created-admin' } } });
   });
 
   render(
     <MemoryRouter>
+      <CurrentPath />
       <AdminSectionPage type="adminManagement" />
     </MemoryRouter>,
   );
@@ -190,8 +187,8 @@ test('creates an Area Admin in a modal and refreshes the table on success', asyn
   fireEvent.change(screen.getByRole('combobox', { name: 'Select an assigned area' }), { target: { value: 'North' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create Admin' }));
 
-  expect(await screen.findByRole('row', { name: /New Area Admin.*new-area@example.com.*North/ })).toBeInTheDocument();
   expect(screen.queryByRole('dialog', { name: 'Create Area Admin Account' })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/admin-dashboard/users-permissions?userId=created-admin'));
 });
 
 test('Edit modal keeps footer actions visible, omits create help, and saves from the footer', async () => {

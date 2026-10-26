@@ -56,6 +56,8 @@ import LandlordReviews from './pages/LandlordReviews';
 import TenantRentalRequestDetail from './pages/TenantRentalRequestDetail';
 import AdminSystemLogs from './pages/AdminSystemLogs';
 import SystemSettings from './pages/SystemSettings';
+import UsersPermissionsPage from './pages/UsersPermissionsPage';
+import PermissionDeniedPage from './pages/PermissionDeniedPage';
 
 //  (Components)
 import Navbar from './components/Navbar';
@@ -84,11 +86,26 @@ const RouteMain = ({ children }) => {
   );
 };
 
+const getUserRole = (user) => user?.effectiveRole || user?.role;
+
+const isPlatformAdmin = (user) => (
+  getUserRole(user) === 'platform_admin' ||
+  user?.role === 'platform_admin' ||
+  (user?.role === 'admin' && (
+    user.adminType === 'platform' ||
+    (!user.adminType && (user.adminAreas || []).length === 0)
+  ))
+);
+
+const getRouteRole = (user) => (
+  ['platform_admin', 'area_admin'].includes(getUserRole(user)) ? 'admin' : getUserRole(user)
+);
+
 const DashboardRouteShell = ({ children, maintenanceActive }) => {
-  const { user } = useAuth();
+  const { user, permissionLoading, permissionError } = useAuth();
   const location = useLocation();
   const { t } = useLanguage();
-  const role = user?.role;
+  const role = getRouteRole(user);
   const isDashboardRoute = !maintenanceActive && (
     (role === 'landlord' && (location.pathname === '/landlord-dashboard' || location.pathname.startsWith('/landlord/'))) ||
     (role === 'tenant' && (location.pathname === '/tenant-dashboard' || location.pathname.startsWith('/tenant/'))) ||
@@ -106,7 +123,7 @@ const DashboardRouteShell = ({ children, maintenanceActive }) => {
   }
 
   const roleTitle = role === 'admin'
-    ? t(user.adminType === 'area' ? 'Area Admin' : 'Platform Admin')
+    ? t(getUserRole(user) === 'area_admin' || user.adminType === 'area' ? 'Area Admin' : 'Platform Admin')
     : t(role === 'landlord' ? 'Landlord' : 'Tenant');
 
   return (
@@ -115,6 +132,8 @@ const DashboardRouteShell = ({ children, maintenanceActive }) => {
       menuGroups={getDashboardMenuGroups(user, t)}
       user={user}
       title={roleTitle}
+      permissionLoading={permissionLoading}
+      permissionError={permissionError}
     >
       <ScrollToTop />
       <div className="w-full min-w-0">{children}</div>
@@ -140,10 +159,64 @@ const dashboardPaths = {
   tenant: '/tenant-dashboard',
   landlord: '/landlord-dashboard',
   admin: '/admin-dashboard',
+  area_admin: '/admin-dashboard',
+  platform_admin: '/admin-dashboard',
+};
+
+export const getRoutePermission = (user, pathname) => {
+  const resolvedRole = getRouteRole(user);
+  const rules = resolvedRole === 'admin' || resolvedRole === 'area_admin' || resolvedRole === 'platform_admin'
+    ? [
+      ['/admin-dashboard/pending', 'pendingProperties'],
+      ['/admin-dashboard/properties-awaiting-verification', 'pendingProperties'],
+      ['/admin-dashboard/verified', 'verifiedProperties'],
+      ['/admin-dashboard/rejected', 'rejectedProperties'],
+      ['/admin-dashboard/rental-requests', 'rentalRequests'],
+      ['/admin-dashboard/contact-messages', 'contactMessages'],
+      ['/admin-dashboard/messages', 'messages'],
+      ['/admin-dashboard/notifications', 'notifications'],
+      ['/admin-dashboard/all-properties', 'allProperties'],
+      ['/admin-dashboard/review-properties', 'pendingProperties'],
+      ['/admin-dashboard/all-users', 'users'],
+    ]
+    : user?.role === 'landlord'
+      ? [
+        ['/landlord/add-property', 'addProperty'],
+        ['/landlord/edit-property', 'myProperties'],
+        ['/landlord/my-properties', 'myProperties'],
+        ['/landlord/verified-properties', 'verifiedProperties'],
+        ['/landlord/under-review', 'underReview'],
+        ['/landlord/under-review-properties', 'underReview'],
+        ['/landlord/rejected', 'rejectedProperties'],
+        ['/landlord/rejected-properties', 'rejectedProperties'],
+        ['/landlord/rental-requests', 'rentalRequests'],
+        ['/landlord/rented-properties', 'rentedProperties'],
+        ['/landlord/rent-payments', 'rentPayments'],
+        ['/landlord/bank-information', 'bankInformation'],
+        ['/landlord/account-settings', 'accountSettings'],
+        ['/landlord/profile', 'accountSettings'],
+        ['/landlord/messages', 'messages'],
+        ['/landlord/notifications', 'notifications'],
+        ['/landlord/reviews', 'reviews'],
+      ]
+      : user?.role === 'tenant'
+        ? [
+          ['/tenant/verified-properties', 'verifiedProperties'],
+          ['/tenant/favorites', 'favorites'],
+          ['/tenant/search', 'searchProperties'],
+          ['/tenant/rental-requests', 'rentalRequests'],
+          ['/tenant/rented-property', 'rentedProperty'],
+          ['/tenant/rent-payment', 'rentPayments'],
+          ['/tenant/recently-viewed', 'recentlyViewed'],
+          ['/tenant/messages', 'messages'],
+          ['/tenant/notifications', 'notifications'],
+        ]
+        : [];
+  return rules.find(([path]) => pathname.startsWith(path))?.[1];
 };
 
 const PrivateRoute = ({ children, allowedRoles, allowedAdminTypes }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, permissionLoading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -163,12 +236,19 @@ const PrivateRoute = ({ children, allowedRoles, allowedAdminTypes }) => {
     return <Navigate to="/change-password" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={dashboardPaths[user.role] || '/'} replace />;
+  const userRole = getUserRole(user) || user?.role;
+
+  if (allowedRoles && !allowedRoles.includes(getRouteRole(user))) {
+    return <Navigate to={dashboardPaths[userRole] || '/'} replace />;
   }
 
-  if (user.role === 'admin' && allowedAdminTypes && !allowedAdminTypes.includes(user.adminType || 'platform')) {
-    return <Navigate to={dashboardPaths[user.role] || '/'} replace />;
+  if (!isPlatformAdmin(user) && getRouteRole(user) === 'admin' && allowedAdminTypes && !allowedAdminTypes.includes(user.adminType || 'platform')) {
+    return <Navigate to={dashboardPaths[userRole] || '/'} replace />;
+  }
+
+  const requiredPermission = getRoutePermission(user, location.pathname);
+  if (!isPlatformAdmin(user) && !permissionLoading && requiredPermission && user.permissions?.[requiredPermission] !== true) {
+    return <Navigate to="/permission-denied" replace state={{ feature: requiredPermission }} />;
   }
 
   return children;
@@ -187,10 +267,10 @@ const PublicOnlyRoute = ({ children }) => {
   }
 
   if (user) {
+    const userRole = getUserRole(user) || user?.role;
     if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
-    return <Navigate to={dashboardPaths[user.role] || '/'} replace />;
+    return <Navigate to={dashboardPaths[userRole] || '/'} replace />;
   }
-
   return children;
 };
 
@@ -207,10 +287,10 @@ const AuthenticatedPublicRoute = ({ children }) => {
   }
 
   if (user) {
+    const userRole = getUserRole(user) || user?.role;
     if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
-    return <Navigate to={dashboardPaths[user.role] || '/'} replace />;
+    return <Navigate to={dashboardPaths[userRole] || '/'} replace />;
   }
-
   return children;
 };
 
@@ -227,8 +307,9 @@ const PublicAliasRoute = ({ target }) => {
   }
 
   if (user) {
+    const userRole = getUserRole(user) || user?.role;
     if (user.mustChangePassword) return <Navigate to="/change-password" replace />;
-    return <Navigate to={dashboardPaths[user.role] || '/'} replace />;
+    return <Navigate to={dashboardPaths[userRole] || '/'} replace />;
   }
 
   return <Navigate to={target} replace />;
@@ -366,6 +447,7 @@ function AppContent() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/change-password" element={<PrivateRoute><ChangePassword /></PrivateRoute>} />
+            <Route path="/permission-denied" element={<PrivateRoute><PermissionDeniedPage /></PrivateRoute>} />
 
             <Route 
               path="/landlord/add-property" 
@@ -520,6 +602,7 @@ function AppContent() {
             <Route path="/admin-dashboard/messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminMessages /></PrivateRoute>} />
             <Route path="/admin-dashboard/system-logs" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSystemLogs /></PrivateRoute>} />
             <Route path="/admin-dashboard/system-settings" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><SystemSettings /></PrivateRoute>} />
+            <Route path="/admin-dashboard/users-permissions" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><UsersPermissionsPage /></PrivateRoute>} />
             <Route path="/admin-dashboard/open" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><Navigate to="/admin-dashboard" replace /></PrivateRoute>} />
             <Route path="/admin-dashboard/properties-awaiting-verification" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['area']}><AdminSectionPage type="awaitingVerification" /></PrivateRoute>} />
             <Route path="/admin-dashboard/review-properties" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="reviewProperties" /></PrivateRoute>} />

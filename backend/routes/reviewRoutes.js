@@ -5,7 +5,7 @@ const {
   createReview,
   getLandlordReviews,
 } = require('../controllers/reviewController');
-const { auth } = require('../middleware/auth');
+const { auth, optionalAuth, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -23,9 +23,9 @@ const landlordOnly = (req, res, next) => {
   next();
 };
 
-router.get('/property/:propertyId', getPropertyReviews);
-router.get('/my/:propertyId', auth, tenantOnly, getMyPropertyReview);
-router.post('/', auth, tenantOnly, createReview);
-router.get('/landlord', auth, landlordOnly, getLandlordReviews);
+router.get('/property/:propertyId', optionalAuth, requirePermission('reviews'), getPropertyReviews);
+router.get('/my/:propertyId', auth, tenantOnly, requirePermission('reviews'), getMyPropertyReview);
+router.post('/', auth, tenantOnly, requirePermission('reviews'), createReview);
+router.get('/landlord', auth, landlordOnly, requirePermission('reviews'), getLandlordReviews);
 
 module.exports = router;

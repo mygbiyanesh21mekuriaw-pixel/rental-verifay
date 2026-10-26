@@ -16,6 +16,7 @@ app.use('/uploads', require('./middleware/privateUpload').privateUploadAccess);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/permissions', require('./routes/permissionRoutes'));
 app.use('/api', require('./routes/changePasswordRoutes'));
 app.use('/api/admins', require('./routes/adminAccountRoutes'));
 app.use('/api/areas', require('./routes/areaRoutes'));

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Favorite = require('../models/Favorite');
 const Property = require('../models/Property');
 const { isApprovedProperty } = require('../utils/propertyVerification');
+const { logAudit } = require('../utils/auditLogger');
 
 const validatePropertyId = (propertyId) => {
   if (!propertyId || !mongoose.Types.ObjectId.isValid(propertyId)) {
@@ -21,7 +22,7 @@ const toggleFavorite = async (req, res) => {
     }
 
     const property = await Property.findById(propertyId)
-      .select('_id isVerified verificationStatus availabilityStatus');
+      .select('_id title isVerified verificationStatus availabilityStatus');
 
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
@@ -34,6 +35,11 @@ const toggleFavorite = async (req, res) => {
 
     if (existing) {
       await Favorite.deleteOne({ _id: existing._id });
+      await logAudit({
+        req, action: 'FAVORITE_REMOVED', module: 'favorites',
+        targetType: 'property', targetId: property._id, targetLabel: property.title,
+        description: `Tenant ${req.user.name} removed "${property.title}" from favorites.`,
+      });
       return res.json({ message: 'Removed from favorites', isFavorite: false });
     }
 
@@ -46,6 +52,11 @@ const toggleFavorite = async (req, res) => {
       property: propertyId,
     });
     await favorite.save();
+    await logAudit({
+      req, action: 'FAVORITE_ADDED', module: 'favorites',
+      targetType: 'property', targetId: property._id, targetLabel: property.title,
+      description: `Tenant ${req.user.name} added "${property.title}" to favorites.`,
+    });
     return res.json({ message: 'Added to favorites', isFavorite: true });
   } catch (error) {
     console.error('Error toggling favorite:', error);

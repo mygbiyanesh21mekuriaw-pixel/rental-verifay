@@ -32,6 +32,10 @@ const SystemSettingsSchema = new mongoose.Schema({
     enabled: { type: Boolean, default: false },
     message: { type: String, trim: true, maxlength: 500, default: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.' },
   },
+  auditRetention: {
+    enabled: { type: Boolean, default: false },
+    months: { type: Number, min: 1, max: 120, default: 12 },
+  },
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

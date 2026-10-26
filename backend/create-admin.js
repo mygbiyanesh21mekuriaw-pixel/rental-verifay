@@ -2,6 +2,8 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('./models/User');
+const { ensureUserPermissions } = require('./services/userPermissions');
+const { permissionRoleForUser } = require('./config/permissionCatalog');
 
 const PLATFORM_ADMIN_USERNAME = 'platform_admin';
 const LEGACY_PLATFORM_ADMIN_USERNAME = 'platform.admin';
@@ -125,11 +127,13 @@ async function createAdmin() {
       phone: String(process.env.ADMIN_PHONE || '').trim(),
       role: 'admin',
       adminType: 'platform',
+      status: 'active',
       adminAreas: [],
     });
 
     try {
       await admin.save();
+      await ensureUserPermissions(admin._id, permissionRoleForUser(admin));
     } catch (error) {
       if (error?.code === 11000) {
         if (error?.keyPattern?.username) warnUsernameCollision(adminEmail);

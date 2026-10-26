@@ -4,7 +4,7 @@ const Property = require('../models/Property');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { isApprovedProperty } = require('../utils/propertyVerification');
-const { createSystemLog } = require('./systemLogController');
+const { logAudit } = require('../utils/auditLogger');
 const { normalizeAdminAreaObject, propertyMatchesAdminAreas, buildAdminAreaQuery } = require('../utils/adminArea');
 const { appendAdminDecision } = require('../utils/adminHandlingHistory');
 const { getAdministrativeRole } = require('../middleware/auth');
@@ -179,15 +179,15 @@ const adminRespondToRentalRequest = async (req, res) => {
       recipientRole: 'landlord',
       message: `The rental request for "${propertyTitle}" was ${status} by the Area Admin.`,
     });
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
-      action: status === 'approved' ? 'RENTAL_REQUEST_APPROVED' : 'RENTAL_REQUEST_REJECTED',
-      description: `Area Admin ${status} rental request for property "${propertyTitle}".`,
-      property: request.property._id,
-      rentalRequest: request._id,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req,
+      action: status === 'approved' ? 'RENTAL_REQUEST_ACCEPTED' : 'RENTAL_REQUEST_REJECTED',
+      module: 'rentals',
+      targetType: 'rental_request',
+      targetId: request._id,
+      targetLabel: propertyTitle,
+      details: { status: { from: 'pending', to: status } },
+      description: `Area Admin ${req.user.name} ${status} the rental request for "${propertyTitle}".`,
     });
 
     res.json({ message: `Rental request ${status}`, request });
@@ -275,15 +275,10 @@ const createRentRequest = async (req, res) => {
 
     try {
       await rentRequest.save();
-      await createSystemLog({
-        user: tenantId,
-        role: tenant.role,
-        action: 'RENTAL_REQUEST_CREATED',
-        description: `Tenant ${tenant.name} submitted a rental request for property "${property.title}".`,
-        property: propertyId,
-        rentalRequest: rentRequest._id,
-        status: 'success',
-        ipAddress: req.ip || '',
+      await logAudit({
+        req, actor: tenant, action: 'RENTAL_REQUEST_CREATED', module: 'rentals',
+        targetType: 'rental_request', targetId: rentRequest._id, targetLabel: property.title,
+        description: `Tenant ${tenant.name} sent a rental request for "${property.title}".`,
       });
     } catch (saveError) {
       if (saveError.code === 11000) {
@@ -431,6 +426,16 @@ const landlordRespondToRequest = async (req, res) => {
     request.updatedAt = Date.now();
 
     await request.save();
+    await logAudit({
+      req,
+      action: status === 'approved' ? 'RENTAL_REQUEST_ACCEPTED' : 'RENTAL_REQUEST_REJECTED',
+      module: 'rentals',
+      targetType: 'rental_request',
+      targetId: request._id,
+      targetLabel: request.propertyTitle || 'Property',
+      details: { status: { from: 'pending', to: status } },
+      description: `Landlord ${req.user.name} ${status === 'approved' ? 'accepted' : 'rejected'} the rental request for "${request.propertyTitle || 'Property'}".`,
+    });
 
     // ለተከራይ ማሳወቂያ
     let notificationMessage = '';

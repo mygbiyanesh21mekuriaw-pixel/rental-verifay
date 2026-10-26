@@ -31,6 +31,14 @@ test('mustChangePassword defaults to false for existing and newly constructed us
   assert.equal(user.mustChangePassword, false);
 });
 
+test('status defaults active for existing user records and accepts only supported states', () => {
+  const user = new User({ name: 'Existing User', email: 'status@example.com', password: 'hash' });
+  const statusPath = User.schema.path('status');
+  assert.equal(statusPath.options.default, 'active');
+  assert.deepEqual(statusPath.options.enum, ['pending', 'active', 'suspended']);
+  assert.equal(user.status, 'active');
+});
+
 const createResponse = () => ({
   statusCode: null,
   body: null,
@@ -161,10 +169,41 @@ test('inactive users with valid credentials receive a clear login rejection', as
     await login({ body: { email: 'inactive@example.com', password: 'correct-password' } }, response);
     assert.equal(response.statusCode, 403);
     assert.match(response.body.message, /account is inactive/i);
-    assert.equal(loginLogged, false);
+    assert.equal(loginLogged, true);
   } finally {
     User.find = originals.find;
     SystemLog.create = originals.createSystemLog;
+  }
+});
+
+test('login rejects pending and suspended users with the account status message', async () => {
+  const originalFind = User.find;
+  const hashedPassword = await bcrypt.hash('correct-password', 4);
+
+  try {
+    for (const [status, message] of [
+      ['pending', 'Your account is waiting for Platform Admin approval.'],
+      ['suspended', 'Your account is suspended.'],
+    ]) {
+      User.find = () => ({
+        limit: () => ({
+          select: async () => [{
+            _id: `${status}-user-id`,
+            name: 'Status User',
+            email: `${status}@example.com`,
+            password: hashedPassword,
+            role: 'tenant',
+            status,
+          }],
+        }),
+      });
+      const response = createResponse();
+      await login({ body: { email: `${status}@example.com`, password: 'correct-password' } }, response);
+      assert.equal(response.statusCode, 403);
+      assert.deepEqual(response.body, { message });
+    }
+  } finally {
+    User.find = originalFind;
   }
 });
 
@@ -492,6 +531,9 @@ test('landlords and tenants can register without an area', async () => {
       assert.equal(response.statusCode, 201);
       assert.equal(response.body.user.role, role);
       assert.equal(response.body.user.area, '');
+      assert.equal(response.body.user.status, 'pending');
+      assert.equal(response.body.token, undefined);
+      assert.match(response.body.message, /waiting for Platform Admin approval/);
     }
     assert.deepEqual(savedUsers.map((user) => user.area), ['', '']);
   } finally {

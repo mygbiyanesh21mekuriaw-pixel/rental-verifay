@@ -14,10 +14,10 @@ const {
   adminRespondToRentalRequest,
 } = require('../controllers/rentalRequestController');
 
-const { auth, adminOnly, areaAdminOnly } = require('../middleware/auth');
+const { auth, adminOnly, areaAdminOnly, requirePermission } = require('../middleware/auth');
 
-router.get('/admin-requests', auth, adminOnly, getAdminRentalRequests);
-router.put('/admin-requests/:id/respond', auth, areaAdminOnly, adminRespondToRentalRequest);
+router.get('/admin-requests', auth, adminOnly, requirePermission('rentalRequests'), getAdminRentalRequests);
+router.put('/admin-requests/:id/respond', auth, areaAdminOnly, requirePermission('rentalRequests'), adminRespondToRentalRequest);
 
 // =====================================================
 // TENANT
@@ -27,6 +27,7 @@ router.put('/admin-requests/:id/respond', auth, areaAdminOnly, adminRespondToRen
 router.post(
   '/',
   auth,
+  requirePermission('rentalRequests'),
   (req, res, next) => {
     if (req.user.role !== 'tenant') {
       return res.status(403).json({
@@ -43,6 +44,7 @@ router.post(
 router.get(
   '/my-requests',
   auth,
+  requirePermission('rentalRequests'),
   (req, res, next) => {
     if (req.user.role !== 'tenant') {
       return res.status(403).json({
@@ -59,6 +61,7 @@ router.get(
 router.get(
   '/my-requests/:id',
   auth,
+  requirePermission('rentalRequests'),
   (req, res, next) => {
     if (req.user.role !== 'tenant') {
       return res.status(403).json({
@@ -79,6 +82,7 @@ router.get(
 router.get(
   '/landlord-requests',
   auth,
+  requirePermission('rentalRequests'),
   (req, res, next) => {
     if (req.user.role !== 'landlord') {
       return res.status(403).json({
@@ -95,6 +99,7 @@ router.get(
 router.get(
   '/landlord-stats',
   auth,
+  requirePermission('rentalRequests'),
   (req, res, next) => {
     if (req.user.role !== 'landlord') {
       return res.status(403).json({
@@ -111,6 +116,7 @@ router.get(
 router.get(
   '/landlord-requests/:id',
   auth,
+  requirePermission('rentalRequests'),
   (req, res, next) => {
     if (req.user.role !== 'landlord') {
       return res.status(403).json({
@@ -127,6 +133,7 @@ router.get(
 router.put(
   '/landlord-requests/:id/respond',
   auth,
+  requirePermission('rentalRequests'),
   (req, res, next) => {
     if (req.user.role !== 'landlord') {
       return res.status(403).json({

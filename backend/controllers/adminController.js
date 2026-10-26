@@ -5,6 +5,7 @@ const VerificationRequest = require('../models/VerificationRequest');
 const RentalRequest = require('../models/RentalRequest');
 const Payment = require('../models/Payment');
 const User = require('../models/User');
+const UserPermission = require('../models/UserPermission');
 const Area = require('../models/Area');
 const { buildAssignedAreaQuery } = require('../utils/area');
 const { getAdministrativeRole } = require('../middleware/auth');
@@ -15,7 +16,19 @@ const {
   buildAdminAreaQuery,
 } = require('../utils/adminArea');
 const { createLandlordNotification } = require('./notificationController');
-const { createSystemLog } = require('./systemLogController');
+const { logAudit } = require('../utils/auditLogger');
+const {
+  ensureUserPermissions,
+  getDefaultUserPermissions,
+  getUserPermissions,
+  replaceUserPermissions,
+} = require('../services/userPermissions');
+const {
+  PERMISSION_CATALOG,
+  getPermissionKeys,
+  permissionRoleForUser,
+  validatePermissionMap,
+} = require('../config/permissionCatalog');
 const { clearUnfinishedAreaAdminAssignments, getAdminAreaNames } = require('../utils/areaAdminHandover');
 const { appendAdminDecision } = require('../utils/adminHandlingHistory');
 const {
@@ -210,9 +223,20 @@ const createAdminAccount = async (req, res) => {
       mustChangePassword: adminType === 'area',
       role: 'admin',
       adminType,
+      status: 'active',
       assignedArea: adminType === 'area' ? areaRecord.name : '',
       adminAreas: adminType === 'area' ? [{ city: areaRecord.name }] : [],
     });
+    await ensureUserPermissions(admin._id, permissionRoleForUser(admin));
+    if (adminType === 'area') {
+      await logAudit({
+        req, action: 'AREA_ADMIN_CREATED', module: 'users',
+        targetType: 'user', targetId: admin._id,
+        targetLabel: `${admin.name} (${admin.email})`,
+        details: { assignedArea: areaRecord.name },
+        description: `Platform Admin created area admin ${admin.name} (${admin.email}) for ${areaRecord.name}.`,
+      });
+    }
 
     const safeAdmin = admin.toObject();
     delete safeAdmin.password;
@@ -527,7 +551,17 @@ const getAdminProperties = async (req, res) => {
     }
 
     await addHandlerStatus(properties);
-    res.json(properties.map(sanitizeAdminProperty));
+    const visibleProperties = isAreaAdmin && status === 'all'
+      ? properties.filter((property) => {
+        const permissionKey = property.verificationStatus === 'approved'
+          ? 'verifiedProperties'
+          : property.verificationStatus === 'rejected'
+            ? 'rejectedProperties'
+            : 'pendingProperties';
+        return req.user.permissions?.[permissionKey] === true;
+      })
+      : properties;
+    res.json(visibleProperties.map(sanitizeAdminProperty));
   } catch (error) {
     console.error('Reject property failed', { propertyId: req.params.id, adminId: req.user?.id, message: error.message });
     res.status(500).json({ message: 'Unable to reject property', error: error.message });
@@ -580,14 +614,10 @@ const verifyProperty = async (req, res) => {
       'approved'
     );
 
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
-      action: 'PROPERTY_VERIFIED',
-      description: `Admin verified property "${property.title}".`,
-      property: property._id,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, action: 'PROPERTY_VERIFIED', module: 'properties',
+      targetType: 'property', targetId: property._id, targetLabel: property.title,
+      description: `Area Admin ${admin.name} verified property "${property.title}".`,
     });
 
     res.json({ message: 'Property verified successfully', property: sanitizeAdminProperty(property) });
@@ -649,14 +679,11 @@ const rejectProperty = async (req, res) => {
       comment || 'Please review the verification requirements and resubmit the property.'
     );
 
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
-      action: 'PROPERTY_REJECTED',
-      description: `Admin rejected property "${property.title}". ${comment || 'Documentation insufficient.'}`,
-      property: property._id,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, action: 'PROPERTY_REJECTED', module: 'properties',
+      targetType: 'property', targetId: property._id, targetLabel: property.title,
+      details: { comment: comment || 'Documentation insufficient.' },
+      description: `Area Admin ${admin.name} rejected property "${property.title}".`,
     });
 
     res.json({ message: 'Property rejected', property: sanitizeAdminProperty(property) });
@@ -674,7 +701,15 @@ const rejectProperty = async (req, res) => {
 const getAllUsers = async (req, res) => {
   try {
     const isAreaAdmin = getAdministrativeRole(req.user) === 'area_admin';
+    const queryStatus = req.query?.status;
+    if (queryStatus && !['pending', 'active', 'suspended'].includes(String(queryStatus))) {
+      return res.status(400).json({ message: 'Status must be pending, active, or suspended.' });
+    }
+    if (queryStatus === 'pending' && getAdministrativeRole(req.user) !== 'platform_admin') {
+      return res.status(403).json({ message: 'Platform Admin access required.' });
+    }
     let filter = {};
+    if (queryStatus) filter.status = String(queryStatus);
     if (isAreaAdmin) {
       const adminAreas = req.user.assignedArea
         ? [req.user.assignedArea]
@@ -735,6 +770,189 @@ const getAllUsers = async (req, res) => {
     console.error('Unable to load admin users:', error);
     res.status(500).json({ message: 'Server error' });
   }
+};
+
+const getUserPermissionDetails = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid user ID.' });
+    const user = await User.findById(req.params.id)
+      .select('_id role adminType adminAreas assignedArea status')
+      .lean();
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    const actualRole = permissionRoleForUser(user);
+    const role = actualRole === 'platform_admin'
+      ? 'platform_admin'
+      : req.query?.role || actualRole;
+    if (!PERMISSION_CATALOG[role]) return res.status(400).json({ message: 'Unknown permission catalog role.' });
+    const permissions = role === actualRole
+      ? await getUserPermissions(user._id, role)
+      : getDefaultUserPermissions(role);
+    return res.json({
+      role,
+      status: ['pending', 'active', 'suspended'].includes(user.status) ? user.status : 'active',
+      catalog: getPermissionKeys(role).map((permissionKey) => ({
+        permissionKey,
+        enabled: permissions[permissionKey] === true,
+      })),
+      permissions,
+    });
+  } catch (error) {
+    console.error('Unable to load user permissions:', error);
+    return res.status(500).json({ message: 'Unable to load user permissions.' });
+  }
+};
+
+const updateUserPermissions = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid user ID.' });
+    const { role, status, permissions } = req.body || {};
+    if (!['area_admin', 'landlord', 'tenant'].includes(role)) {
+      return res.status(400).json({ message: 'Role must be area_admin, landlord, or tenant.' });
+    }
+    if (!['pending', 'active', 'suspended'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be pending, active, or suspended.' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    const currentRole = permissionRoleForUser(user);
+    if (currentRole === 'platform_admin' || String(user._id) === String(req.user.id)) {
+      return res.status(403).json({ message: 'You cannot change a Platform Admin account.' });
+    }
+    let areaRecord = null;
+    if (role === 'area_admin') {
+      if (!['tenant', 'landlord'].includes(currentRole)) {
+        if (currentRole !== 'area_admin') {
+          return res.status(400).json({ message: 'Only tenants and landlords can be promoted to Area Admin.' });
+        }
+      }
+      const assignedArea = String(req.body.area || user.assignedArea || user.area || '').trim();
+      if (!assignedArea) {
+        return res.status(400).json({ message: 'Assign a valid area before promoting this user to Area Admin.' });
+      }
+      areaRecord = await Area.findOne({ normalizedName: assignedArea.toLowerCase() }).select('name').lean();
+      if (!areaRecord) return res.status(400).json({ message: 'Assign a valid area before promoting this user to Area Admin.' });
+      if (currentRole !== 'area_admin') {
+        const conflictingAdmin = await getAreaAdminConflict(areaRecord.name, user._id);
+        if (conflictingAdmin) {
+          return res.status(409).json({ message: getAreaAdminConflictMessage(areaRecord.name, conflictingAdmin.name) });
+        }
+      }
+    }
+
+    const oldStatus = ['pending', 'active', 'suspended'].includes(user.status) ? user.status : 'active';
+    const oldPermissions = await getUserPermissions(user._id, currentRole);
+    const currentPermissions = role === currentRole ? oldPermissions : getDefaultUserPermissions(role);
+    const validation = validatePermissionMap(role, permissions, currentPermissions);
+    if (validation.error) return res.status(400).json({ message: validation.error });
+
+    if (role === 'area_admin') {
+      user.role = 'admin';
+      user.adminType = 'area';
+      user.assignedArea = areaRecord.name;
+      user.adminAreas = [{ city: areaRecord.name }];
+    } else if (currentRole === 'area_admin') {
+      await clearUnfinishedAreaAdminAssignments(user);
+      user.adminType = undefined;
+      user.adminAreas = [];
+      user.assignedArea = '';
+      user.role = role;
+    } else {
+      user.role = role;
+    }
+    user.status = status;
+    user.isActive = status !== 'suspended';
+    await replaceUserPermissions(user._id, role, validation.permissions, req.user.id, currentRole !== role);
+    await user.save();
+
+    const permissionKeysChanged = new Set([
+      ...Object.keys(oldPermissions),
+      ...Object.keys(validation.permissions),
+    ]);
+    const permissionChanges = [...permissionKeysChanged]
+      .filter((key) => oldPermissions[key] !== validation.permissions[key])
+      .map((key) => `${key}: ${oldPermissions[key] ?? 'not assigned'} -> ${validation.permissions[key] ?? 'not assigned'}`);
+    const changes = [
+      ...(currentRole !== role ? [`role: ${currentRole} -> ${role}`] : []),
+      ...(oldStatus !== status ? [`status: ${oldStatus} -> ${status}`] : []),
+      ...permissionChanges,
+    ];
+    const changedFields = {};
+    if (currentRole !== role) changedFields.role = { from: currentRole, to: role };
+    if (oldStatus !== status) changedFields.status = { from: oldStatus, to: status };
+    for (const key of permissionKeysChanged) {
+      if (oldPermissions[key] !== validation.permissions[key]) {
+        changedFields[`permissions.${key}`] = {
+          from: oldPermissions[key] ?? null,
+          to: validation.permissions[key] ?? null,
+        };
+      }
+    }
+    await logAudit({
+      req, action: 'USER_PERMISSIONS_UPDATED', module: 'permissions',
+      targetType: 'user', targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      details: changedFields,
+      description: `Platform Admin ${req.user?.name || 'Administrator'} updated ${user.name} (${user.email}). ${changes.join('; ') || 'No effective changes.'}`,
+    });
+
+    return res.json({
+      message: 'User permissions updated successfully.',
+      user: { id: String(user._id), role, status },
+      permissions: validation.permissions,
+    });
+  } catch (error) {
+    console.error('Unable to update user permissions:', error);
+    return res.status(500).json({ message: 'Unable to update user permissions.' });
+  }
+};
+
+const approveUser = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid user ID.' });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    if (permissionRoleForUser(user) === 'platform_admin') {
+      return res.status(403).json({ message: 'Platform Admin accounts cannot be approved or changed here.' });
+    }
+    if (user.status !== 'pending') return res.status(409).json({ message: 'Only pending users can be approved.' });
+    user.status = 'active';
+    user.isActive = true;
+    await user.save();
+    await ensureUserPermissions(user._id, permissionRoleForUser(user));
+    await logAudit({
+      req, action: 'USER_APPROVED', module: 'users',
+      targetType: 'user', targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      description: `Platform Admin ${req.user?.name || 'Administrator'} approved user ${user.name} (${user.email}).`,
+    });
+    return res.json({ message: 'User approved successfully.', user: { id: String(user._id), status: user.status } });
+  } catch (error) {
+    console.error('Unable to approve user:', error);
+    return res.status(500).json({ message: 'Unable to approve user.' });
+  }
+};
+
+const createAreaAdmin = async (req, res) => {
+  const name = String(req.body?.name || req.body?.fullName || '').trim();
+  const emailPrefix = String(req.body?.email || '').split('@')[0].toLowerCase();
+  const baseUsername = (emailPrefix.replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '').slice(0, 16) || 'area_admin');
+  let username = baseUsername.length >= 3 ? baseUsername : `${baseUsername}admin`;
+
+  for (let suffix = 1; await User.findOne({ username: { $regex: `^${username}$`, $options: 'i' } }); suffix += 1) {
+    const suffixText = String(suffix);
+    username = `${baseUsername.slice(0, 20 - suffixText.length)}${suffixText}`;
+  }
+
+  const request = Object.create(req);
+  request.body = {
+    ...req.body,
+    fullName: name,
+    username: req.body?.username || username,
+    password: req.body?.tempPassword || req.body?.temporaryPassword || req.body?.password,
+    adminType: 'area',
+  };
+  return createAdminAccount(request, res);
 };
 
 // የስታቲስቲክስ መረጃ (Admin Dashboard)
@@ -957,29 +1175,33 @@ const setUserActive = async (req, res) => {
       }
     }
 
-    if (user.isActive === req.body.isActive) {
+    if (user.isActive === req.body.isActive && !(req.body.isActive && user.status === 'pending')) {
       return res.json({ message: req.body.isActive ? 'User is already active.' : 'User is already inactive.' });
     }
 
+    const previousStatus = user.status;
     const isAreaAdmin = getAdministrativeRole(user) === 'area_admin';
     if (isAreaAdmin && !req.body.isActive) {
       await clearUnfinishedAreaAdminAssignments(user);
     }
     user.isActive = req.body.isActive;
+    user.status = req.body.isActive ? 'active' : 'suspended';
     await user.save();
 
-    await createSystemLog({
-      user: req.user.id,
-      role: actorRole,
+    await logAudit({
+      req,
       action: req.body.isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
-      description: `User ${user.name} (${user._id}) was ${req.body.isActive ? 'activated' : 'deactivated'}.`,
-      status: 'success',
-      ipAddress: req.ip || '',
+      module: 'users',
+      targetType: 'user',
+      targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      details: { status: { from: previousStatus, to: user.status } },
+      description: `${req.user?.name || 'Administrator'} ${req.body.isActive ? 'activated' : 'suspended'} user ${user.name} (${user.email}).`,
     });
 
     return res.json({
       message: req.body.isActive ? 'User activated successfully.' : 'User deactivated successfully.',
-      user: { _id: user._id, isActive: user.isActive },
+      user: { _id: user._id, isActive: user.isActive, status: user.status },
     });
   } catch (error) {
     console.error('Unable to update user status:', error);
@@ -1034,8 +1256,17 @@ const changeUserRole = async (req, res) => {
       user.assignedArea = area.name;
       user.adminAreas = [{ city: area.name }];
       user.isActive = true;
+      user.status = 'active';
       user.replacedBy = null;
       await user.save();
+      await ensureUserPermissions(user._id, permissionRoleForUser(user));
+      await logAudit({
+        req, action: 'USER_ROLE_UPDATED', module: 'users',
+        targetType: 'user', targetId: user._id,
+        targetLabel: `${user.name} (${user.email})`,
+        details: { role: { from: currentRole, to: 'area_admin' }, assignedArea: requestedAreaName },
+        description: `Platform Admin ${req.user?.name || 'Administrator'} promoted ${user.name} (${user.email}) to Area Admin for ${requestedAreaName}.`,
+      });
       const safeUser = user.toObject();
       delete safeUser.password;
       return res.json({ message: 'Area Admin promotion successful.', user: safeUser });
@@ -1045,20 +1276,18 @@ const changeUserRole = async (req, res) => {
       return res.status(400).json({ message: 'Only Area Admin accounts can be demoted or deactivated here.' });
     }
 
-    const previousAreas = getAdminAreaNames(user);
-
     if (role === 'deactivate') {
       await clearUnfinishedAreaAdminAssignments(user);
       user.isActive = false;
+      user.status = 'suspended';
       user.replacedBy = null;
       await user.save();
-      await createSystemLog({
-        user: req.user?.id || user._id,
-        role: req.user ? getAdministrativeRole(req.user) : 'admin',
-        action: 'AREA_ADMIN_DEACTIVATED',
-        description: `Area Admin ${user.name} was deactivated from ${previousAreas.join(', ') || 'their area'}.`,
-        status: 'success',
-        ipAddress: req.ip || '',
+      await logAudit({
+        req, action: 'AREA_ADMIN_DEACTIVATED', module: 'users',
+        targetType: 'user', targetId: user._id,
+        targetLabel: `${user.name} (${user.email})`,
+        details: { status: { from: 'active', to: 'suspended' } },
+        description: `Platform Admin ${req.user?.name || 'Administrator'} suspended Area Admin ${user.name} (${user.email}).`,
       });
       const safeUser = user.toObject();
       delete safeUser.password;
@@ -1093,17 +1322,17 @@ const changeUserRole = async (req, res) => {
     await clearUnfinishedAreaAdminAssignments(user);
     if (existingAccount) {
       user.isActive = false;
+      user.status = 'suspended';
       user.replacedBy = existingAccount._id;
       user.assignedArea = '';
       user.adminAreas = [];
       await user.save();
-      await createSystemLog({
-        user: user._id,
-        role: 'admin',
-        action: 'AREA_ADMIN_LINKED_EXISTING_ACCOUNT',
-        description: `Area Admin ${user.name} was linked to existing ${existingAccount.role} account ${existingAccount._id} after leaving ${previousAreas.join(', ') || 'their area'}.`,
-        status: 'success',
-        ipAddress: req.ip || '',
+      await logAudit({
+        req, action: 'AREA_ADMIN_LINKED_EXISTING_ACCOUNT', module: 'users',
+        targetType: 'user', targetId: user._id,
+        targetLabel: `${user.name} (${user.email})`,
+        details: { status: { from: 'active', to: 'suspended' }, replacedByRole: existingAccount.role },
+        description: `Platform Admin ${req.user?.name || 'Administrator'} linked Area Admin ${user.name} (${user.email}) to the existing ${existingAccount.role} account.`,
       });
       return res.json({
         message: `Existing ${existingAccount.role} account selected. The Area Admin account is deactivated.`,
@@ -1116,15 +1345,16 @@ const changeUserRole = async (req, res) => {
     user.adminAreas = [];
     user.assignedArea = '';
     user.isActive = true;
+    user.status = 'active';
     user.replacedBy = null;
     await user.save();
-    await createSystemLog({
-      user: user._id,
-      role: 'admin',
-      action: 'AREA_ADMIN_DEMOTED',
-      description: `Area Admin ${user.name} was demoted from ${previousAreas.join(', ') || 'their area'} to ${role}.`,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await ensureUserPermissions(user._id, permissionRoleForUser(user));
+    await logAudit({
+      req, action: 'AREA_ADMIN_DEMOTED', module: 'users',
+      targetType: 'user', targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      details: { role: { from: 'area_admin', to: role } },
+      description: `Platform Admin ${req.user?.name || 'Administrator'} changed Area Admin ${user.name} (${user.email}) to ${role}.`,
     });
 
     const safeUser = user.toObject();
@@ -1134,6 +1364,7 @@ const changeUserRole = async (req, res) => {
     if (isAreaAdminDuplicateKeyError(error)) {
       return respondAreaAdminConflict(res, error.keyValue?.assignedArea || requestedAreaName, req.params.id);
     }
+    console.error('Unable to change user role:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -1222,36 +1453,29 @@ const setAreaAdminActive = async (req, res) => {
     if (!admin || admin.role !== 'admin' || admin.adminType !== 'area') {
       return res.status(404).json({ message: 'Area Admin not found.' });
     }
-    if (admin.isActive === req.body.isActive) {
+    if (admin.isActive === req.body.isActive && !(req.body.isActive && admin.status === 'pending')) {
       return res.json({ message: req.body.isActive ? 'Area Admin is already active.' : 'Area Admin is already inactive.' });
     }
 
+    const previousStatus = admin.status;
     const areaNames = getAdminAreaNames(admin);
     if (!req.body.isActive) {
       await clearUnfinishedAreaAdminAssignments(admin);
     }
     admin.isActive = req.body.isActive;
+    admin.status = req.body.isActive ? 'active' : 'suspended';
     await admin.save();
 
-    if (!req.body.isActive) {
-      await createSystemLog({
-        user: req.user.id,
-        role: getAdministrativeRole(req.user),
-        action: 'AREA_ADMIN_DEACTIVATED',
-        description: `Area Admin ${admin.name} was deactivated for ${areaNames.join(', ') || 'their area'}.`,
-        status: 'success',
-        ipAddress: req.ip || '',
-      });
-    } else {
-      await createSystemLog({
-        user: req.user.id,
-        role: getAdministrativeRole(req.user),
-        action: 'AREA_ADMIN_ACTIVATED',
-        description: `Area Admin ${admin.name} was activated for ${areaNames.join(', ') || 'their area'}.`,
-        status: 'success',
-        ipAddress: req.ip || '',
-      });
-    }
+    await logAudit({
+      req,
+      action: req.body.isActive ? 'AREA_ADMIN_ACTIVATED' : 'AREA_ADMIN_DEACTIVATED',
+      module: 'users',
+      targetType: 'user',
+      targetId: admin._id,
+      targetLabel: `${admin.name} (${admin.email})`,
+      details: { status: { from: previousStatus, to: admin.status } },
+      description: `Platform Admin ${req.user?.name || 'Administrator'} ${req.body.isActive ? 'activated' : 'suspended'} Area Admin ${admin.name} (${admin.email}).`,
+    });
     return res.json({ message: req.body.isActive ? 'Area Admin activated successfully.' : 'Area Admin deactivated successfully.' });
   } catch (error) {
     return res.status(500).json({ message: 'Unable to update Area Admin status.' });
@@ -1288,6 +1512,10 @@ module.exports = {
   verifyProperty,
   rejectProperty,
   getAllUsers,
+  getUserPermissionDetails,
+  updateUserPermissions,
+  approveUser,
+  createAreaAdmin,
   getStats,
   getAnalytics,
   getAdminPaymentPeriods,

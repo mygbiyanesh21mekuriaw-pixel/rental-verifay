@@ -28,6 +28,7 @@ import './landlordDashboard.css';
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const LandlordNotificationContext = React.createContext(0);
+const EMPTY_PERMISSIONS = Object.freeze({});
 
 const isValidImageFile = (file) => {
   if (!file) return false;
@@ -75,6 +76,8 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
   const dashboardLayout = useDashboardLayout();
   const [currentNotificationCount, setCurrentNotificationCount] = useState(notificationCount);
   const user = suppliedUser || authUser;
+  const userId = user?.id;
+  const canViewNotifications = user?.permissions?.notifications === true;
   const showBackToDashboard = [
     '/landlord/add-property',
     '/landlord/my-properties',
@@ -91,7 +94,11 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
   ].includes(location.pathname);
 
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
+      setCurrentNotificationCount(0);
+      return undefined;
+    }
+    if (!canViewNotifications) {
       setCurrentNotificationCount(0);
       return undefined;
     }
@@ -111,6 +118,7 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
         }
       } catch (error) {
         console.error('Unable to load landlord notification count:', error);
+        if (active) setCurrentNotificationCount(null);
       }
     };
 
@@ -121,7 +129,7 @@ export const LandlordLayout = ({ children, user: suppliedUser = null, notificati
       active = false;
       window.clearInterval(interval);
     };
-  }, [user]);
+  }, [canViewNotifications, userId]);
 
   const content = (
     <>
@@ -154,6 +162,9 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   const { user } = useAuth();
   const { t, formatDate } = useLanguage();
   const notificationCount = React.useContext(LandlordNotificationContext);
+  const permissions = user?.permissions || EMPTY_PERMISSIONS;
+  const userId = user?.id;
+  const canViewNotifications = permissions.notifications === true;
   const { propertyId } = useParams();
   const isEditMode = Boolean(propertyId);
   const location = useLocation();
@@ -189,6 +200,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   const [recentRequests, setRecentRequests] = useState([]);
   const [recentRequestsLoading, setRecentRequestsLoading] = useState(true);
   const [recentRequestsError, setRecentRequestsError] = useState(false);
+  const [unavailablePermissions, setUnavailablePermissions] = useState({});
   const [documentFile, setDocumentFile] = useState(null);
   const [existingProofOfOwnership, setExistingProofOfOwnership] = useState(false);
 
@@ -236,7 +248,16 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   }, [initialShowForm, isEditMode, propertyId]);
 
   useEffect(() => {
+    if (permissions.rentalRequests !== true) {
+      setRecentRequests([]);
+      setRecentRequestsError(false);
+      setRecentRequestsLoading(false);
+      return undefined;
+    }
+
     let active = true;
+    setRecentRequestsLoading(true);
+    setRecentRequestsError(false);
     const loadRecentRequests = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -260,10 +281,10 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [permissions.rentalRequests, userId]);
 
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setOverviewStats({
         properties: 0,
         verified: 0,
@@ -273,47 +294,56 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         payments: 0,
         notifications: 0,
       });
+      setUnavailablePermissions({});
       return;
     }
 
-    const loadOverviewStats = async () => {
+    let active = true;
+    setUnavailablePermissions({});
+    const loadDashboardList = async (permissionKey, endpoint, label) => {
+      if (permissions[permissionKey] !== true) return [];
       try {
         const token = localStorage.getItem('token');
-        const [propertiesRes, requestsRes, paymentsRes] = await Promise.all([
-          axios.get(`${process.env.REACT_APP_API_URL}/api/properties`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${process.env.REACT_APP_API_URL}/api/rental-requests/landlord-requests`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${process.env.REACT_APP_API_URL}/api/payments/landlord`, { headers: { Authorization: `Bearer ${token}` } }),
-        ]);
-
-        const properties = Array.isArray(propertiesRes.data) ? propertiesRes.data : [];
-        const landlordProperties = properties.filter((property) =>String(property.landlord?._id || property.landlord) === String(user.id));
-        const requests = Array.isArray(requestsRes.data) ? requestsRes.data : [];
-        const payments = Array.isArray(paymentsRes.data) ? paymentsRes.data : [];
-
-        setOverviewStats({
-          properties: landlordProperties.length,
-          verified: landlordProperties.filter((property) =>property.isVerified && property.verificationStatus === 'approved').length,
-          rented: landlordProperties.filter((property) =>property.availabilityStatus === 'rented').length,
-          requests: requests.length,
-          waitingRequests: requests.filter((request) => String(request.status || '').trim().toLowerCase() === 'pending').length,
-          payments: payments.length,
-          notifications: notificationCount,
-        });
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}${endpoint}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!Array.isArray(response.data)) {
+          throw new Error(`Unexpected ${label} response`);
+        }
+        return response.data;
       } catch (error) {
-        setOverviewStats({
-          properties: 0,
-          verified: 0,
-          rented: 0,
-          requests: 0,
-          waitingRequests: 0,
-          payments: 0,
-          notifications: notificationCount,
-        });
+        console.error(`Unable to load landlord dashboard ${label}:`, error);
+        if (active) setUnavailablePermissions((current) => ({ ...current, [permissionKey]: true }));
+        return [];
       }
     };
 
+    const loadOverviewStats = async () => {
+      const [properties, requests, payments] = await Promise.all([
+        loadDashboardList('myProperties', '/api/properties', 'properties'),
+        loadDashboardList('rentalRequests', '/api/rental-requests/landlord-requests', 'rental requests'),
+        loadDashboardList('rentPayments', '/api/payments/landlord', 'rent payments'),
+      ]);
+      if (!active) return;
+
+      const landlordProperties = properties.filter((property) => String(property.landlord?._id || property.landlord) === String(userId));
+      setOverviewStats({
+        properties: landlordProperties.length,
+        verified: landlordProperties.filter((property) => property.isVerified && property.verificationStatus === 'approved').length,
+        rented: landlordProperties.filter((property) => property.availabilityStatus === 'rented').length,
+        requests: requests.length,
+        waitingRequests: requests.filter((request) => String(request.status || '').trim().toLowerCase() === 'pending').length,
+        payments: payments.length,
+        notifications: canViewNotifications && Number.isFinite(notificationCount) ? notificationCount : 0,
+      });
+    };
+
     loadOverviewStats();
-  }, [user, notificationCount]);
+    return () => {
+      active = false;
+    };
+  }, [canViewNotifications, notificationCount, permissions, userId]);
 
   const handleFormChange = (e) => {
     setFormData((previous) => ({
@@ -490,13 +520,18 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
       today.getTime() - today.getTimezoneOffset() * 60000
     ).toISOString().slice(0, 10);
     const cards = [
-      { key: 'myProperties', label: 'My Properties', value: overviewStats.properties, icon: <FaHome aria-hidden="true" />, path: '/landlord/my-properties', accent: 'bg-blue-50 text-blue-700' },
-      { key: 'verified', label: 'Verified Properties', value: overviewStats.verified, icon: <FaCheck aria-hidden="true" />, path: '/landlord/verified-properties', accent: 'bg-[#1d4ed8] text-white' },
-      { key: 'rentalRequests', label: 'Rental Requests', value: overviewStats.requests, icon: <FaFileAlt aria-hidden="true" />, path: '/landlord/rental-requests', accent: 'bg-blue-50 text-blue-700' },
-      { key: 'rented', label: 'Rented Properties', value: overviewStats.rented, icon: <FaHardHat aria-hidden="true" />, path: '/landlord/rented-properties', accent: 'bg-amber-50 text-amber-700' },
-      { key: 'rentPayments', label: 'Rent Payments', value: overviewStats.payments, icon: <FaMoneyBill aria-hidden="true" />, path: '/landlord/rent-payments', accent: 'bg-cyan-50 text-cyan-700' },
-      { key: 'notifications', label: 'Notifications', value: overviewStats.notifications, icon: <FaBell aria-hidden="true" />, path: '/landlord/notifications', accent: 'bg-rose-50 text-rose-700' },
-    ];
+      { key: 'myProperties', permissionKey: 'myProperties', label: 'My Properties', value: overviewStats.properties, icon: <FaHome aria-hidden="true" />, path: '/landlord/my-properties', accent: 'bg-blue-50 text-blue-700' },
+      { key: 'verified', permissionKey: 'verifiedProperties', dataPermissionKey: 'myProperties', label: 'Verified Properties', value: overviewStats.verified, icon: <FaCheck aria-hidden="true" />, path: '/landlord/verified-properties', accent: 'bg-[#1d4ed8] text-white' },
+      { key: 'rentalRequests', permissionKey: 'rentalRequests', label: 'Rental Requests', value: overviewStats.requests, icon: <FaFileAlt aria-hidden="true" />, path: '/landlord/rental-requests', accent: 'bg-blue-50 text-blue-700' },
+      { key: 'rented', permissionKey: 'rentedProperties', dataPermissionKey: 'myProperties', label: 'Rented Properties', value: overviewStats.rented, icon: <FaHardHat aria-hidden="true" />, path: '/landlord/rented-properties', accent: 'bg-amber-50 text-amber-700' },
+      { key: 'rentPayments', permissionKey: 'rentPayments', label: 'Rent Payments', value: overviewStats.payments, icon: <FaMoneyBill aria-hidden="true" />, path: '/landlord/rent-payments', accent: 'bg-cyan-50 text-cyan-700' },
+      { key: 'notifications', permissionKey: 'notifications', label: 'Notifications', value: overviewStats.notifications, icon: <FaBell aria-hidden="true" />, path: '/landlord/notifications', accent: 'bg-rose-50 text-rose-700' },
+    ].filter((card) => (
+      permissions[card.permissionKey] === true &&
+      permissions[card.dataPermissionKey || card.permissionKey] === true &&
+      unavailablePermissions[card.dataPermissionKey || card.permissionKey] !== true &&
+      (card.key !== 'notifications' || Number.isFinite(notificationCount))
+    ));
 
     return (
       <div className="w-full min-w-0 space-y-6">
@@ -546,7 +581,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
           ))}
         </div>
 
-        <section className="w-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="landlord-recent-requests-title">
+        {permissions.rentalRequests === true && unavailablePermissions.rentalRequests !== true && !recentRequestsError && <section className="w-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="landlord-recent-requests-title">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
             <h3 id="landlord-recent-requests-title" className="m-0 min-w-0 text-base font-bold text-slate-900 sm:text-lg">{t('Recent Rental Requests')}</h3>
             <Link to="/landlord/rental-requests" className="shrink-0 rounded font-semibold text-[var(--rv-dashboard-topbar)] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rv-dashboard-topbar)] focus-visible:ring-offset-2">
@@ -666,7 +701,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
               </div>
             </>
           )}
-        </section>
+        </section>}
       </div>
     );
   };

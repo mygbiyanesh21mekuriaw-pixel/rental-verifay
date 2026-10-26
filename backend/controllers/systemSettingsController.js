@@ -1,4 +1,5 @@
 const SystemSettings = require('../models/SystemSettings');
+const { logAudit } = require('../utils/auditLogger');
 
 const supportedAppearances = ['light', 'dark', 'system'];
 const defaultSettings = {
@@ -22,6 +23,7 @@ const defaultSettings = {
     enabled: false,
     message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
   },
+  auditRetention: { enabled: false, months: 12 },
 };
 
 const serializeSettings = (settings) => ({
@@ -41,6 +43,10 @@ const serializeSettings = (settings) => ({
   maintenance: {
     ...defaultSettings.maintenance,
     ...(settings?.maintenance || {}),
+  },
+  auditRetention: {
+    enabled: settings?.auditRetention?.enabled ?? defaultSettings.auditRetention.enabled,
+    months: settings?.auditRetention?.months ?? defaultSettings.auditRetention.months,
   },
 });
 
@@ -129,6 +135,7 @@ const updateSystemSettings = async (req, res) => {
     general,
     properties,
     maintenance,
+    auditRetention,
   } = req.body || {};
   if (
     (defaultAppearance !== undefined && !supportedAppearances.includes(defaultAppearance)) ||
@@ -136,6 +143,12 @@ const updateSystemSettings = async (req, res) => {
     !validGeneral(general) ||
     !validBooleanGroup(properties, ['submissionsEnabled', 'requireAdminReview']) ||
     !validBooleanGroup(maintenance, ['enabled']) ||
+    !validBooleanGroup(auditRetention, ['enabled']) ||
+    (auditRetention?.months !== undefined && (
+      !Number.isInteger(auditRetention.months) ||
+      auditRetention.months < 1 ||
+      auditRetention.months > 120
+    )) ||
     (maintenance?.message !== undefined && (
       typeof maintenance.message !== 'string' ||
       maintenance.message.trim().length === 0 ||
@@ -169,8 +182,13 @@ const updateSystemSettings = async (req, res) => {
     if (maintenance.enabled !== undefined) updates['maintenance.enabled'] = maintenance.enabled;
     if (maintenance.message !== undefined) updates['maintenance.message'] = maintenance.message.trim();
   }
+  if (auditRetention) {
+    if (auditRetention.enabled !== undefined) updates['auditRetention.enabled'] = auditRetention.enabled;
+    if (auditRetention.months !== undefined) updates['auditRetention.months'] = auditRetention.months;
+  }
 
   try {
+    const previous = await SystemSettings.findOne({ key: 'global' }).lean();
     const settings = await SystemSettings.findOneAndUpdate(
       { key: 'global' },
       {
@@ -179,6 +197,20 @@ const updateSystemSettings = async (req, res) => {
       },
       { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
+    const changedFields = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (key === 'updatedBy' || key === 'general.websiteLogoDataUri') continue;
+      const previousValue = key.split('.').reduce((valueAtPath, part) => valueAtPath?.[part], previous);
+      if (previousValue !== value) changedFields[key] = { from: previousValue ?? null, to: value };
+    }
+    if (Object.keys(changedFields).length) {
+      await logAudit({
+        req, action: 'SYSTEM_SETTINGS_CHANGED', module: 'system_settings',
+        targetType: 'system_settings', targetLabel: 'Global system settings',
+        details: changedFields,
+        description: `Platform Admin ${req.user.name} changed system settings.`,
+      });
+    }
     return res.json({
       message: 'System settings saved.',
       settings: serializeSettings(settings),
@@ -204,6 +236,7 @@ const uploadWebsiteLogo = async (req, res) => {
   }
 
   try {
+    const previous = await SystemSettings.findOne({ key: 'global' }).select('general.websiteLogoDataUri').lean();
     const websiteLogoDataUri = `data:${actualMimeType};base64,${req.file.buffer.toString('base64')}`;
     const settings = await SystemSettings.findOneAndUpdate(
       { key: 'global' },
@@ -216,6 +249,12 @@ const uploadWebsiteLogo = async (req, res) => {
       },
       { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     );
+    await logAudit({
+      req, action: 'SYSTEM_SETTINGS_CHANGED', module: 'system_settings',
+      targetType: 'system_settings', targetLabel: 'Website logo',
+      details: { websiteLogo: { from: Boolean(previous?.general?.websiteLogoDataUri), to: true } },
+      description: `Platform Admin ${req.user.name} changed the website logo.`,
+    });
     return res.json({
       message: 'Website logo updated.',
       settings: serializeSettings(settings),

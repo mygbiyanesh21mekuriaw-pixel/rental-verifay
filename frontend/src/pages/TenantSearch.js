@@ -271,7 +271,7 @@ const TenantSearch = () => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      const params = new URLSearchParams({ verified: 'true' });
+      const params = new URLSearchParams({ verified: 'true', feature: 'searchProperties' });
 
       const fieldEntries = [
         ['title', nextFilters.title],

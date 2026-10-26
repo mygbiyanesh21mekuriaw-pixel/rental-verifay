@@ -171,6 +171,7 @@ test('GET system settings returns sensible defaults when no document exists', as
       enabled: false,
       message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
     },
+    auditRetention: { enabled: false, months: 12 },
   });
 });
 
@@ -211,11 +212,15 @@ test('GET settings ignores legacy saved language values without changing other s
       enabled: false,
       message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
     },
+    auditRetention: { enabled: false, months: 12 },
   });
 });
 
 test('system settings save only supported global preferences', async () => {
   const originalFindOneAndUpdate = SystemSettings.findOneAndUpdate;
+  const originalFindOne = SystemSettings.findOne;
+  const SystemLog = require('../models/SystemLog');
+  const originalSystemLogCreate = SystemLog.create;
   const savedSettings = {
     defaultAppearance: 'dark',
     notifications: { inAppEnabled: false, emailEnabled: true },
@@ -227,6 +232,8 @@ test('system settings save only supported global preferences', async () => {
     update = changes;
     return Promise.resolve(savedSettings);
   };
+  SystemSettings.findOne = () => ({ lean: async () => null });
+  SystemLog.create = async (record) => record;
   const req = {
     user: { id: 'platform-user' },
     body: {
@@ -251,6 +258,8 @@ test('system settings save only supported global preferences', async () => {
     await updateSystemSettings(req, res);
   } finally {
     SystemSettings.findOneAndUpdate = originalFindOneAndUpdate;
+    SystemSettings.findOne = originalFindOne;
+    SystemLog.create = originalSystemLogCreate;
   }
 
   assert.deepEqual(query, { key: 'global' });
@@ -276,5 +285,6 @@ test('system settings save only supported global preferences', async () => {
       enabled: false,
       message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
     },
+    auditRetention: { enabled: false, months: 12 },
   });
 });

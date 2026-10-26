@@ -21,6 +21,7 @@ const createResponse = () => ({
 const setupAdminCreation = () => {
   const originals = {
     findOne: User.findOne,
+    find: User.find,
     create: User.create,
     areaFindOne: Area.findOne,
     environment: Object.fromEntries(['EMAIL_USER', 'EMAIL_PASS'].map((key) => [key, process.env[key]])),
@@ -30,6 +31,7 @@ const setupAdminCreation = () => {
   process.env.EMAIL_USER = 'configured@example.com';
   process.env.EMAIL_PASS = 'configured-but-unused';
   User.findOne = async () => null;
+  User.find = () => ({ select: () => ({ lean: async () => [] }) });
   Area.findOne = () => ({ select: () => ({ lean: async () => ({ name: 'North' }) }) });
   User.create = async (data) => {
     savedAdmin = data;
@@ -43,6 +45,7 @@ const setupAdminCreation = () => {
     getSavedAdmin: () => savedAdmin,
     restore() {
       User.findOne = originals.findOne;
+      User.find = originals.find;
       User.create = originals.create;
       Area.findOne = originals.areaFindOne;
       for (const [key, value] of Object.entries(originals.environment)) {
@@ -72,6 +75,7 @@ test('creates an Area Admin with a hashed temporary password and does not send e
     await createAdminAccount(createRequest(), response);
     assert.equal(response.statusCode, 201);
     assert.equal(setup.getSavedAdmin().mustChangePassword, true);
+    assert.equal(setup.getSavedAdmin().status, 'active');
     assert.equal(await bcrypt.compare('temporary-password', setup.getSavedAdmin().password), true);
     assert.equal(response.body.message, 'Admin created. Please give the temporary password to the admin directly. They must change it on first login.');
     assert.equal(response.body.user.password, undefined);
@@ -91,6 +95,7 @@ test('creates the Area Admin without configured email variables', async () => {
     await createAdminAccount(createRequest(), response);
     assert.equal(response.statusCode, 201);
     assert.equal(setup.getSavedAdmin().mustChangePassword, true);
+    assert.equal(setup.getSavedAdmin().status, 'active');
     assert.equal(response.body.message, 'Admin created. Please give the temporary password to the admin directly. They must change it on first login.');
     assert.equal(response.body.user.password, undefined);
   } finally {

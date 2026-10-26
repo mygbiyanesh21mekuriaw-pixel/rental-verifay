@@ -258,7 +258,7 @@ const Navbar = () => {
 
     [
       FaClipboardList,
-      'System Logs',
+      'Audit Log',
       '/admin-dashboard/system-logs',
     ],
 

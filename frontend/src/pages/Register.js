@@ -88,6 +88,7 @@ const Register = () => {
     role: '',
   });
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -118,6 +119,7 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
 
     const validationErrors = validateRegisterForm(formData);
     setFieldErrors(validationErrors);
@@ -132,7 +134,7 @@ const Register = () => {
     const result = await register(userData);
     
     if (result.success) {
-      navigate(dashboardPaths[result.user?.role] || '/', { replace: true });
+      setSuccessMessage(result.message || 'Your account is waiting for Platform Admin approval.');
     } else {
       setError(result.error);
     }
@@ -147,6 +149,7 @@ const Register = () => {
         <p className="auth-subtitle">Join a trusted marketplace for verified rentals.</p>
         
         {error && <div className="auth-error">{error}</div>}
+        {successMessage && <div className="auth-success" role="status">{t(successMessage)} <Link to="/login">{t('Login')}</Link></div>}
         
         <form onSubmit={handleSubmit} className="auth-form" noValidate>
           <div className="auth-field">

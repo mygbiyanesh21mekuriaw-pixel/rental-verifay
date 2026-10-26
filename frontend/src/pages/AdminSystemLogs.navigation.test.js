@@ -3,6 +3,7 @@ import axios from 'axios';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import AdminSystemLogs from './AdminSystemLogs';
+import { LanguageProvider } from '../context/LanguageContext';
 
 jest.mock('axios', () => ({
   get: jest.fn(),
@@ -29,12 +30,14 @@ test('system logs links back to the platform admin dashboard', async () => {
   });
 
   render(
-    <MemoryRouter initialEntries={['/admin-dashboard/system-logs']}>
-      <Routes>
-        <Route path="/admin-dashboard" element={<CurrentPath />} />
-        <Route path="/admin-dashboard/system-logs" element={<AdminSystemLogs />} />
-      </Routes>
-    </MemoryRouter>,
+    <LanguageProvider>
+      <MemoryRouter initialEntries={['/admin-dashboard/system-logs']}>
+        <Routes>
+          <Route path="/admin-dashboard" element={<CurrentPath />} />
+          <Route path="/admin-dashboard/system-logs" element={<AdminSystemLogs />} />
+        </Routes>
+      </MemoryRouter>
+    </LanguageProvider>,
   );
 
   const backLink = await screen.findByRole('link', { name: /back to dashboard/i });

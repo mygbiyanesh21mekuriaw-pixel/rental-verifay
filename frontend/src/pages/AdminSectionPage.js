@@ -491,7 +491,7 @@ const AdminSectionPage = ({ type }) => {
         payload.fullName = adminForm.name;
         payload.area = adminForm.area;
         payload.username = adminForm.username;
-        payload.password = adminForm.password;
+        payload.tempPassword = adminForm.password;
       } else {
         payload.name = adminForm.name;
         payload.assignedArea = adminForm.area;
@@ -499,7 +499,7 @@ const AdminSectionPage = ({ type }) => {
       const token = localStorage.getItem('token');
       const endpoint = editingAdminId
         ? `${process.env.REACT_APP_API_URL}/api/admin/users/admin/${editingAdminId}`
-        : `${process.env.REACT_APP_API_URL}/api/admin/users/admin`;
+        : `${process.env.REACT_APP_API_URL}/api/admin/area-admins`;
       const response = editingAdminId
         ? await axios.put(endpoint, payload, { headers: { Authorization: `Bearer ${token}` } })
         : await axios.post(endpoint, payload, { headers: { Authorization: `Bearer ${token}` } });
@@ -507,7 +507,11 @@ const AdminSectionPage = ({ type }) => {
       const successMessage = response.data?.message || 'Area Admin updated successfully.';
       handleCancelAdminEdit();
       if (wasEditing) setAdminFormMessage(successMessage);
-      else showAdminNotice(t('Admin created. Please give the temporary password to the admin directly. They must change it on first login.'));
+      else if (response.data?.user?._id) {
+        navigate(`/admin-dashboard/users-permissions?userId=${encodeURIComponent(response.data.user._id)}`);
+      } else {
+        showAdminNotice(t('Admin created. Please give the temporary password to the admin directly. They must change it on first login.'));
+      }
       await fetchItems();
     } catch (error) {
       setAdminFormError(error.response?.data?.message || 'Unable to create admin account.');

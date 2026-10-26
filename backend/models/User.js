@@ -85,6 +85,12 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'suspended'],
+    default: 'active',
+    index: true,
+  },
   replacedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -122,5 +128,31 @@ UserSchema.index(
     collation: { locale: 'en', strength: 2 },
   },
 );
+
+const removeUserPermissions = async (userId) => {
+  await require('./UserPermission').deleteMany({ userId });
+};
+
+UserSchema.pre('deleteOne', { document: true, query: false }, async function cascadePermissions() {
+  await removeUserPermissions(this._id);
+});
+
+UserSchema.pre('deleteOne', { document: false, query: true }, async function cascadeQueryPermissions() {
+  const user = await this.model.findOne(this.getFilter()).select('_id').lean();
+  if (user) await removeUserPermissions(user._id);
+});
+
+UserSchema.pre('findOneAndDelete', async function cascadeFindOnePermissions() {
+  const user = await this.model.findOne(this.getFilter()).select('_id').lean();
+  if (user) await removeUserPermissions(user._id);
+});
+
+UserSchema.pre('deleteMany', async function cascadeManyPermissions() {
+  const users = await this.model.find(this.getFilter()).select('_id').lean();
+  const userIds = users.map((user) => user._id);
+  if (userIds.length > 0) {
+    await require('./UserPermission').deleteMany({ userId: { $in: userIds } });
+  }
+});
 
 module.exports = mongoose.model('User', UserSchema);

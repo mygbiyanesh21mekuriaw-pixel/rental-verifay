@@ -32,13 +32,65 @@ export const useDashboardLayout = () => useContext(DashboardLayoutContext);
 
 const item = (label, path, Icon) => ({ label, path, Icon });
 const group = (label, items) => ({ label, items });
+const dashboardPathForUser = (user) => {
+  const role = user?.effectiveRole || user?.role;
+  if (['admin', 'area_admin', 'platform_admin'].includes(role)) return '/admin-dashboard';
+  return `/${role}-dashboard`;
+};
+
+export const isDashboardMenuItemActive = (pathname, path) => (
+  pathname === path ||
+  (path !== '/landlord-dashboard' && path !== '/tenant-dashboard' && path !== '/admin-dashboard' &&
+    pathname.startsWith(`${path}/`)) ||
+  (path === '/landlord/add-property' && pathname.startsWith('/landlord/edit-property')) ||
+  (path === '/landlord/rejected' && pathname === '/landlord/rejected-properties')
+);
+
+const ALWAYS_ON_PERMISSION_KEYS = ['dashboard', 'accountSettings', 'changePassword'];
+
+const featureKeyForPath = (path) => ({
+  '/landlord/add-property': 'addProperty',
+  '/landlord/my-properties': 'myProperties',
+  '/landlord/verified-properties': 'verifiedProperties',
+  '/landlord/under-review': 'underReview',
+  '/landlord/rejected': 'rejectedProperties',
+  '/landlord/rental-requests': 'rentalRequests',
+  '/landlord/rented-properties': 'rentedProperties',
+  '/landlord/rent-payments': 'rentPayments',
+  '/landlord/bank-information': 'bankInformation',
+  '/landlord/account-settings': 'accountSettings',
+  '/landlord/profile': 'accountSettings',
+  '/landlord/messages': 'messages',
+  '/landlord/notifications': 'notifications',
+  '/landlord/reviews': 'reviews',
+  '/tenant/verified-properties': 'verifiedProperties',
+  '/tenant/favorites': 'favorites',
+  '/tenant/search': 'searchProperties',
+  '/tenant/rental-requests': 'rentalRequests',
+  '/tenant/rented-property': 'rentedProperty',
+  '/tenant/account-settings': 'accountSettings',
+  '/tenant/messages': 'messages',
+  '/tenant/notifications': 'notifications',
+  '/tenant/rent-payment': 'rentPayments',
+  '/tenant/recently-viewed': 'recentlyViewed',
+  '/admin-dashboard/all-properties': 'allProperties',
+  '/admin-dashboard/pending': 'pendingProperties',
+  '/admin-dashboard/verified': 'verifiedProperties',
+  '/admin-dashboard/rejected': 'rejectedProperties',
+  '/admin-dashboard/rental-requests': 'rentalRequests',
+  '/admin-dashboard/messages': 'messages',
+  '/admin-dashboard/contact-messages': 'contactMessages',
+  '/admin-dashboard/all-users': 'users',
+  '/admin-dashboard/profile': 'accountSettings',
+}[path]);
 
 export const getDashboardMenuGroups = (user, t) => {
+  const role = user?.effectiveRole || user?.role;
   const dashboard = group(null, [
-    item('Dashboard', user?.role === 'admin' ? '/admin-dashboard' : `/${user?.role}-dashboard`, FaChartBar),
+    item('Dashboard', dashboardPathForUser(user), FaChartBar),
   ]);
 
-  if (user?.role === 'landlord') {
+  if (role === 'landlord') {
     return [
       dashboard,
       group('Properties', [
@@ -60,7 +112,7 @@ export const getDashboardMenuGroups = (user, t) => {
     ];
   }
 
-  if (user?.role === 'tenant') {
+  if (role === 'tenant') {
     return [
       dashboard,
       group('Properties', [
@@ -78,8 +130,12 @@ export const getDashboardMenuGroups = (user, t) => {
     ];
   }
 
-  if (user?.role === 'admin') {
-    const isPlatform = !user.adminType || user.adminType === 'platform';
+  if (['admin', 'area_admin', 'platform_admin'].includes(role)) {
+    const isPlatform = role === 'platform_admin' ||
+      (role === 'admin' && (
+        user.adminType === 'platform' ||
+        (!user.adminType && (user.adminAreas || []).length === 0)
+      ));
     if (isPlatform) {
       return [
         dashboard,
@@ -87,12 +143,13 @@ export const getDashboardMenuGroups = (user, t) => {
           item('Admin Management', '/admin-dashboard/admin-management', FaShieldAlt),
           item('Ethiopia Places', '/admin-dashboard/places', FaMap),
           item('Users', '/admin-dashboard/all-users', FaUsers),
+          item('Roles & Permissions', '/admin-dashboard/users-permissions', FaUsers),
           item('Properties', '/admin-dashboard/all-properties', FaBuilding),
           item('Admin Analytics', '/admin-dashboard/analytics', FaChartBar),
           item('Payment Period', '/admin-dashboard/payment-period', FaCreditCard),
         ]),
         group('System', [
-          item('System Logs', '/admin-dashboard/system-logs', FaClipboardList),
+          item('Audit Log', '/admin-dashboard/system-logs', FaClipboardList),
           item('System Settings', '/admin-dashboard/system-settings', FaCog),
         ]),
         group('Account', [
@@ -128,7 +185,47 @@ export const getDashboardMenuGroups = (user, t) => {
   return [group(null, [item(t('Dashboard'), '/', FaTh)])];
 };
 
-const DashboardLayout = ({ children, header, menuGroups, user, title }) => {
+export const filterDashboardMenuGroups = (menuGroups, user, permissionLoading = false) => {
+  const safeMenuGroups = Array.isArray(menuGroups) ? menuGroups : [];
+  const role = user?.effectiveRole || user?.role;
+  if (['platform_admin'].includes(role) ||
+    (user?.role === 'admin' && (
+      user.adminType === 'platform' ||
+      (!user.adminType && (user.adminAreas || []).length === 0)
+    ))) {
+    return safeMenuGroups;
+  }
+
+  const permissions = user?.permissions &&
+    typeof user.permissions === 'object' &&
+    !Array.isArray(user.permissions) &&
+    Object.keys(user.permissions).length > 0
+    ? user.permissions
+    : null;
+  const useOnlyAlwaysOn = permissionLoading || !permissions;
+
+  return safeMenuGroups
+  .map((section) => ({
+    ...section,
+    items: section.items.filter(({ path }) => {
+      const featureKey = featureKeyForPath(path);
+      if (!featureKey) return true;
+      if (useOnlyAlwaysOn) return ALWAYS_ON_PERMISSION_KEYS.includes(featureKey);
+      return permissions[featureKey] === true;
+    }),
+  }))
+  .filter((section) => section.items.length > 0);
+};
+
+const DashboardLayout = ({
+  children,
+  header,
+  menuGroups,
+  user,
+  title,
+  permissionLoading = false,
+  permissionError = '',
+}) => {
   const location = useLocation();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -154,11 +251,16 @@ const DashboardLayout = ({ children, header, menuGroups, user, title }) => {
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [menuOpen]);
 
-  const groups = menuGroups || getDashboardMenuGroups(user, t);
+  const groups = filterDashboardMenuGroups(
+    menuGroups || getDashboardMenuGroups(user, t),
+    user,
+    permissionLoading,
+  );
+  const effectiveRole = user?.effectiveRole || user?.role;
   const roleLabel = title || (
-    user?.role === 'admin'
-      ? t(user.adminType === 'area' ? 'Area Admin' : 'Platform Admin')
-      : t(user?.role === 'landlord' ? 'Landlord' : 'Tenant')
+    ['admin', 'area_admin', 'platform_admin'].includes(effectiveRole)
+      ? t(effectiveRole === 'area_admin' || user.adminType === 'area' ? 'Area Admin' : 'Platform Admin')
+      : t(effectiveRole === 'landlord' ? 'Landlord' : 'Tenant')
   );
 
   return (
@@ -181,6 +283,16 @@ const DashboardLayout = ({ children, header, menuGroups, user, title }) => {
             }`}
           >
             <nav aria-label={t('Dashboard navigation')} className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
+              {permissionLoading && (
+                <p role="status" className="mb-3 px-3 text-xs text-white/75">
+                  {t('Loading permissions…')}
+                </p>
+              )}
+              {permissionError && (
+                <p role="alert" className="mb-3 rounded-md bg-white/10 px-3 py-2 text-xs leading-relaxed text-white">
+                  {t(permissionError)}
+                </p>
+              )}
               {groups.map((section, sectionIndex) => (
                 <div key={section.label || `dashboard-${sectionIndex}`} className={section.label ? 'mt-4 first:mt-0' : 'first:mt-0'}>
                   {section.label && (
@@ -189,19 +301,15 @@ const DashboardLayout = ({ children, header, menuGroups, user, title }) => {
                     </h2>
                   )}
                   {section.items.map(({ label, path, Icon }) => {
-                    const isActive = location.pathname === path ||
-                      (path !== '/landlord-dashboard' && path !== '/tenant-dashboard' && path !== '/admin-dashboard' &&
-                        location.pathname.startsWith(`${path}/`)) ||
-                      (path === '/landlord/add-property' && location.pathname.startsWith('/landlord/edit-property')) ||
-                      (path === '/landlord/rejected' && location.pathname === '/landlord/rejected-properties');
+                    const isActive = isDashboardMenuItemActive(location.pathname, path);
                     return (
                       <Link
                         key={path}
                         to={path}
                         onClick={() => setMenuOpen(false)}
                         aria-current={isActive ? 'page' : undefined}
-                        className={`flex min-h-10 items-center gap-3 rounded-none border-l-2 border-transparent px-3 py-2 text-sm font-medium text-white/80 no-underline transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
-                          isActive ? 'border-white font-semibold text-white' : ''
+                        className={`flex min-h-10 items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium text-white/80 no-underline transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+                          isActive ? 'border-white bg-white/15 font-semibold text-white shadow-inner' : ''
                         }`}
                       >
                         <Icon aria-hidden="true" className="shrink-0" />
@@ -224,6 +332,11 @@ const DashboardLayout = ({ children, header, menuGroups, user, title }) => {
             </div>
           </aside>
           <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto rounded-xl bg-white p-3 md:p-4">
+            {location.state?.featureDisabled && (
+              <div role="alert" className="mb-4 border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {t('This feature is currently disabled for your role.')}
+              </div>
+            )}
             {children}
           </main>
         </div>

@@ -6,7 +6,7 @@ const RentalRequest = require('../models/RentalRequest');
 const User = require('../models/User');
 const LandlordCredit = require('../models/LandlordCredit');
 const Notification = require('../models/Notification');
-const { createSystemLog } = require('./systemLogController');
+const { logAudit } = require('../utils/auditLogger');
 const { creditLandlordForPayment } = require('../services/landlordCreditService');
 
 const {
@@ -333,15 +333,11 @@ const createPayment = async (req, res) => {
         { _id: payment._id, paymentReference, status: 'pending' },
         { $set: { status: 'failed', verifiedAt: null }, $unset: { checkoutUrl: 1 } }
       );
-      await createSystemLog({
-        user: req.user.id,
-        role: req.user.role,
-        action: 'PAYMENT_FAILED',
-        description: `Tenant payment for property "${property.title}" failed during provider initialization.`,
-        property: property._id,
-        payment: payment._id,
-        status: 'failed',
-        ipAddress: req.ip || '',
+      await logAudit({
+        req, action: 'PAYMENT_FAILED', module: 'payments', status: 'failed',
+        targetType: 'payment', targetId: payment._id, targetLabel: property.title,
+        details: { reason: 'provider_initialization_failed' },
+        description: `Tenant rent payment for "${property.title}" failed during provider initialization.`,
       });
       return res.status(502).json({ message: providerResult?.providerMessage || 'Payment provider initialization failed', payment: await paymentView(Payment.findById(payment._id)) });
     }
@@ -362,15 +358,11 @@ const createPayment = async (req, res) => {
       return res.status(409).json({ message: 'Payment attempt changed while checkout was being initialized. Please reload the payment page.' });
     }
 
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
-      action: 'PAYMENT_SUBMITTED',
-      description: `Tenant submitted a rent payment for property "${property.title}" for period ${period}.`,
-      property: property._id,
-      payment: payment._id,
-      status: 'pending',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, action: 'PAYMENT_SUBMITTED', module: 'payments',
+      targetType: 'payment', targetId: payment._id, targetLabel: property.title,
+      details: { paymentPeriod: period, amount: payment.amount, currency: payment.currency },
+      description: `Tenant ${req.user.name} made a rent payment for "${property.title}".`,
     });
 
     res.status(201).json({
@@ -467,9 +459,20 @@ const applyChapaVerification = async (payment, verification, req) => {
       { landlord: updatedPayment.landlord, recipientRole: 'landlord', property: updatedPayment.property, propertyTitle, message: 'Payment Received for your property.', type: 'info' },
       { recipientRole: 'admin', property: updatedPayment.property, propertyTitle, message: 'A tenant rent payment was confirmed.', instructions: `Payment reference: ${updatedPayment.paymentReference}.`, type: 'info' },
     ]);
-    await createSystemLog({ user: updatedPayment.tenant, role: 'tenant', action: 'PAYMENT_CONFIRMED', description: `Tenant rent payment for property "${propertyTitle}" was confirmed.`, property: updatedPayment.property, payment: updatedPayment._id, status: 'success', ipAddress: req?.ip || req?.socket?.remoteAddress || '' });
+    await logAudit({
+      req, actor: { id: updatedPayment.tenant, role: 'tenant' },
+      action: 'PAYMENT_CONFIRMED', module: 'payments',
+      targetType: 'payment', targetId: updatedPayment._id, targetLabel: propertyTitle,
+      description: `Tenant rent payment for "${propertyTitle}" was confirmed.`,
+    });
   } else {
-    await createSystemLog({ user: updatedPayment.tenant, role: 'tenant', action: 'PAYMENT_FAILED', description: `Tenant rent payment for property "${updatedPayment.property}" ended in ${status} status.`, property: updatedPayment.property, payment: updatedPayment._id, status: 'failed', ipAddress: req?.ip || req?.socket?.remoteAddress || '' });
+    await logAudit({
+      req, actor: { id: updatedPayment.tenant, role: 'tenant' },
+      action: 'PAYMENT_FAILED', module: 'payments', status: 'failed',
+      targetType: 'payment', targetId: updatedPayment._id, targetLabel: 'Rent payment',
+      details: { status },
+      description: `Tenant rent payment ended in ${status} status.`,
+    });
   }
   return updatedPayment;
 };

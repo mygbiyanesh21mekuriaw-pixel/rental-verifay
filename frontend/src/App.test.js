@@ -1,4 +1,4 @@
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
@@ -40,6 +40,96 @@ beforeEach(() => {
       contactAddress: '',
     },
   };
+});
+
+test.each([false, true])(
+  'landlord rejected-properties permission=%s controls direct-route access',
+  async (rejectedPropertiesEnabled) => {
+    const landlord = {
+      id: 'landlord-dani',
+      name: 'Dani',
+      role: 'landlord',
+      status: 'active',
+    };
+    const permissions = [
+      'dashboard',
+      'myProperties',
+      'verifiedProperties',
+      'underReview',
+      'rentalRequests',
+      'rentedProperties',
+      'rentPayments',
+      'bankInformation',
+      'messages',
+      'reviews',
+      'notifications',
+      'accountSettings',
+      'changePassword',
+      ...(rejectedPropertiesEnabled ? ['rejectedProperties'] : []),
+    ];
+    axios.get.mockImplementation((url) => {
+      if (url.endsWith('/api/auth/me')) return Promise.resolve({ data: { user: landlord } });
+      if (url.endsWith('/api/permissions/me')) return Promise.resolve({ data: { permissions } });
+      return Promise.resolve({ data: [] });
+    });
+    localStorage.setItem('token', 'landlord-token');
+    localStorage.setItem('user', JSON.stringify(landlord));
+    window.history.pushState({}, '', '/landlord/rejected');
+
+    renderApp();
+
+    if (rejectedPropertiesEnabled) {
+      expect(await screen.findByRole('heading', { name: 'Rejected Properties' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Permission denied' })).not.toBeInTheDocument();
+    } else {
+      expect(await screen.findByRole('heading', { name: 'Permission denied' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Back to Dashboard' })).toHaveAttribute('href', '/landlord-dashboard');
+    }
+  }
+);
+
+test('a 403 from an optional landlord dashboard widget does not redirect the dashboard', async () => {
+  const landlord = {
+    id: 'landlord-dani',
+    name: 'Dani',
+    role: 'landlord',
+    status: 'active',
+  };
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/api/auth/me')) return Promise.resolve({ data: { user: landlord } });
+    if (url.endsWith('/api/permissions/me')) {
+      return Promise.resolve({
+        data: {
+          permissions: [
+            'dashboard', 'myProperties', 'verifiedProperties', 'underReview', 'rejectedProperties',
+            'rentalRequests', 'rentedProperties', 'rentPayments', 'bankInformation', 'messages',
+            'reviews', 'notifications', 'accountSettings', 'changePassword',
+          ],
+        },
+      });
+    }
+    if (url.includes('/api/payments/landlord')) {
+      return Promise.reject({ response: { status: 403, data: { message: 'Permission denied' } } });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+  localStorage.setItem('token', 'landlord-token');
+  localStorage.setItem('user', JSON.stringify(landlord));
+  window.history.pushState({}, '', '/landlord-dashboard');
+
+  try {
+    renderApp();
+    expect(await screen.findByRole('heading', { name: 'Welcome back, Dani' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Permission denied' })).not.toBeInTheDocument();
+    const dashboardMain = within(screen.getByRole('main'));
+    await waitFor(() => {
+      expect(dashboardMain.queryByRole('link', { name: /Rent Payments/ })).not.toBeInTheDocument();
+    });
+    expect(dashboardMain.getByRole('link', { name: /My Properties/ })).toBeInTheDocument();
+  } finally {
+    consoleError.mockRestore();
+  }
 });
 
 test('renders only the public navigation before login', async () => {
@@ -355,6 +445,56 @@ test.each([
     expect(document.querySelectorAll('.dashboard-layout-sidebar')).toHaveLength(1);
   }
 );
+
+test('platform admin can open a sidebar route without a permissions API response', async () => {
+  const platformAdmin = {
+    id: 'platform-admin-id',
+    name: 'Platform Admin',
+    role: 'admin',
+    adminType: 'platform',
+    permissions: {},
+  };
+  localStorage.setItem('token', 'platform-admin-token');
+  localStorage.setItem('user', JSON.stringify(platformAdmin));
+  axios.get.mockResolvedValue({ data: { user: platformAdmin } });
+  window.history.pushState({}, '', '/admin-dashboard');
+
+  renderApp();
+
+  const sidebar = await screen.findByRole('navigation', { name: 'Dashboard navigation' });
+  fireEvent.click(within(sidebar).getByRole('link', { name: 'Admin Management' }));
+
+  expect(window.location.pathname).toBe('/admin-dashboard/admin-management');
+  expect(axios.get).not.toHaveBeenCalledWith(
+    expect.stringContaining('/api/permissions/me')
+  );
+});
+
+test('area admin keeps the session and falls back to always-on links when permissions fail', async () => {
+  const areaAdmin = {
+    id: 'area-admin-id',
+    name: 'Area Admin',
+    role: 'admin',
+    adminType: 'area',
+    permissions: {},
+  };
+  localStorage.setItem('token', 'area-admin-token');
+  localStorage.setItem('user', JSON.stringify(areaAdmin));
+  axios.get.mockImplementation((url) => (
+    String(url).includes('/api/permissions/me')
+      ? Promise.reject(new Error('Permissions service unavailable'))
+      : Promise.resolve({ data: { user: areaAdmin } })
+  ));
+  window.history.pushState({}, '', '/admin-dashboard');
+
+  renderApp();
+
+  expect(await screen.findByText(/Unable to load permissions/)).toBeInTheDocument();
+  const sidebar = screen.getByRole('navigation', { name: 'Dashboard navigation' });
+  expect(within(sidebar).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/admin-dashboard');
+  expect(within(sidebar).queryByRole('link', { name: 'Properties' })).not.toBeInTheDocument();
+  expect(localStorage.getItem('token')).toBe('area-admin-token');
+});
 
 test('toggles the mobile navigation and closes it after navigation', async () => {
   renderApp();

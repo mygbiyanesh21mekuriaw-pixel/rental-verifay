@@ -2,6 +2,9 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Property = require('../models/Property');
+const { getUserPermissions } = require('../services/userPermissions');
+const { permissionRoleForUser, PERMISSION_CATALOG } = require('../config/permissionCatalog');
+const requirePermission = require('./requirePermission');
 
 const getAdministrativeRole = (user) => {
   if (user?.role === 'platform_admin' || user?.role === 'area_admin') return user.role;
@@ -24,22 +27,31 @@ const resolveAuthenticatedUser = async (decoded) => {
   if (!mongoose.isValidObjectId(decoded?.id)) return null;
 
   const user = await User.findById(decoded.id)
-    .select('_id role adminType adminAreas assignedArea area mustChangePassword isActive')
+    .select('_id name email role adminType adminAreas assignedArea area mustChangePassword isActive status')
     .lean();
-  if (!user || user.isActive === false) return null;
+  if (!user) return null;
 
   const adminAreas = user.adminAreas || [];
+  const adminType = user.role === 'admin'
+    ? user.adminType || (adminAreas.length > 0 ? 'area' : 'platform')
+    : undefined;
+  const effectiveRole = permissionRoleForUser({ ...user, adminType });
+  const status = ['pending', 'active', 'suspended'].includes(user.status) ? user.status : 'active';
+  if (user.isActive === false && effectiveRole !== 'platform_admin' && status !== 'suspended') return null;
   return {
     id: String(user._id),
+    name: user.name,
+    email: user.email,
     role: user.role,
-    adminType: user.role === 'admin'
-      ? user.adminType || (adminAreas.length > 0 ? 'area' : 'platform')
-      : undefined,
+    adminType,
     adminAreas,
     assignedArea: user.assignedArea || getLegacyAssignedArea(adminAreas),
     area: user.area || '',
-      mustChangePassword: user.mustChangePassword === true,
+    mustChangePassword: user.mustChangePassword === true,
     isActive: user.isActive !== false,
+    status,
+    sessionId: decoded.sessionId || decoded.jti || '',
+    permissions: await getUserPermissions(user._id, effectiveRole),
   };
 };
 
@@ -72,6 +84,13 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'User account is not available' });
     }
     req.user = user;
+    const isPlatformAdmin = permissionRoleForUser(user) === 'platform_admin';
+    if (!isPlatformAdmin && user.status === 'pending') {
+      return res.status(403).json({ message: 'Your account is waiting for Platform Admin approval.' });
+    }
+    if (!isPlatformAdmin && user.status === 'suspended') {
+      return res.status(403).json({ message: 'Your account is suspended.' });
+    }
       const requestPath = `${req.baseUrl || ''}${req.path || ''}`;
       const isAllowedDuringPasswordChange = (
         req.method === 'POST' && ['/api/change-password', '/api/logout', '/api/auth/logout'].includes(requestPath)
@@ -100,6 +119,13 @@ const optionalAuth = async (req, res, next) => {
       return res.status(401).json({ message: 'User account is not available' });
     }
     req.user = user;
+    const isPlatformAdmin = permissionRoleForUser(user) === 'platform_admin';
+    if (!isPlatformAdmin && user.status === 'pending') {
+      return res.status(403).json({ message: 'Your account is waiting for Platform Admin approval.' });
+    }
+    if (!isPlatformAdmin && user.status === 'suspended') {
+      return res.status(403).json({ message: 'Your account is suspended.' });
+    }
     const requestPath = `${req.baseUrl || ''}${req.path || ''}`;
     const isAllowedDuringPasswordChange = (
       req.method === 'POST' && ['/api/change-password', '/api/logout', '/api/auth/logout'].includes(requestPath)
@@ -128,6 +154,52 @@ const requireRole = (...roles) => (req, res, next) => {
   }
   req.user.accessRole = role;
   next();
+};
+
+const requireAdminPropertyPermission = (req, res, next) => {
+  const role = getAdministrativeRole(req.user);
+  if (role !== 'area_admin') return next();
+  const status = String(req.query.status || '').toLowerCase();
+  if (status === 'all') return next();
+  const featureKey = {
+    pending: 'pendingProperties',
+    approved: 'verifiedProperties',
+    verified: 'verifiedProperties',
+    rejected: 'rejectedProperties',
+  }[status] || 'allProperties';
+  return requirePermission(featureKey)(req, res, next);
+};
+
+const requirePropertyAccess = (req, res, next) => {
+  if (!req.user) return next();
+  const role = getAdministrativeRole(req.user);
+  if (role === 'platform_admin') return next();
+  if (!PERMISSION_CATALOG[role]) return res.status(403).json({ message: 'Permission denied' });
+  if (role === 'tenant') {
+    if (req.params?.id) {
+      const canViewDetails = req.user.permissions?.verifiedProperties === true
+        || req.user.permissions?.searchProperties === true;
+      return canViewDetails ? next() : res.status(403).json({ message: 'Permission denied' });
+    }
+    const searchFields = [
+      'search', 'title', 'description', 'location', 'address', 'region', 'zone', 'wereda',
+      'city', 'subCity', 'kebele', 'houseNumber', 'price', 'minPrice', 'maxPrice',
+      'bedrooms', 'availability', 'sortPrice',
+    ];
+    const hasSearchFilters = searchFields.some((field) => req.query?.[field] !== undefined);
+    const permissionKey = req.query?.feature === 'searchProperties' || hasSearchFilters
+      ? 'searchProperties'
+      : 'verifiedProperties';
+    const allowed = req.user.permissions?.[permissionKey] === true;
+    return allowed ? next() : res.status(403).json({ message: 'Permission denied' });
+  }
+  const permissionKey = role === 'landlord'
+    ? 'myProperties'
+    : role === 'area_admin'
+      ? 'allProperties'
+      : null;
+  if (!permissionKey || req.user.permissions?.[permissionKey] === true) return next();
+  return res.status(403).json({ message: 'Permission denied' });
 };
 
 const adminOnly = requireRole('platform_admin', 'area_admin');
@@ -179,6 +251,9 @@ module.exports = {
   optionalAuth,
   adminOnly,
   requireRole,
+  requirePermission,
+  requireAdminPropertyPermission,
+  requirePropertyAccess,
   getAdministrativeRole,
   areaAdminOnly,
   platformAdminOnly,

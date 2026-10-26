@@ -4,11 +4,13 @@ const SystemSettings = require('../models/SystemSettings');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { createSystemLog } = require('./systemLogController');
+const { logAudit } = require('../utils/auditLogger');
 const { decryptBankAccountNumber } = require('../utils/bankAccountCrypto');
 const maskBankAccountNumber = require('../utils/maskBankAccountNumber');
 const sendEmail = require('../utils/email');
 const { uploadFilesToUrls } = require('../utils/uploadMedia');
+const { ensureUserPermissions, getUserPermissions } = require('../services/userPermissions');
+const { permissionRoleForUser } = require('../config/permissionCatalog');
 
 const registrationNamePattern = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
 const registrationEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -44,6 +46,7 @@ const serializeUser = (user) => {
     phone: user.phone || '',
     profilePhoto: user.profilePhoto || '',
     role: user.role,
+    status: user.status || 'active',
     mustChangePassword: user.mustChangePassword === true,
     area: user.area || '',
     adminType: user.role === 'admin'
@@ -145,29 +148,21 @@ const register = async (req, res) => {
       area: area?.name || '',
       profilePhoto: profilePhoto?.trim() || '',
       role,
+      status: 'pending',
     });
 
     await user.save();
+    await ensureUserPermissions(user._id, permissionRoleForUser(user));
 
-    await createSystemLog({
-      user: user._id,
-      role: user.role,
-      action: 'USER_REGISTERED',
-      description: `User ${user.name} registered as ${user.role}.`,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, actor: user, action: 'USER_REGISTERED', module: 'auth',
+      targetType: 'user', targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      description: `${user.name} (${user.email}) registered as ${permissionRoleForUser(user)}.`,
     });
 
-    // JWT ቶከን ያመንጩ
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
     res.status(201).json({
-      message: 'User registered successfully',
-      token,
+      message: 'Your account is waiting for Platform Admin approval.',
       user: serializeUser(user),
     });
   } catch (error) {
@@ -199,6 +194,8 @@ const login = async (req, res) => {
     ) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+    const sessionId = crypto.randomUUID();
+    req.auditSessionId = sessionId;
 
     const escapedIdentifier = normalizedIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const matchingUsers = await User.find({
@@ -209,41 +206,79 @@ const login = async (req, res) => {
     const user = matchingUsers.length === 1 ? matchingUsers[0] : null;
 
     if (!user) {
+      await logAudit({
+        req,
+        action: 'USER_LOGIN',
+        module: 'auth',
+        status: 'failed',
+        details: { identifier: normalizedIdentifier },
+        description: 'Login failed for an unknown account.',
+      });
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     // ይለፍ ቃሉን ያረጋግጡ
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      await logAudit({
+        req, actor: user, action: 'USER_LOGIN', module: 'auth', status: 'failed',
+        details: { reason: 'invalid_credentials' },
+        description: `Login failed for ${user.name} (${user.email}).`,
+      });
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    if (user.isActive === false) {
+    const isPlatformAdmin = permissionRoleForUser(user) === 'platform_admin';
+    if (!isPlatformAdmin && user.status === 'pending') {
+      await logAudit({
+        req, actor: user, action: 'USER_LOGIN', module: 'auth', status: 'denied',
+        details: { reason: 'pending_account' },
+        description: `Login denied for pending user ${user.name} (${user.email}).`,
+      });
+      return res.status(403).json({ message: 'Your account is waiting for Platform Admin approval.' });
+    }
+    if (!isPlatformAdmin && user.status === 'suspended') {
+      await logAudit({
+        req, actor: user, action: 'USER_LOGIN', module: 'auth', status: 'denied',
+        details: { reason: 'suspended_account' },
+        description: `Login denied for suspended user ${user.name} (${user.email}).`,
+      });
+      return res.status(403).json({ message: 'Your account is suspended.' });
+    }
+    if (!isPlatformAdmin && user.isActive === false) {
+      await logAudit({
+        req, actor: user, action: 'USER_LOGIN', module: 'auth', status: 'denied',
+        details: { reason: 'inactive_account' },
+        description: `Login denied for inactive user ${user.name} (${user.email}).`,
+      });
       return res.status(403).json({
         message: 'This account is inactive. Contact an administrator for assistance.',
       });
     }
 
-    await createSystemLog({
-      user: user._id,
-      role: user.role,
+    await logAudit({
+      req,
+      actor: user,
       action: 'USER_LOGIN',
-      description: `User ${user.name} logged in successfully.`,
-      status: 'success',
-      ipAddress: req.ip || '',
+      module: 'auth',
+      targetType: 'user',
+      targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      description: `${user.name} (${user.email}) logged in.`,
     });
 
     // JWT ቶከን ያመንጩ
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role, sessionId },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
+    const permissions = await getUserPermissions(user._id, permissionRoleForUser(user));
     res.json({
       message: 'Login successful',
       token,
       mustChangePassword: user.mustChangePassword === true,
-      user: serializeUser(user),
+      user: { ...serializeUser(user), permissions },
     });
   } catch (error) {
     const isDatabaseAuthenticationFailure = error?.code === 8000 ||
@@ -280,6 +315,7 @@ const getMe = async (req, res) => {
     const settings = await SystemSettings.findOne({ key: 'global' }).lean();
     res.json({
       ...serializeUser(user),
+      permissions: req.user.permissions || {},
       systemPreferences: {
         defaultAppearance: settings?.defaultAppearance || 'system',
         notifications: settings?.notifications || { inAppEnabled: true, emailEnabled: true },
@@ -331,13 +367,11 @@ const updateProfile = async (req, res) => {
     user.profilePhoto = profilePhoto || user.profilePhoto;
     await user.save();
 
-    await createSystemLog({
-      user: user._id,
-      role: user.role,
-      action: 'USER_UPDATED',
-      description: `User ${user.name} updated their profile information.`,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, actor: user, action: 'USER_UPDATED', module: 'account',
+      targetType: 'user', targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      description: `${user.name} (${user.email}) updated their profile information.`,
     });
 
     res.json({ 
@@ -365,13 +399,11 @@ const updateProfilePhoto = async (req, res) => {
     user.profilePhoto = profilePhoto;
     await user.save();
 
-    await createSystemLog({
-      user: user._id,
-      role: user.role,
-      action: 'USER_UPDATED',
-      description: `User ${user.name} updated their profile photo.`,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, actor: user, action: 'USER_UPDATED', module: 'account',
+      targetType: 'user', targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      description: `${user.name} (${user.email}) updated their profile photo.`,
     });
 
     return res.json({
@@ -403,13 +435,10 @@ const changePassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    await createSystemLog({
-      user: user._id,
-      role: user.role,
-      action: 'PASSWORD_CHANGED',
-      description: `User ${user.name} changed their password.`,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, actor: user, action: 'PASSWORD_CHANGED', module: 'auth',
+      targetType: 'user', targetId: user._id, targetLabel: `${user.name} (${user.email})`,
+      description: `${user.name} (${user.email}) changed their password.`,
     });
 
     res.json({ message: 'Password changed successfully.' });
@@ -439,6 +468,12 @@ const changePasswordOnFirstLogin = async (req, res) => {
     user.mustChangePassword = false;
     await user.save();
 
+    await logAudit({
+      req, actor: user, action: 'PASSWORD_CHANGED', module: 'auth',
+      targetType: 'user', targetId: user._id, targetLabel: `${user.name} (${user.email})`,
+      details: { firstLogin: true },
+      description: `${user.name} (${user.email}) changed their temporary password.`,
+    });
     return res.json({ message: 'Password changed successfully.', mustChangePassword: false });
   } catch (error) {
     return res.status(500).json({ message: 'Unable to change password.' });
@@ -538,13 +573,11 @@ const resetPassword = async (req, res) => {
     user.passwordResetExpiresAt = undefined;
     await user.save();
 
-    await createSystemLog({
-      user: user._id,
-      role: user.role,
-      action: 'PASSWORD_RESET',
-      description: `User ${user.name} reset their password using an email link.`,
-      status: 'success',
-      ipAddress: req.ip || '',
+    await logAudit({
+      req, actor: user, action: 'PASSWORD_RESET', module: 'auth',
+      targetType: 'user', targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      description: `${user.name} (${user.email}) reset their password using an email link.`,
     });
 
     return res.json({ message: 'Password updated successfully.' });
@@ -556,14 +589,16 @@ const resetPassword = async (req, res) => {
 
 const logout = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('name role');
-    await createSystemLog({
-      user: req.user.id,
-      role: req.user.role,
+    const user = await User.findById(req.user.id).select('name email role');
+    await logAudit({
+      req,
+      actor: user || req.user,
       action: 'USER_LOGOUT',
-      description: user ? `${user.name} logged out.` : 'User logged out.',
-      status: 'success',
-      ipAddress: req.ip || '',
+      module: 'auth',
+      targetType: 'user',
+      targetId: req.user.id,
+      targetLabel: user?.name || req.user.name,
+      description: user ? `${user.name} (${user.email || ''}) logged out.` : 'User logged out.',
     });
 
     res.json({ message: 'Logout successful' });

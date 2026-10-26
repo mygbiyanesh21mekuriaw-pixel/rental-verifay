@@ -6,9 +6,11 @@ const SystemLogSchema = new mongoose.Schema({
     ref: 'User',
     default: null,
   },
+  actorName: { type: String, default: '' },
+  actorEmail: { type: String, default: '' },
   role: {
     type: String,
-    enum: ['admin', 'landlord', 'tenant', 'user'],
+    enum: ['admin', 'platform_admin', 'area_admin', 'landlord', 'tenant', 'user'],
     default: null,
   },
   action: {
@@ -38,9 +40,17 @@ const SystemLogSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['success', 'failed', 'pending'],
+    enum: ['success', 'failed', 'pending', 'denied'],
     default: 'success',
   },
+  module: { type: String, default: '' },
+  targetType: { type: String, default: '' },
+  targetId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  targetLabel: { type: String, default: '' },
+  details: { type: mongoose.Schema.Types.Mixed, default: {} },
+  ip: { type: String, default: '' },
+  userAgent: { type: String, default: '' },
+  sessionId: { type: String, default: '' },
   ipAddress: {
     type: String,
     default: '',
@@ -55,5 +65,7 @@ SystemLogSchema.index({ createdAt: -1 });
 SystemLogSchema.index({ action: 1, createdAt: -1 });
 SystemLogSchema.index({ role: 1, createdAt: -1 });
 SystemLogSchema.index({ status: 1, createdAt: -1 });
+SystemLogSchema.index({ user: 1, createdAt: -1 });
+SystemLogSchema.index({ module: 1, createdAt: -1 });
 
 module.exports = mongoose.model('SystemLog', SystemLogSchema);

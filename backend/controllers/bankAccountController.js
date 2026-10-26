@@ -12,6 +12,7 @@ const {
   decryptBankAccountNumber,
 } = require('../utils/bankAccountCrypto');
 const maskBankAccountNumber = require('../utils/maskBankAccountNumber');
+const { logAudit } = require('../utils/auditLogger');
 const { retryLandlordCredits } = require('../services/landlordCreditService');
 const {
   getPayoutEligibilityFailure,
@@ -207,9 +208,10 @@ const createLandlordBankAccount = async (req, res) => {
       return res.status(404).json({ message: 'Landlord account not found.' });
     }
     let hasRecoverableAccountNumber = Boolean(landlord.bankAccountNumber);
+    let previousAccountNumberMasked = '';
     if (hasRecoverableAccountNumber) {
       try {
-        decryptBankAccountNumber(landlord.bankAccountNumber);
+        previousAccountNumberMasked = maskBankAccountNumber(decryptBankAccountNumber(landlord.bankAccountNumber));
       } catch (error) {
         hasRecoverableAccountNumber = false;
       }
@@ -221,6 +223,11 @@ const createLandlordBankAccount = async (req, res) => {
       });
     }
 
+    const previousBankInformation = {
+      bankName: landlord.bankName || '',
+      bankCode: landlord.bankCode || '',
+      accountName: landlord.bankAccountName || '',
+    };
     landlord.bankName = bank.name;
     landlord.bankCode = bankCode;
     landlord.bankAccountName = accountName;
@@ -232,6 +239,26 @@ const createLandlordBankAccount = async (req, res) => {
     landlord.bankAccountVerified = false;
 
     await landlord.save();
+    const nextAccountNumberMasked = accountNumber
+      ? maskBankAccountNumber(accountNumber)
+      : previousAccountNumberMasked;
+    const changedFields = {};
+    if (previousBankInformation.bankName !== bank.name) changedFields.bankName = { from: previousBankInformation.bankName, to: bank.name };
+    if (previousBankInformation.bankCode !== bankCode) changedFields.bankCode = { from: previousBankInformation.bankCode, to: bankCode };
+    if (previousBankInformation.accountName !== accountName) changedFields.accountName = { from: previousBankInformation.accountName, to: accountName };
+    if (accountNumber && previousAccountNumberMasked !== nextAccountNumberMasked) {
+      changedFields.accountNumber = { from: previousAccountNumberMasked, to: nextAccountNumberMasked };
+    }
+    await logAudit({
+      req,
+      action: 'BANK_INFORMATION_CHANGED',
+      module: 'bank_information',
+      targetType: 'user',
+      targetId: landlord._id,
+      targetLabel: `${landlord.name} (${landlord.email})`,
+      details: changedFields,
+      description: `Landlord ${landlord.name} (${landlord.email}) changed bank information.`,
+    });
     try {
       await retryLandlordCredits(req.user.id);
     } catch (creditError) {

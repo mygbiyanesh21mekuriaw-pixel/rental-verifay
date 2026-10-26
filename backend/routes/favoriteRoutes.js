@@ -5,7 +5,7 @@ const {
   getMyFavorites,
   isFavorited,
 } = require('../controllers/favoriteController');
-const { auth } = require('../middleware/auth');
+const { auth, requirePermission } = require('../middleware/auth');
 
 const tenantOnly = (req, res, next) => {
   if (req.user.role !== 'tenant') {
@@ -15,12 +15,12 @@ const tenantOnly = (req, res, next) => {
 };
 
 // Get all favorites for the authenticated tenant
-router.get('/', auth, tenantOnly, getMyFavorites);
+router.get('/', auth, tenantOnly, requirePermission('favorites'), getMyFavorites);
 
 // Check if a specific property is favorited
-router.get('/:propertyId', auth, tenantOnly, isFavorited);
+router.get('/:propertyId', auth, tenantOnly, requirePermission('favorites'), isFavorited);
 
 // Toggle favorite status
-router.post('/toggle', auth, tenantOnly, toggleFavorite);
+router.post('/toggle', auth, tenantOnly, requirePermission('favorites'), toggleFavorite);
 
 module.exports = router;

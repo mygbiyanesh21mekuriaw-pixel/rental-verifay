@@ -26,6 +26,7 @@ const initialSettings = {
     enabled: false,
     message: 'RentalVerify is temporarily unavailable for scheduled maintenance. Please check back soon.',
   },
+  auditRetention: { enabled: false, months: 12 },
 };
 
 const settingsTabs = [
@@ -33,6 +34,7 @@ const settingsTabs = [
   { id: 'appearance-notifications', label: 'Appearance & Notifications' },
   { id: 'properties', label: 'Properties' },
   { id: 'maintenance', label: 'Maintenance' },
+  { id: 'audit-retention', label: 'Audit retention' },
 ];
 
 const ToggleSwitch = ({ id, label, checked, onChange, description }) => (
@@ -403,6 +405,32 @@ const SystemSettings = () => {
                   </div>
                   <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-900">Platform Admins can continue working and turn maintenance mode off.</p>
                 </div>
+              </section>
+            )}
+
+            {activeTab === 'audit-retention' && (
+              <section aria-label="Audit log retention settings" className="max-w-3xl space-y-6">
+                <h2 className="text-xl font-bold text-slate-900">Audit log retention</h2>
+                <ToggleSwitch
+                  id="audit-retention-enabled"
+                  label="Enable configured audit log retention"
+                  description="Retention cleanup is disabled by default. No audit records are deleted automatically unless this option is explicitly enabled and a cleanup policy is configured."
+                  checked={settings.auditRetention?.enabled === true}
+                  onChange={(event) => updateSection('auditRetention', 'enabled', event.target.checked)}
+                />
+                <div className="max-w-xs">
+                  <label htmlFor="audit-retention-months" className="mb-2 block font-semibold text-slate-800">Keep logs for (months)</label>
+                  <input
+                    id="audit-retention-months"
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={settings.auditRetention?.months ?? 12}
+                    onChange={(event) => updateSection('auditRetention', 'months', Number(event.target.value))}
+                    className="w-full rounded-lg border border-slate-300 p-3"
+                  />
+                </div>
+                <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Default retention is 12 months. This setting stores the policy only; existing logs are never deleted by this page.</p>
               </section>
             )}
           </div>

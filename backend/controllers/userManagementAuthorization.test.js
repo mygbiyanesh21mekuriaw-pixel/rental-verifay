@@ -248,13 +248,33 @@ test('Platform Admin can deactivate and reactivate a non-Platform Admin user wit
     await setUserActive({ ...request, body: { isActive: false } }, deactivateResponse);
     assert.equal(deactivateResponse.statusCode, null);
     assert.equal(user.isActive, false);
+    assert.equal(user.status, 'suspended');
 
     const activateResponse = createResponse();
     await setUserActive({ ...request, body: { isActive: true } }, activateResponse);
     assert.equal(activateResponse.statusCode, null);
     assert.equal(user.isActive, true);
+    assert.equal(user.status, 'active');
     assert.deepEqual(logs.map((entry) => entry.action), ['USER_DEACTIVATED', 'USER_ACTIVATED']);
   });
+});
+
+test('Platform Admin activation approves pending registrations already marked active', async () => {
+  const user = makeUser({ status: 'pending', isActive: true });
+  const response = createResponse();
+  await withReplacements({
+    'User.findById': async () => user,
+    'SystemLog.create': async () => null,
+  }, async () => {
+    await setUserActive({
+      params: { id: userId },
+      body: { isActive: true },
+      user: { id: adminId, role: 'admin', adminType: 'platform' },
+    }, response);
+  });
+
+  assert.equal(response.statusCode, null);
+  assert.equal(user.status, 'active');
 });
 
 test('user status and role endpoints reject self-actions and Platform Admin targets', async () => {

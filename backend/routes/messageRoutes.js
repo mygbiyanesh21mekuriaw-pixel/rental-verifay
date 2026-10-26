@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth, adminOnly, requirePermission } = require('../middleware/auth');
 const {
   openConversation,
   getConversation,
@@ -11,18 +11,18 @@ const {
   getAdminConversations,
 } = require('../controllers/messageController');
 
-router.post('/conversations/open', auth, openConversation);
-router.get('/admin/conversations', auth, adminOnly, getAdminConversations);
-router.post('/admin/conversations/:id/messages', auth, adminOnly, sendAdminMessage);
-router.get('/conversations', auth, (req, res, next) => {
+router.post('/conversations/open', auth, requirePermission('messages'), openConversation);
+router.get('/admin/conversations', auth, adminOnly, requirePermission('messages'), getAdminConversations);
+router.post('/admin/conversations/:id/messages', auth, adminOnly, requirePermission('messages'), sendAdminMessage);
+router.get('/conversations', auth, requirePermission('messages'), (req, res, next) => {
   if (req.user.role !== 'landlord') return res.status(403).json({ message: 'Landlords only' });
   next();
 }, getLandlordConversations);
-router.get('/tenant/conversations', auth, (req, res, next) => {
+router.get('/tenant/conversations', auth, requirePermission('messages'), (req, res, next) => {
   if (req.user.role !== 'tenant') return res.status(403).json({ message: 'Tenants only' });
   next();
 }, getTenantConversations);
-router.get('/conversations/:id', auth, getConversation);
-router.post('/conversations/:id/messages', auth, sendMessage);
+router.get('/conversations/:id', auth, requirePermission('messages'), getConversation);
+router.post('/conversations/:id/messages', auth, requirePermission('messages'), sendMessage);
 
 module.exports = router;

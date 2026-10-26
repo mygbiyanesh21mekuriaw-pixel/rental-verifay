@@ -11,7 +11,7 @@ const {
 	requestPasswordReset,
 	resetPassword,
 } = require('../controllers/authController');
-const { auth } = require('../middleware/auth');
+const { auth, requirePermission } = require('../middleware/auth');
 const { upload, handleMulterError } = require('../middleware/upload');
 
 router.post('/register', register);
@@ -21,8 +21,8 @@ router.post('/reset-password', resetPassword);
 router.post('/logout', auth, logout);
 router.get('/me', auth, getMe);
 
-router.put('/profile', auth, updateProfile);
-router.put('/profile/photo', auth, upload.single('profilePhoto'), handleMulterError, updateProfilePhoto);
-router.put('/change-password', auth, changePassword);
+router.put('/profile', auth, requirePermission('accountSettings'), updateProfile);
+router.put('/profile/photo', auth, requirePermission('accountSettings'), upload.single('profilePhoto'), handleMulterError, updateProfilePhoto);
+router.put('/change-password', auth, requirePermission('changePassword'), changePassword);
 
 module.exports = router;
