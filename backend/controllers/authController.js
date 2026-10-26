@@ -113,9 +113,11 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 8 characters.' });
     }
 
-    if (!requestedArea) return res.status(400).json({ message: 'Area is required.' });
-    const area = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
-    if (!area) return res.status(400).json({ message: 'Select an existing area.' });
+    let area = null;
+    if (requestedArea) {
+      area = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+      if (!area) return res.status(400).json({ message: 'Select an existing area.' });
+    }
 
     // ተጠቃሚው አስቀድሞ መኖሩን ያረጋግጡ
     const existingUser = await User.findOne({ email: normalizedEmail });
@@ -140,7 +142,7 @@ const register = async (req, res) => {
       username: normalizedUsername,
       password: hashedPassword,
       phone: normalizedPhone,
-      area: area.name,
+      area: area?.name || '',
       profilePhoto: profilePhoto?.trim() || '',
       role,
     });
@@ -214,6 +216,11 @@ const login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
+    }
+    if (user.isActive === false) {
+      return res.status(403).json({
+        message: 'This account is inactive. Contact an administrator for assistance.',
+      });
     }
 
     await createSystemLog({

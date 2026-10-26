@@ -118,6 +118,30 @@ test('auth rejects a deactivated Area Admin even when their JWT is still valid',
   }
 });
 
+test('auth rejects a previously issued landlord token after the database account is deactivated', async () => {
+  const originalFindById = User.findById;
+  const inactiveLandlord = {
+    _id: '507f1f77bcf86cd799439017',
+    role: 'landlord',
+    isActive: false,
+  };
+  User.findById = () => createUserQuery(inactiveLandlord);
+  const token = jwt.sign(
+    { id: inactiveLandlord._id, role: 'landlord' },
+    process.env.JWT_SECRET,
+  );
+  const response = createResponse();
+  let nextCalled = false;
+
+  try {
+    await auth(makeRequest(token), response, () => { nextCalled = true; });
+    assert.equal(response.statusCode, 401);
+    assert.equal(nextCalled, false);
+  } finally {
+    User.findById = originalFindById;
+  }
+});
+
 test('auth uses the current database role instead of a stale elevated JWT role', async () => {
   const originalFindById = User.findById;
   const tenant = {

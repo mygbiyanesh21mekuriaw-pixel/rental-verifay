@@ -13,6 +13,9 @@ jest.mock('../context/AuthContext', () => ({
 jest.mock('./LanguageSwitcher', () => () => null);
 jest.mock('./ProfilePhotoControl', () => () => null);
 jest.mock('./ProfileAvatar', () => () => null);
+jest.mock('../context/LanguageContext', () => ({
+  useLanguage: () => ({ t: (value) => value }),
+}));
 jest.mock('../context/SystemStatusContext', () => ({
   useSystemStatus: () => ({
     status: {
@@ -48,5 +51,28 @@ test.each([
     );
   } else {
     expect(screen.queryByRole('link', { name: 'System Settings' })).not.toBeInTheDocument();
+  }
+});
+
+test.each([
+  ['Area Admin', { role: 'admin', adminType: 'area' }, true],
+  ['Platform Admin', { role: 'admin', adminType: 'platform' }, false],
+])('%s sees the Area Admin contact inbox only when assigned the area-admin role', (_roleName, user, allowed) => {
+  mockUser = user;
+  axios.get.mockResolvedValue({ data: { unreadCount: 0 } });
+
+  render(
+    <MemoryRouter>
+      <Navbar />
+    </MemoryRouter>,
+  );
+
+  if (allowed) {
+    expect(screen.getByRole('link', { name: 'Contact Messages' })).toHaveAttribute(
+      'href',
+      '/admin-dashboard/contact-messages',
+    );
+  } else {
+    expect(screen.queryByRole('link', { name: 'Contact Messages' })).not.toBeInTheDocument();
   }
 });

@@ -47,6 +47,7 @@ test('verification document upload is private to its landlord and authorized adm
   const property = {
     _id: '507f1f77bcf86cd799439099',
     landlord: '507f1f77bcf86cd799439002',
+    area: 'Mekelle',
     city: 'Mekelle',
   };
   const activeUsers = new Map([

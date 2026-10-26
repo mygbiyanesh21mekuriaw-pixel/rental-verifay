@@ -15,7 +15,12 @@ jest.mock('../context/AuthContext', () => ({
 
 jest.mock('../context/LanguageContext', () => {
   const translate = (value) => value;
-  return { useLanguage: () => ({ t: translate }) };
+  return {
+    useLanguage: () => ({
+      t: translate,
+      formatDate: (value) => String(value),
+    }),
+  };
 });
 
 const platformAdmin = { role: 'admin', adminType: 'platform', name: 'Admin Example' };
@@ -104,7 +109,6 @@ beforeEach(() => {
     });
     if (url.endsWith('/api/admin/analytics')) return Promise.resolve({ data: { trends: { propertiesByMonth: [] } } });
     if (url.endsWith('/api/admin/payment-periods')) return Promise.resolve({ data: [{ status: 'pending' }, { status: 'paid' }] });
-    if (url.endsWith('/api/contact/platform-admin/inbox')) return Promise.resolve({ data: [{ read: false }, { read: true }] });
     if (url.includes('/api/admin/system-logs')) {
       return Promise.resolve({
         data: {
@@ -136,7 +140,6 @@ test('platform dashboard shows linked stats, charts, pending properties, recent 
   expect(await screen.findByRole('link', { name: /Area Admins/ })).toHaveTextContent('3');
   expect(screen.getByRole('link', { name: /Platform Admin/ })).toHaveTextContent('1');
   expect(screen.getByRole('link', { name: /Pending Payments/ })).toHaveAttribute('href', '/admin-dashboard/payment-period');
-  expect(screen.getByRole('link', { name: /Unread Contact Messages/ })).toHaveAttribute('href', '/admin-dashboard/contact-messages');
   expect(screen.getByRole('heading', { name: 'Properties by status' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'New properties per month' })).toBeInTheDocument();
   expect(screen.getByRole('img', { name: 'Properties by status' })).toHaveTextContent('3');
@@ -156,7 +159,7 @@ test('platform dashboard shows linked stats, charts, pending properties, recent 
     expect.any(Object),
   );
   expect(screen.getByRole('link', { name: /Manage users/ })).toHaveAttribute('href', '/admin-dashboard/all-users');
-  expect(screen.getByRole('link', { name: /View messages/ })).toHaveAttribute('href', '/admin-dashboard/contact-messages');
+  expect(screen.queryByRole('link', { name: /View messages/ })).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: /Review properties/ })).toHaveAttribute('href', '/admin-dashboard/review-properties');
 });
 
@@ -203,6 +206,7 @@ test('area admin dashboard shows assigned area, scoped rental counts and area qu
   expect(screen.getByRole('link', { name: /Verified Properties/ })).toHaveAttribute('href', '/admin-dashboard/verified');
   expect(screen.getByRole('link', { name: /Rejected Properties/ })).toHaveAttribute('href', '/admin-dashboard/rejected');
   expect(screen.getByRole('link', { name: /Rental requests/ })).toHaveAttribute('href', '/admin-dashboard/rental-requests');
+  expect(screen.getByRole('link', { name: /Contact Messages/ })).toHaveAttribute('href', '/admin-dashboard/contact-messages');
   expect(screen.getByRole('link', { name: /Review properties/ })).toHaveAttribute('href', '/admin-dashboard/pending');
   expect(axios.get).toHaveBeenCalledWith(
     expect.stringContaining('/api/rental-requests/admin-requests'),
@@ -217,7 +221,6 @@ test('recent activity fills remaining places with routine events when fewer than
     if (url.endsWith('/api/admin/stats')) return Promise.resolve({ data: { totalUsers: 0 } });
     if (url.endsWith('/api/admin/analytics')) return Promise.resolve({ data: { trends: { propertiesByMonth: [] } } });
     if (url.endsWith('/api/admin/payment-periods')) return Promise.resolve({ data: [] });
-    if (url.endsWith('/api/contact/platform-admin/inbox')) return Promise.resolve({ data: [] });
     if (url.includes('/api/admin/system-logs')) {
       return Promise.resolve({
         data: {

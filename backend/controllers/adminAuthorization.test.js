@@ -4,8 +4,10 @@ const User = require('../models/User');
 const Property = require('../models/Property');
 const systemLogRoutes = require('../routes/systemLogRoutes');
 const adminRoutes = require('../routes/adminRoutes');
+const adminAccountRoutes = require('../routes/adminAccountRoutes');
+const { deleteAreaAdminAccount } = require('./adminController');
 const { platformAdminOnly } = require('../middleware/auth');
-const { getAdminProperties, getAllUsers } = require('./adminController');
+const { getAdminProperties, getPendingProperties, getAllUsers } = require('./adminController');
 const { requireRole } = require('../middleware/auth');
 
 const createResponse = () => ({
@@ -47,7 +49,8 @@ test('legacy area admins remain scoped when loading administrative properties', 
     );
 
     assert.equal(response.statusCode, null);
-    assert.ok(propertyFilter.$and[0].$or[0].city instanceof RegExp);
+    assert.ok(propertyFilter.$and[0].$or[0].area instanceof RegExp);
+    assert.equal(propertyFilter.$and[0].$or[0].city, undefined);
     assert.deepEqual(response.body, []);
   } finally {
     User.findById = originalUserFindById;
@@ -71,6 +74,31 @@ test('role changes are restricted to Platform Admins', () => {
   assert.equal(route.route.stack[1].handle, platformAdminOnly);
 });
 
+test('user status route allows only authenticated admins', () => {
+  const route = adminRoutes.stack.find((layer) =>
+    layer.route?.path === '/users/:id/active' && layer.route.methods.patch);
+
+  assert.ok(route);
+  assert.equal(route.route.stack[0].handle.name, 'auth');
+  assert.deepEqual(route.route.stack[1].handle.toString(), requireRole('platform_admin', 'area_admin').toString());
+});
+
+test('Area Admin delete routes reject deletion and require Platform Admin authorization', () => {
+  const routes = [
+    [adminAccountRoutes, '/:id'],
+    [adminRoutes, '/users/admin/:id'],
+  ];
+
+  routes.forEach(([router, path]) => {
+    const route = router.stack.find((layer) => layer.route?.path === path && layer.route.methods.delete);
+
+    assert.ok(route);
+    assert.equal(route.route.stack[0].handle.name, 'auth');
+    assert.equal(route.route.stack[1].handle, platformAdminOnly);
+    assert.equal(route.route.stack.at(-1).handle, deleteAreaAdminAccount);
+  });
+});
+
 test('area-admin role is derived from legacy admin fields and exposes its assigned area', () => {
   const middleware = requireRole('area_admin');
   const req = { user: { role: 'admin', adminType: 'area', assignedArea: 'Mekelle' } };
@@ -92,12 +120,26 @@ test('platform-admin role middleware rejects area admins', () => {
   assert.equal(response.statusCode, 403);
 });
 
-test('area-admin user query is restricted to the assigned area', async () => {
-  const originalUserFind = User.find;
-  let query;
+test('Area Admin user list is derived from properties and rentals in the assigned area', async () => {
+  const originals = {
+    userFind: User.find,
+    propertyFind: Property.find,
+    rentalFind: require('../models/RentalRequest').find,
+  };
+  let userFilter;
+  let propertyFilter;
+  let rentalFilter;
+  Property.find = (filter) => {
+    propertyFilter = filter;
+    return { select: () => ({ lean: async () => [{ _id: 'area-property', landlord: 'landlord-id' }] }) };
+  };
+  require('../models/RentalRequest').find = (filter) => {
+    rentalFilter = filter;
+    return { select: () => ({ lean: async () => [{ tenant: 'tenant-id', landlord: 'landlord-id' }] }) };
+  };
   User.find = (filter) => {
-    query = filter;
-    return { select: async () => [] };
+    userFilter = filter;
+    return { select: () => ({ lean: async () => [] }) };
   };
   const response = createResponse();
 
@@ -106,10 +148,17 @@ test('area-admin user query is restricted to the assigned area', async () => {
       user: { role: 'admin', adminType: 'area', assignedArea: 'Mekelle' },
     }, response);
 
-    assert.deepEqual(query, { area: 'Mekelle' });
+    assert.ok(propertyFilter.$or[0].area instanceof RegExp);
+    assert.deepEqual(rentalFilter, { property: { $in: ['area-property'] } });
+    assert.deepEqual(userFilter, {
+      _id: { $in: ['landlord-id', 'tenant-id'] },
+      role: { $in: ['landlord', 'tenant'] },
+    });
     assert.deepEqual(response.body, []);
   } finally {
-    User.find = originalUserFind;
+    User.find = originals.userFind;
+    Property.find = originals.propertyFind;
+    require('../models/RentalRequest').find = originals.rentalFind;
   }
 });
 
@@ -140,10 +189,49 @@ test('area-admin property query matches only the assigned area', async () => {
       response,
     );
 
-    assert.ok(propertyFilter.$and[0].$or.some((condition) => condition.area instanceof RegExp));
+    assert.ok(propertyFilter.$and[0].area instanceof RegExp);
+    assert.equal(propertyFilter.$and[0].city, undefined);
     assert.deepEqual(response.body, []);
   } finally {
     User.findById = originalUserFindById;
     Property.find = originalPropertyFind;
+  }
+});
+
+test('Under Review property query uses only the Area Admin assigned property area', async () => {
+  const originals = { findById: User.findById, propertyFind: Property.find };
+  let propertyFilter;
+  User.findById = () => ({
+    select() {
+      return {
+        lean: async () => ({
+          adminType: 'area',
+          assignedArea: 'Dessie',
+          adminAreas: [{ city: 'Dessie' }],
+        }),
+      };
+    },
+  });
+  Property.find = (filter) => {
+    propertyFilter = filter;
+    return {
+      populate() {
+        return this;
+      },
+      lean: async () => [],
+    };
+  };
+  const response = createResponse();
+
+  try {
+    await getPendingProperties({ user: { id: 'area-admin-id' }, params: {} }, response);
+    assert.equal(propertyFilter.verificationStatus, 'pending');
+    assert.equal(propertyFilter.isVerified, false);
+    assert.ok(propertyFilter.$and[0].area instanceof RegExp);
+    assert.equal(propertyFilter.$and[0].city, undefined);
+    assert.deepEqual(response.body, []);
+  } finally {
+    User.findById = originals.findById;
+    Property.find = originals.propertyFind;
   }
 });

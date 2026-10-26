@@ -28,7 +28,7 @@ const privateUploadAccess = async (req, res, next) => {
 
   try {
     let property = await Property.findOne({ verificationDocument: { $regex: uploadPath } })
-      .select('_id landlord region zone wereda city subCity')
+      .select('_id landlord area region zone wereda city subCity')
       .lean();
 
     if (!property) {
@@ -37,7 +37,7 @@ const privateUploadAccess = async (req, res, next) => {
         .lean();
       if (!verificationRequest) return next();
       property = await Property.findById(verificationRequest.property)
-        .select('_id landlord region zone wereda city subCity')
+        .select('_id landlord area region zone wereda city subCity')
         .lean();
       if (!property) return res.status(404).end();
     }

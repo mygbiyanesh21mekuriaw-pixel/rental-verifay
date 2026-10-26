@@ -11,7 +11,7 @@ test('platform admins retain platform-wide sidebar destinations', () => {
   expect(paths).toContain('/admin-dashboard/system-logs');
   expect(paths).toContain('/admin-dashboard/system-settings');
   expect(paths).toContain('/admin-dashboard/all-users');
-  expect(paths).toContain('/admin-dashboard/contact-messages');
+  expect(paths).not.toContain('/admin-dashboard/contact-messages');
 });
 
 test('area admins only see area-scoped sidebar destinations', () => {

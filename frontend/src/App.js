@@ -515,7 +515,7 @@ function AppContent() {
             <Route path="/admin-dashboard/verified" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="verified" /></PrivateRoute>} />
             <Route path="/admin-dashboard/rejected" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="rejected" /></PrivateRoute>} />
             <Route path="/admin-dashboard/notifications" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminNotifications /></PrivateRoute>} />
-            <Route path="/admin-dashboard/contact-messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminContactMessages /></PrivateRoute>} />
+            <Route path="/admin-dashboard/contact-messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['area']}><AdminContactMessages /></PrivateRoute>} />
             <Route path="/admin-dashboard/profile" element={<PrivateRoute allowedRoles={['admin']}><AdminProfile /></PrivateRoute>} />
             <Route path="/admin-dashboard/messages" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminMessages /></PrivateRoute>} />
             <Route path="/admin-dashboard/system-logs" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSystemLogs /></PrivateRoute>} />

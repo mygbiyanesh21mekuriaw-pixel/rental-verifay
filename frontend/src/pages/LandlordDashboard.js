@@ -443,17 +443,15 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         });
         formDataToSend.append('document', documentFile);
 
-        await axios.post(`${process.env.REACT_APP_API_URL}/api/properties`, formDataToSend, {
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/properties`, formDataToSend, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'multipart/form-data',
           },
         });
+        setFormSuccess(response.data?.message || 'Property submitted successfully! Verification is pending');
       }
 
-      if (!isEditMode) {
-        setFormSuccess('Property submitted successfully! Verification is pending');
-      }
       setFormData({
         title: '',
         description: '',

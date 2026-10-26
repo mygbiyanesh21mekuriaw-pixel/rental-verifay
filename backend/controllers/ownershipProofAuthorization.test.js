@@ -76,6 +76,7 @@ const withCloudinaryConfig = async (callback) => {
 const privateProperty = (overrides = {}) => ({
   _id: propertyId,
   landlord: ownerId,
+  area: 'Mekelle',
   city: 'Mekelle',
   verificationDocument: '',
   verificationDocumentAsset: cloudAsset,

@@ -6,7 +6,6 @@ import {
   FaCheck,
   FaClipboardList,
   FaEnvelope,
-  FaExclamationCircle,
   FaFileAlt,
   FaHourglassHalf,
   FaMoneyBill,
@@ -127,12 +126,11 @@ const AdminDashboard = () => {
           const requests = await Promise.allSettled([
             get('/api/admin/stats'),
             get('/api/admin/payment-periods'),
-            get('/api/contact/platform-admin/inbox'),
             get('/api/admin/system-logs?limit=100'),
           ]);
           if (!active) return;
 
-          const keys = ['stats', 'payments', 'messages', 'logs'];
+          const keys = ['stats', 'payments', 'logs'];
           const data = {};
           const nextErrors = {};
           requests.forEach((result, index) => {
@@ -233,15 +231,6 @@ const AdminDashboard = () => {
         icon: <FaMoneyBill aria-hidden="true" />,
         iconClass: 'payments',
         to: '/admin-dashboard/payment-period',
-      });
-    }
-    if (isPlatformAdmin && Array.isArray(platformData?.messages)) {
-      cards.push({
-        label: 'Unread Contact Messages',
-        value: platformData.messages.filter((message) => !message.read).length,
-        icon: <FaEnvelope aria-hidden="true" />,
-        iconClass: 'messages',
-        to: '/admin-dashboard/contact-messages',
       });
     }
     return cards;
@@ -471,15 +460,17 @@ const AdminDashboard = () => {
             <FaHourglassHalf aria-hidden="true" />{t('Review properties')}
           </Link>
           {isPlatformAdmin && (
-            <>
-              <Link to="/admin-dashboard/all-users"><FaUsers aria-hidden="true" />{t('Manage users')}</Link>
-              <Link to="/admin-dashboard/contact-messages"><FaExclamationCircle aria-hidden="true" />{t('View messages')}</Link>
-            </>
+            <Link to="/admin-dashboard/all-users"><FaUsers aria-hidden="true" />{t('Manage users')}</Link>
           )}
           {!isPlatformAdmin && (
-            <Link to="/admin-dashboard/rental-requests">
-              <FaClipboardList aria-hidden="true" />{t('Rental requests')}
-            </Link>
+            <>
+              <Link to="/admin-dashboard/rental-requests">
+                <FaClipboardList aria-hidden="true" />{t('Rental requests')}
+              </Link>
+              <Link to="/admin-dashboard/contact-messages">
+                <FaEnvelope aria-hidden="true" />{t('Contact Messages')}
+              </Link>
+            </>
           )}
         </div>
       </section>

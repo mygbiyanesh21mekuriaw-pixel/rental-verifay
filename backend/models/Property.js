@@ -51,8 +51,8 @@ const PropertySchema = new mongoose.Schema({
   },
   area: {
     type: String,
+    required: true,
     trim: true,
-    default: '',
   },
   region: {
     type: String,

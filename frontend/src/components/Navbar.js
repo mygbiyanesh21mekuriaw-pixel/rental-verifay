@@ -293,12 +293,6 @@ const Navbar = () => {
     ],
 
     [
-      FaEnvelope,
-      'Contact Messages',
-      '/admin-dashboard/contact-messages',
-    ],
-
-    [
       FaUser,
       'Account Settings',
       '/admin-dashboard/profile',
@@ -349,6 +343,12 @@ const Navbar = () => {
       FaBell,
       'Notifications',
       '/admin-dashboard/notifications',
+    ],
+
+    [
+      FaEnvelope,
+      'Contact Messages',
+      '/admin-dashboard/contact-messages',
     ],
 
     [

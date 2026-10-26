@@ -10,6 +10,7 @@ const {
   getAnalytics,
   getAdminPaymentPeriods,
   deleteUser,
+  setUserActive,
   changeUserRole,
   createAdminAccount,
   updateAreaAdminAccount,
@@ -32,6 +33,7 @@ router.get('/system-logs', auth, requireRole('platform_admin'), getSystemLogs);
 router.get('/payment-periods', auth, platformAdminOnly, getAdminPaymentPeriods);
 router.get('/demo-bank-accounts', auth, platformAdminOnly, getAllDemoAccounts);
 router.delete('/users/:id', auth, requireRole('platform_admin', 'area_admin'), deleteUser);
+router.patch('/users/:id/active', auth, requireRole('platform_admin', 'area_admin'), setUserActive);
 router.post('/users/admin', auth, platformAdminOnly, createAdminAccount);
 router.put('/users/admin/:id', auth, platformAdminOnly, updateAreaAdminAccount);
 router.delete('/users/admin/:id', auth, platformAdminOnly, deleteAreaAdminAccount);

@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import { apiUrl } from '../utils/apiUrl';
 
 const dashboardPaths = {
   tenant: '/tenant-dashboard',
@@ -31,7 +29,7 @@ const EyeOffIcon = () => (
   </svg>
 );
 
-const validateRegisterForm = ({ name, email, username, phone, password, confirmPassword, role, area }) => {
+const validateRegisterForm = ({ name, email, username, phone, password, confirmPassword, role }) => {
   const nextErrors = {};
   const trimmedName = String(name || '').trim();
   const trimmedEmail = String(email || '').trim();
@@ -75,10 +73,6 @@ const validateRegisterForm = ({ name, email, username, phone, password, confirmP
   if (!role) {
     nextErrors.role = 'Please select a role';
   }
-  if (!area) {
-    nextErrors.area = 'Please select an area';
-  }
-
   return nextErrors;
 };
 
@@ -92,9 +86,7 @@ const Register = () => {
     phone: '',
     profilePhoto: '',
     role: '',
-    area: '',
   });
-  const [areas, setAreas] = useState([]);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -110,20 +102,6 @@ const Register = () => {
       navigate(dashboardPaths[user.role] || '/', { replace: true });
     }
   }, [user, navigate]);
-
-  useEffect(() => {
-    let active = true;
-    Promise.resolve()
-      .then(() => axios.get(apiUrl('/api/public/areas')))
-      .then((response) => {
-        if (active) setAreas(Array.isArray(response.data) ? response.data : []);
-      })
-      .catch((areaError) => {
-        console.error('Unable to load registration areas:', areaError);
-        if (active) setError('Unable to load areas. Please refresh the page.');
-      });
-    return () => { active = false; };
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -317,22 +295,6 @@ const Register = () => {
             {fieldErrors.role && <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.role}</p>}
           </div>
 
-          <div className="auth-field">
-            <label>Area *</label>
-            <select
-              name="area"
-              value={formData.area}
-              onChange={handleChange}
-              required
-              aria-invalid={Boolean(fieldErrors.area)}
-              className={fieldErrors.area ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : ''}
-            >
-              <option value="" disabled>Select an area</option>
-              {areas.map((area) => <option key={area._id} value={area.name}>{area.name}</option>)}
-            </select>
-            {fieldErrors.area && <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.area}</p>}
-          </div>
-          
           <button 
             type="submit" 
             disabled={loading}

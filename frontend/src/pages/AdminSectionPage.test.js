@@ -1,9 +1,10 @@
 import React from 'react';
 import axios from 'axios';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import AdminSectionPage from './AdminSectionPage';
 import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../utils/apiUrl';
 
 jest.mock('axios', () => ({
   get: jest.fn(),
@@ -37,6 +38,7 @@ const users = [
     name: 'Tenant Example',
     email: 'tenant@example.com',
     role: 'tenant',
+    isActive: true,
   },
   platformAdmin,
 ];
@@ -47,6 +49,11 @@ const renderUsersPage = () => render(
     <AdminSectionPage type="allUsers" />
   </MemoryRouter>
 );
+
+const openAreaAdminMenu = async (name = 'Area Admin') => {
+  const row = await screen.findByRole('row', { name: new RegExp(name) });
+  fireEvent.click(within(row).getByRole('button', { name: 'More actions' }));
+};
 
 const CurrentPath = () => {
   const location = useLocation();
@@ -101,7 +108,10 @@ test('shows and hides the create-admin password and resets it after submission',
     </MemoryRouter>,
   );
 
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
   const passwordInput = await screen.findByLabelText('Temporary password');
+  expect(passwordInput).toHaveAttribute('placeholder', 'Temporary password');
+  expect(screen.queryByText('Temporary password')).not.toBeInTheDocument();
   expect(axios.get).toHaveBeenCalledWith(
     expect.stringMatching(/\/api\/areas$/),
     expect.objectContaining({ headers: { Authorization: 'Bearer platform-token' } }),
@@ -115,7 +125,7 @@ test('shows and hides the create-admin password and resets it after submission',
   fireEvent.change(screen.getByPlaceholderText('Full name'), { target: { value: 'Area Admin' } });
   fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'area@example.com' } });
   fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'area_admin' } });
-  fireEvent.change(screen.getByRole('combobox', { name: '' }), { target: { value: 'North' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Select an assigned area' }), { target: { value: 'North' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create Admin' }));
 
   await waitFor(() => expect(axios.post).toHaveBeenCalled());
@@ -132,14 +142,136 @@ test('shows and hides the create-admin password and resets it after submission',
     { headers: { Authorization: 'Bearer platform-token' } },
   );
   expect(passwordInput).toHaveAttribute('minLength', '8');
-  expect(await screen.findByRole('button', { name: 'Show password' })).toBeInTheDocument();
-  expect(passwordInput).toHaveAttribute('type', 'password');
-  expect(passwordInput).toHaveValue('');
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Create Area Admin Account' })).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: '+ New Area Admin' }));
+  expect(await screen.findByLabelText('Temporary password')).toHaveValue('');
   const successMessage = 'Admin created. Please give the temporary password to the admin directly. They must change it on first login.';
   expect(screen.getByRole('status')).toHaveTextContent(successMessage);
   expect(screen.getByRole('status').closest('.admin-success-banner')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Dismiss message' }));
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('creates an Area Admin in a modal and refreshes the table on success', async () => {
+  const createdAdmin = {
+    _id: 'created-admin',
+    name: 'New Area Admin',
+    email: 'new-area@example.com',
+    phone: '0912345678',
+    role: 'admin',
+    adminType: 'area',
+    assignedArea: 'North',
+    isActive: true,
+  };
+  let created = false;
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? areas : created ? [createdAdmin] : [],
+  }));
+  axios.post.mockImplementation(() => {
+    created = true;
+    return Promise.resolve({ data: { message: 'Admin account created.' } });
+  });
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
+  const createDialog = await screen.findByRole('dialog', { name: 'Create Area Admin Account' });
+  const createFooter = createDialog.querySelector('.admin-form-modal-actions');
+  expect(within(createFooter).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  expect(within(createFooter).getByRole('button', { name: 'Create Admin' })).toBeInTheDocument();
+  fireEvent.change(screen.getByPlaceholderText('Full name'), { target: { value: createdAdmin.name } });
+  fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: createdAdmin.email } });
+  fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'new_area_admin' } });
+  fireEvent.change(screen.getByLabelText('Temporary password'), { target: { value: 'Temporary123' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Select an assigned area' }), { target: { value: 'North' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create Admin' }));
+
+  expect(await screen.findByRole('row', { name: /New Area Admin.*new-area@example.com.*North/ })).toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: 'Create Area Admin Account' })).not.toBeInTheDocument();
+});
+
+test('Edit modal keeps footer actions visible, omits create help, and saves from the footer', async () => {
+  const areaAdmin = {
+    _id: 'area-admin-id',
+    name: 'Area Admin',
+    email: 'area@example.com',
+    phone: '0912345678',
+    role: 'admin',
+    adminType: 'area',
+    assignedArea: 'North',
+    isActive: true,
+  };
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? areas : [areaAdmin],
+  }));
+  axios.put.mockResolvedValue({ data: { message: 'Area Admin updated successfully.' } });
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  await openAreaAdminMenu();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Edit Area Admin' });
+  expect(within(dialog).queryByText('Create an Area Admin account for one assigned area.')).not.toBeInTheDocument();
+  const footer = dialog.querySelector('.admin-form-modal-actions');
+  expect(within(footer).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByPlaceholderText('Full name'), { target: { value: 'Updated Admin' } });
+  fireEvent.click(within(footer).getByRole('button', { name: 'Save Changes' }));
+
+  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
+    expect.stringMatching(/\/api\/admin\/users\/admin\/area-admin-id$/),
+    expect.objectContaining({ name: 'Updated Admin', assignedArea: 'North' }),
+    expect.objectContaining({ headers: expect.any(Object) }),
+  ));
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+});
+
+test('admin form modal locks body scroll, traps focus, closes on Escape, and restores focus', async () => {
+  const originalOverflow = document.body.style.overflow;
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  const trigger = await screen.findByRole('button', { name: '+ New Area Admin' });
+  fireEvent.click(trigger);
+  const dialog = await screen.findByRole('dialog', { name: 'Create Area Admin Account' });
+  expect(document.body.style.overflow).toBe('hidden');
+
+  const closeButton = within(dialog).getByRole('button', { name: 'Close' });
+  const submitButton = within(dialog).getByRole('button', { name: 'Create Admin' });
+  expect(closeButton).toHaveFocus();
+  fireEvent.keyDown(closeButton, { key: 'Tab', shiftKey: true });
+  expect(submitButton).toHaveFocus();
+  fireEvent.keyDown(document, { key: 'Escape' });
+
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(document.body.style.overflow).toBe(originalOverflow);
+  expect(trigger).toHaveFocus();
+});
+
+test('admin form modal closes from the backdrop without a confirmation prompt', async () => {
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Create Area Admin Account' });
+  fireEvent.change(within(dialog).getByPlaceholderText('Full name'), { target: { value: 'Draft Admin' } });
+  fireEvent.mouseDown(dialog.parentElement);
+
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(window.confirm).not.toHaveBeenCalled();
 });
 
 test('marks occupied areas unavailable in create and edit forms', async () => {
@@ -173,14 +305,17 @@ test('marks occupied areas unavailable in create and edit forms', async () => {
     </MemoryRouter>,
   );
 
-  const createAreaSelect = await screen.findByRole('combobox', { name: '' });
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
+  const createAreaSelect = await screen.findByRole('combobox', { name: 'Select an assigned area' });
   expect(screen.getByRole('option', { name: 'North (taken by North Admin)' })).toBeDisabled();
   expect(screen.getByRole('option', { name: 'South (taken by South Admin)' })).toBeDisabled();
 
-  fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  await openAreaAdminMenu('North Admin');
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
   await waitFor(() => expect(screen.getByRole('option', { name: 'North' })).toBeEnabled());
   expect(screen.getByRole('option', { name: 'South (taken by South Admin)' })).toBeDisabled();
-  expect(createAreaSelect).toBeInTheDocument();
+  expect(createAreaSelect).not.toBeInTheDocument();
 });
 
 test('shows a server conflict message in the Area Admin form', async () => {
@@ -206,11 +341,12 @@ test('shows a server conflict message in the Area Admin form', async () => {
     </MemoryRouter>,
   );
 
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
   fireEvent.change(await screen.findByPlaceholderText('Full name'), { target: { value: 'New Admin' } });
   fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'new@example.com' } });
   fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'new_admin' } });
   fireEvent.change(screen.getByLabelText('Temporary password'), { target: { value: 'Temporary123' } });
-  fireEvent.change(screen.getByRole('combobox', { name: '' }), { target: { value: 'South' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Select an assigned area' }), { target: { value: 'South' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create Admin' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -236,7 +372,8 @@ test('Platform Admin resets an Area Admin password using the reset card action',
     </MemoryRouter>,
   );
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }));
+  await openAreaAdminMenu();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Reset password' }));
   fireEvent.change(document.getElementById('reset-admin-password-area-admin-id'), { target: { value: 'replacement-password' } });
   fireEvent.click(screen.getByRole('button', { name: 'Reset password' }));
 
@@ -270,7 +407,8 @@ test('shows a reset error in the shared dismissible notice without closing the r
     </MemoryRouter>,
   );
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Reset password' }));
+  await openAreaAdminMenu();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Reset password' }));
   fireEvent.change(document.getElementById('reset-admin-password-area-admin-id'), { target: { value: 'replacement-password' } });
   fireEvent.click(screen.getByRole('button', { name: 'Reset password' }));
 
@@ -298,6 +436,9 @@ test('shows the area API status and message when loading areas fails', async () 
     </MemoryRouter>,
   );
 
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
+
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'HTTP 503: Area database unavailable.',
   );
@@ -313,9 +454,12 @@ test('links to Ethiopia Places when no places have been registered', async () =>
     </MemoryRouter>,
   );
 
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
+
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
   const placesLink = await screen.findByRole('link', { name: 'Ethiopia Places' });
   expect(placesLink).toHaveAttribute('href', '/admin-dashboard/places');
-  expect(screen.getByRole('combobox')).toHaveTextContent('No places registered yet');
+  expect(screen.getByRole('combobox', { name: 'Select an assigned area' })).toHaveTextContent('No places registered yet');
 });
 
 test.each([
@@ -407,6 +551,193 @@ test('Area Admin property cards show the latest handler snapshot and former-admi
   expect(screen.getByText(/Verified by Admin A on.*\(former admin\)/)).toBeInTheDocument();
 });
 
+test('Area Admin cards offer lifecycle actions without Delete', async () => {
+  const areaAdmin = {
+    _id: 'area-admin-id',
+    name: 'Area Admin',
+    email: 'area@example.com',
+    role: 'admin',
+    adminType: 'area',
+    assignedArea: 'North',
+    isActive: true,
+  };
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? areas : [areaAdmin],
+  }));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByText(
+    'To free an area, Demote the admin or Edit their area. Deactivate only blocks login and keeps the area reserved.',
+  )).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Deactivate' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'More actions' })).toHaveAttribute('aria-expanded', 'false');
+  await openAreaAdminMenu();
+  expect(screen.getByRole('menuitem', { name: 'Demote' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Reset password' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+  expect(axios.delete).not.toHaveBeenCalled();
+});
+
+test('searches Area Admins and filters active status', async () => {
+  const areaAdmins = Array.from({ length: 12 }, (_, index) => ({
+    _id: `area-admin-${index + 1}`,
+    name: `Admin ${index + 1}`,
+    email: `admin${index + 1}@example.com`,
+    phone: `09123456${String(index).padStart(2, '0')}`,
+    role: 'admin',
+    adminType: 'area',
+    assignedArea: `Area ${index + 1}`,
+    isActive: index % 2 === 0,
+  }));
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? areas : areaAdmins,
+  }));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByText('Admin 1')).toBeInTheDocument();
+  expect(screen.getByText('Area Admin results: 12')).toBeInTheDocument();
+  fireEvent.change(screen.getByPlaceholderText('Search by name, email, phone, or area'), {
+    target: { value: 'admin12@example.com' },
+  });
+  expect(await screen.findByText('Admin 12')).toBeInTheDocument();
+  expect(screen.queryByText('Admin 1')).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), { target: { value: 'inactive' } });
+  expect(screen.getByRole('row', { name: /Admin 12.*admin12@example.com/ })).toBeInTheDocument();
+  expect(screen.getByText('Area Admin results: 1')).toBeInTheDocument();
+});
+
+test('paginates Area Admins by ten and resets to a valid page when search changes', async () => {
+  const areaAdmins = Array.from({ length: 12 }, (_, index) => ({
+    _id: `area-admin-${index + 1}`,
+    name: `Admin ${index + 1}`,
+    email: `admin${index + 1}@example.com`,
+    role: 'admin',
+    adminType: 'area',
+    assignedArea: `Area ${index + 1}`,
+    isActive: true,
+  }));
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? areas : areaAdmins,
+  }));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByText('Admin 1')).toBeInTheDocument();
+  expect(screen.queryByText('Admin 11')).not.toBeInTheDocument();
+  expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  expect(screen.getByText('Admin 11')).toBeInTheDocument();
+  expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+
+  fireEvent.change(screen.getByPlaceholderText('Search by name, email, phone, or area'), {
+    target: { value: 'admin12@example.com' },
+  });
+  expect(screen.getByText('Admin 12')).toBeInTheDocument();
+  expect(screen.getByText('Page 1 of 1')).toBeInTheDocument();
+});
+
+test('Area Admin actions menu supports keyboard navigation and selecting menu items', async () => {
+  const areaAdmin = {
+    _id: 'area-admin-id',
+    name: 'Area Admin',
+    email: 'area@example.com',
+    role: 'admin',
+    adminType: 'area',
+    assignedArea: 'North',
+    isActive: true,
+  };
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? areas : [areaAdmin],
+  }));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  const trigger = await screen.findByRole('button', { name: 'More actions' });
+  expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(trigger);
+  const menu = await screen.findByRole('menu', { name: 'Actions for Area Admin' });
+  const menuItems = within(menu).getAllByRole('menuitem');
+  expect(menuItems).toHaveLength(3);
+  expect(menuItems.map((item) => item.textContent.trim())).toEqual(['Edit', 'Reset password', 'Demote']);
+  expect(menuItems[0].querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  expect(menu.querySelector('hr')).toBeInTheDocument();
+  expect(menuItems[2]).toHaveClass('is-destructive');
+  expect(within(screen.getByRole('row', { name: /Area Admin/ })).getByRole('button', { name: 'More actions' }))
+    .toHaveAttribute('aria-expanded', 'true');
+  expect(menuItems[0]).toHaveFocus();
+  fireEvent.keyDown(menuItems[0], { key: 'ArrowDown' });
+  expect(menuItems[1]).toHaveFocus();
+  fireEvent.keyDown(menuItems[1], { key: 'Enter' });
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  expect(document.getElementById('reset-admin-password-area-admin-id')).toBeInTheDocument();
+  expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  expect(trigger).toHaveFocus();
+});
+
+test('Area Admin actions menu flips upward and closes on Escape, outside click, and scroll', async () => {
+  const admins = [
+    { _id: 'top', name: 'Top Admin', email: 'top@example.com', role: 'admin', adminType: 'area', assignedArea: 'North', isActive: true },
+    { _id: 'bottom', name: 'Bottom Admin', email: 'bottom@example.com', role: 'admin', adminType: 'area', assignedArea: 'South', isActive: true },
+  ];
+  axios.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith('/api/areas') ? areas : admins }));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  const triggers = await screen.findAllByRole('button', { name: 'More actions' });
+  jest.spyOn(triggers[0], 'getBoundingClientRect').mockReturnValue({
+    top: 80, bottom: 120, left: 400, right: 440, width: 40, height: 40,
+  });
+  jest.spyOn(triggers[1], 'getBoundingClientRect').mockReturnValue({
+    top: window.innerHeight - 70, bottom: window.innerHeight - 30, left: 400, right: 440, width: 40, height: 40,
+  });
+
+  fireEvent.click(triggers[0]);
+  const topMenu = await screen.findByRole('menu');
+  expect(topMenu).toHaveAttribute('data-placement', 'below');
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  expect(triggers[0]).toHaveFocus();
+
+  fireEvent.click(triggers[1]);
+  const bottomMenu = await screen.findByRole('menu');
+  expect(bottomMenu).toHaveAttribute('data-placement', 'above');
+  fireEvent.scroll(document);
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  expect(triggers[1]).toHaveFocus();
+
+  fireEvent.click(triggers[0]);
+  await screen.findByRole('menu');
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  expect(triggers[0]).toHaveAttribute('aria-expanded', 'false');
+  expect(triggers[0]).toHaveFocus();
+});
+
 test('deactivates an Area Admin with an area handover confirmation', async () => {
   const areaAdmin = {
     _id: 'area-admin-id',
@@ -458,7 +789,8 @@ test('requires a role choice before demoting an Area Admin', async () => {
     </MemoryRouter>,
   );
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Demote' }));
+  await openAreaAdminMenu();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Demote' }));
   const dialog = await screen.findByRole('dialog', { name: 'Change Area Admin role' });
   expect(dialog).toHaveTextContent('3 unfinished items will stay in North until a new admin is assigned. Completed work stays in history.');
   expect(screen.getByRole('radio', { name: 'Landlord' })).not.toBeChecked();
@@ -504,7 +836,8 @@ test('confirms using an existing account with the same email instead of creating
     </MemoryRouter>,
   );
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Demote' }));
+  await openAreaAdminMenu();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Demote' }));
   fireEvent.click(await screen.findByRole('radio', { name: 'Tenant' }));
   fireEvent.click(screen.getByRole('button', { name: 'Confirm role change' }));
 
@@ -520,7 +853,9 @@ test('confirms using an existing account with the same email instead of creating
 test('promotes a Tenant to Area Admin only after selecting an area', async () => {
   renderUsersPage();
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Promote to Area Admin' }));
+  const tenantRow = await screen.findByRole('row', { name: /Tenant Example/ });
+  fireEvent.click(within(tenantRow).getByRole('button', { name: 'More actions' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Promote to Area Admin' }));
   expect(await screen.findByRole('dialog', { name: 'Promote to Area Admin' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Confirm promotion' })).toBeDisabled();
 
@@ -555,7 +890,8 @@ test('allows deactivation without assigning a role', async () => {
     </MemoryRouter>,
   );
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Demote' }));
+  await openAreaAdminMenu();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Demote' }));
   fireEvent.click(await screen.findByRole('radio', { name: 'Deactivate only (no role)' }));
   fireEvent.click(screen.getByRole('button', { name: 'Confirm role change' }));
 
@@ -566,7 +902,7 @@ test('allows deactivation without assigning a role', async () => {
   ));
 });
 
-test('platform admin can delete another user after confirmation', async () => {
+test('Platform Admin can delete an eligible user after a clear confirmation', async () => {
   renderUsersPage();
 
   expect(await screen.findByText('Role: platform_admin')).toBeInTheDocument();
@@ -574,15 +910,17 @@ test('platform admin can delete another user after confirmation', async () => {
   expect(deleteButton).toHaveTextContent('');
   expect(deleteButton).toHaveAttribute('title', 'Delete user');
   expect(screen.queryByRole('button', { name: 'Delete Platform Admin' })).not.toBeInTheDocument();
+  const platformAdminCard = screen.getByText('Role: platform_admin').closest('.admin-user-list-card');
+  expect(platformAdminCard.querySelector('.admin-card-actions')).toBeNull();
 
   fireEvent.click(deleteButton);
 
   expect(window.confirm).toHaveBeenCalledWith(
-    'Delete Tenant Example (tenant@example.com)? This action cannot be undone.',
+    'Delete this user? They have no properties, active rentals, or payments. This cannot be undone.',
   );
   await waitFor(() => {
     expect(axios.delete).toHaveBeenCalledWith(
-      `${process.env.REACT_APP_API_URL}/api/admin/users/tenant-id`,
+      apiUrl('/api/admin/users/tenant-id'),
       { headers: { Authorization: 'Bearer platform-token' } },
     );
   });
@@ -598,6 +936,68 @@ test('cancelling user deletion does not call the API', async () => {
 
   expect(axios.delete).not.toHaveBeenCalled();
   expect(screen.getByText('tenant@example.com')).toBeInTheDocument();
+});
+
+test('Platform Admin can deactivate and reactivate an eligible user with confirmation and status badges', async () => {
+  renderUsersPage();
+
+  expect(await screen.findByRole('button', { name: 'Deactivate' })).toBeInTheDocument();
+  expect(screen.getAllByText('Active')).toHaveLength(2);
+  fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }));
+
+  expect(window.confirm).toHaveBeenCalledWith(
+    'Deactivate this user and block them from logging in?',
+  );
+  await waitFor(() => expect(axios.patch).toHaveBeenCalledWith(
+    apiUrl('/api/admin/users/tenant-id/active'),
+    { isActive: false },
+    { headers: { Authorization: 'Bearer platform-token' } },
+  ));
+  expect(await screen.findByText('Inactive')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
+  expect(window.confirm).toHaveBeenLastCalledWith(
+    'Activate this user and allow them to log in again?',
+  );
+  await waitFor(() => expect(axios.patch).toHaveBeenLastCalledWith(
+    apiUrl('/api/admin/users/tenant-id/active'),
+    { isActive: true },
+    { headers: { Authorization: 'Bearer platform-token' } },
+  ));
+  await waitFor(() => expect(screen.getAllByText('Active')).toHaveLength(2));
+});
+
+test('Area Admin can deactivate related users but cannot delete them or act outside their own card', async () => {
+  useAuth.mockReturnValue({
+    user: { id: 'area-admin-id', role: 'admin', adminType: 'area', assignedArea: 'North' },
+  });
+  const scopedUsers = [
+    { ...users[0], canDelete: false },
+    { ...platformAdmin, isActive: true },
+  ];
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas') ? areas : scopedUsers,
+  }));
+
+  renderUsersPage();
+
+  expect(await screen.findByText('tenant@example.com')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Deactivate' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Delete Tenant Example' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Deactivate Platform Admin' })).not.toBeInTheDocument();
+  expect(axios.delete).not.toHaveBeenCalled();
+});
+
+test('Platform Admin cannot delete a user the server marks as ineligible', async () => {
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas')
+      ? areas
+      : [{ ...users[0], canDelete: false, deletionCounts: { properties: 1, activeRentals: 0, payments: 0 } }, platformAdmin],
+  }));
+  renderUsersPage();
+
+  expect(await screen.findByText('tenant@example.com')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Delete Tenant Example' })).not.toBeInTheDocument();
 });
 
 test('shows an error when the API rejects user deletion', async () => {

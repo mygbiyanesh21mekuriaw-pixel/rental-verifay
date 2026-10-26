@@ -24,20 +24,11 @@ const {
   propertyMatchesAdminAreas,
   buildAdminAreaQuery,
 } = require('../utils/adminArea');
+const { matchAreaFromAddress, UNASSIGNED_AREA } = require('../utils/propertyArea');
 
-const resolvePropertyArea = async (requestedArea, address) => {
-  const areaName = String(requestedArea || '').trim();
-  if (areaName) {
-    const area = await Area.findOne({ normalizedName: areaName.toLowerCase() }).select('name').lean();
-    return area?.name || null;
-  }
-
-  const candidates = ['city', 'wereda', 'zone', 'region', 'subCity']
-    .map((field) => String(address[field] || '').trim().toLowerCase())
-    .filter(Boolean);
-  if (candidates.length === 0) return '';
-  const area = await Area.findOne({ normalizedName: { $in: candidates } }).select('name').lean();
-  return area?.name || '';
+const resolvePropertyArea = async (address) => {
+  const areas = await Area.find().select('name addressMapping').lean();
+  return matchAreaFromAddress(address, areas) || UNASSIGNED_AREA;
 };
 
 const canViewVerificationDocument = (user, property) => {
@@ -241,8 +232,7 @@ const createProperty = async (req, res) => {
   try {
     const { title, description, price, bedrooms, latitude, longitude } = req.body;
     const address = normalizeAddress(req.body);
-    const areaName = await resolvePropertyArea(req.body.area, address);
-    if (areaName === null) return res.status(400).json({ message: 'Select an existing area.' });
+    const areaName = await resolvePropertyArea(address);
     const landlord = await User.findOne({ _id: req.user.id, role: 'landlord' }).select('_id');
 
     if (!landlord) {
@@ -338,7 +328,9 @@ const createProperty = async (req, res) => {
     });
 
     res.status(201).json({
-      message: 'Property created successfully. Awaiting verification.',
+      message: areaName === UNASSIGNED_AREA
+        ? 'Your property will be reviewed after an area is assigned.'
+        : 'Property created successfully. Awaiting verification.',
       property: propertyResponse(property, req.user),
     });
   } catch (error) {
@@ -743,8 +735,8 @@ const updateProperty = async (req, res) => {
 
     const { title, description, price, bedrooms, latitude, longitude } = req.body;
     const address = normalizeAddress(req.body);
-    const areaName = await resolvePropertyArea(req.body.area, address);
-    if (areaName === null) return res.status(400).json({ message: 'Select an existing area.' });
+    const areaName = await resolvePropertyArea(address);
+    const previousArea = property.area;
 
     property.title = title || property.title;
     property.description = description || property.description;
@@ -800,6 +792,18 @@ const updateProperty = async (req, res) => {
       ipAddress: req.ip || '',
     });
 
+    if (previousArea !== areaName) {
+      await createSystemLog({
+        user: req.user.id,
+        role: req.user.role,
+        action: 'PROPERTY_AREA_CHANGED',
+        description: `Property "${property.title}" area changed from "${previousArea || UNASSIGNED_AREA}" to "${areaName}" after an address update.`,
+        property: property._id,
+        status: 'success',
+        ipAddress: req.ip || '',
+      });
+    }
+
     await Notification.create({
       recipientRole: 'admin',
       property: property._id,
@@ -811,7 +815,9 @@ const updateProperty = async (req, res) => {
     });
 
     res.json({
-      message: 'Property updated successfully. Needs re-verification.',
+      message: areaName === UNASSIGNED_AREA
+        ? 'Your property will be reviewed after an area is assigned.'
+        : 'Property updated successfully. Needs re-verification.',
       property: propertyResponse(property, req.user),
     });
   } catch (error) {

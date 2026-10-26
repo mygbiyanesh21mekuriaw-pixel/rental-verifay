@@ -25,7 +25,7 @@ beforeEach(() => {
   axios.put.mockReset().mockResolvedValue({ data: { ...messages[0], read: true } });
 });
 
-test('shows Contact Us submissions in the Platform Admin inbox', async () => {
+test('shows Contact Us submissions in the Area Admin inbox', async () => {
   render(
     <MemoryRouter>
       <AdminContactMessages />
@@ -39,7 +39,7 @@ test('shows Contact Us submissions in the Platform Admin inbox', async () => {
     'mailto:aster@example.com',
   );
   expect(axios.get).toHaveBeenCalledWith(
-    expect.stringContaining('/api/contact/platform-admin/inbox'),
+    expect.stringContaining('/api/contact/area-admin/inbox'),
     expect.objectContaining({
       headers: expect.objectContaining({ Authorization: 'Bearer platform-admin-token' }),
     }),
@@ -55,7 +55,7 @@ test('marks an inbox message as read', async () => {
 
   fireEvent.click(await screen.findByRole('button', { name: 'Mark read' }));
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
-    expect.stringContaining('/api/contact/platform-admin/inbox/contact-1/read'),
+    expect.stringContaining('/api/contact/area-admin/inbox/contact-1/read'),
     {},
     expect.objectContaining({
       headers: expect.objectContaining({ Authorization: 'Bearer platform-admin-token' }),

@@ -5,19 +5,27 @@ const Property = require('../models/Property');
 const ContactMessage = require('../models/ContactMessage');
 const RentalRequest = require('../models/RentalRequest');
 const { buildAssignedAreaQuery } = require('../utils/area');
+const { ADDRESS_MAPPING_FIELDS, matchAreaFromAddress, UNASSIGNED_AREA } = require('../utils/propertyArea');
 
-const normalizePlaceFields = (body = {}) => ({
-  name: typeof body.name === 'string' ? body.name.trim() : '',
-  region: typeof body.region === 'string' ? body.region.trim() : '',
-});
+const normalizePlaceFields = (body = {}) => {
+  const addressMapping = Object.fromEntries(ADDRESS_MAPPING_FIELDS.map((field) => [
+    field,
+    typeof body.addressMapping?.[field] === 'string' ? body.addressMapping[field].trim() : '',
+  ]));
+  return {
+    name: typeof body.name === 'string' ? body.name.trim() : '',
+    region: typeof body.region === 'string' ? body.region.trim() : '',
+    addressMapping,
+  };
+};
 
-const validatePlaceFields = ({ name, region }, res) => {
+const validatePlaceFields = ({ name, region, addressMapping }, res) => {
   if (!name) {
     res.status(400).json({ message: 'Place name is required.' });
     return false;
   }
-  if (name.length > 120 || region.length > 120) {
-    res.status(400).json({ message: 'Place name and region must be 120 characters or fewer.' });
+  if ([name, region, ...Object.values(addressMapping)].some((value) => value.length > 120)) {
+    res.status(400).json({ message: 'Place name, region, and address mappings must be 120 characters or fewer.' });
     return false;
   }
   return true;
@@ -68,7 +76,7 @@ const buildAdminAssignmentFilter = (name) => {
 
 const getAreas = async (req, res) => {
   try {
-    const areas = await Area.find().select('name region').sort({ name: 1 }).lean();
+    const areas = await Area.find().select('name region addressMapping').sort({ name: 1 }).lean();
     const areaSummaries = await Promise.all(areas.map(async (area) => {
       const propertyFilter = buildAssignedAreaQuery(area.name);
       const properties = await Property.find(propertyFilter).select('_id').lean();
@@ -101,12 +109,41 @@ const getAreas = async (req, res) => {
   }
 };
 
+const getUnassignedProperties = async (req, res) => {
+  try {
+    const properties = await Property.find({ area: UNASSIGNED_AREA })
+      .select('_id title location region zone wereda city createdAt')
+      .sort({ createdAt: 1 })
+      .lean();
+    res.json(properties);
+  } catch (error) {
+    console.error('Unassigned property lookup failed:', error);
+    res.status(500).json({ message: 'Unable to load properties without an assigned area.' });
+  }
+};
+
+const assignMappedUnassignedProperties = async () => {
+  const [areas, properties] = await Promise.all([
+    Area.find().select('name addressMapping').lean(),
+    Property.find({ area: UNASSIGNED_AREA }).select('_id region zone wereda city').lean(),
+  ]);
+  for (const property of properties) {
+    const areaName = matchAreaFromAddress(property, areas);
+    if (!areaName) continue;
+    await Property.updateOne(
+      { _id: property._id, area: UNASSIGNED_AREA },
+      { $set: { area: areaName } },
+    );
+  }
+};
+
 const createArea = async (req, res) => {
   try {
     const fields = normalizePlaceFields(req.body);
     if (!validatePlaceFields(fields, res)) return;
 
     const area = await Area.create(fields);
+    await assignMappedUnassignedProperties();
     res.status(201).json({ message: 'Place added successfully.', area });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ message: 'A place with that name already exists.' });
@@ -128,6 +165,7 @@ const updateArea = async (req, res) => {
     const previousName = area.name;
     area.name = fields.name;
     area.region = fields.region;
+    area.addressMapping = fields.addressMapping;
     await area.save();
     if (previousName.toLowerCase() !== area.name.toLowerCase()) {
       const previousNamePattern = new RegExp(
@@ -144,6 +182,7 @@ const updateArea = async (req, res) => {
         ContactMessage.updateMany({ area: previousNamePattern }, { $set: { area: area.name } }),
       ]);
     }
+    await assignMappedUnassignedProperties();
     res.json({ message: 'Place updated successfully.', area });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ message: 'A place with that name already exists.' });
@@ -173,4 +212,11 @@ const deleteArea = async (req, res) => {
   }
 };
 
-module.exports = { getAreas, createArea, updateArea, deleteArea };
+module.exports = {
+  getAreas,
+  getUnassignedProperties,
+  assignMappedUnassignedProperties,
+  createArea,
+  updateArea,
+  deleteArea,
+};

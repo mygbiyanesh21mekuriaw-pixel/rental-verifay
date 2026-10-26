@@ -673,14 +673,66 @@ const rejectProperty = async (req, res) => {
 // ሁሉንም ተጠቃሚዎች ማግኘት (Admin ብቻ)
 const getAllUsers = async (req, res) => {
   try {
-    const filter = {};
-    if (getAdministrativeRole(req.user) === 'area_admin') {
-      if (req.user.assignedArea) filter.area = req.user.assignedArea;
-      else filter._id = null;
+    const isAreaAdmin = getAdministrativeRole(req.user) === 'area_admin';
+    let filter = {};
+    if (isAreaAdmin) {
+      const adminAreas = req.user.assignedArea
+        ? [req.user.assignedArea]
+        : (req.user.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+      if (adminAreas.length === 0) {
+        return res.json([]);
+      }
+      const properties = await Property.find(buildAdminAreaQuery(adminAreas))
+        .select('_id landlord rentedBy')
+        .lean();
+      const propertyIds = properties.map((property) => property._id);
+      const relatedUserIds = new Set(
+        properties.flatMap((property) => [property.landlord, property.rentedBy])
+          .filter(Boolean)
+          .map(String),
+      );
+      if (propertyIds.length > 0) {
+        const rentals = await RentalRequest.find({ property: { $in: propertyIds } })
+          .select('tenant landlord')
+          .lean();
+        rentals.forEach((rental) => {
+          if (rental.tenant) relatedUserIds.add(String(rental.tenant));
+          if (rental.landlord) relatedUserIds.add(String(rental.landlord));
+        });
+      }
+      if (relatedUserIds.size === 0) return res.json([]);
+      filter = {
+        _id: { $in: [...relatedUserIds] },
+        role: { $in: ['landlord', 'tenant'] },
+      };
     }
-    const users = await User.find(filter).select('-password');
-    res.json(users);
+    const users = isAreaAdmin
+      ? await User.find(filter)
+        .select('_id name email phone role isActive assignedArea adminType adminAreas')
+        .lean()
+      : await User.find(filter).select('-password').lean();
+    if (isAreaAdmin) return res.json(users);
+
+    const usersWithDeletionStatus = await Promise.all(users.map(async (user) => {
+      if (!['landlord', 'tenant'].includes(user.role)) {
+        return {
+          ...user,
+          deletionCounts: { properties: 0, activeRentals: 0, payments: 0 },
+          canDelete: false,
+        };
+      }
+      const counts = await getUserDeletionCounts(user._id);
+      return {
+        ...user,
+        deletionCounts: counts,
+        canDelete: counts.properties === 0 &&
+          counts.activeRentals === 0 &&
+          counts.payments === 0,
+      };
+    }));
+    res.json(usersWithDeletionStatus);
   } catch (error) {
+    console.error('Unable to load admin users:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -775,36 +827,163 @@ const getAdminPaymentPeriods = async (req, res) => {
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // እራሱን እንዳይሰርዝ
-    if (id === req.user.id) {
-      return res.status(400).json({ message: 'You cannot delete yourself' });
+    const actorRole = getAdministrativeRole(req.user);
+    if (actorRole === 'area_admin') {
+      return res.status(403).json({ message: 'Area Admins cannot delete users.' });
     }
-
-    const filter = { _id: id };
-    if (getAdministrativeRole(req.user) === 'area_admin') {
-      if (req.user.assignedArea) filter.area = req.user.assignedArea;
-      else filter._id = null;
+    if (req.user?.id && String(id) === String(req.user.id)) {
+      return res.status(403).json({ message: 'You cannot delete your own account.' });
     }
-    const user = await User.findOne(filter);
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    if (user.role === 'admin') {
+    if (getAdministrativeRole(user) === 'platform_admin') {
+      return res.status(403).json({ message: 'Platform Admin accounts cannot be deleted.' });
+    }
+    if (getAdministrativeRole(user) === 'area_admin') {
       return res.status(403).json({ message: 'Admin accounts must be managed through Admin Management.' });
     }
+    if (!['landlord', 'tenant'].includes(user.role)) {
+      return res.status(403).json({ message: 'Only Landlord and Tenant accounts can be deleted.' });
+    }
 
-    if (user.role === 'landlord') {
-      const properties = await Property.find({ landlord: user._id }).select('_id');
-      const propertyIds = properties.map(property => property._id);
-      await VerificationRequest.deleteMany({ property: { $in: propertyIds } });
-      await Property.deleteMany({ landlord: user._id });
+    const counts = await getUserDeletionCounts(user._id);
+    if (counts.properties > 0 || counts.activeRentals > 0 || counts.rentalRequests > 0 || counts.payments > 0) {
+      return res.status(409).json({
+        message: 'This user has related properties, rentals or requests, or payments. Deactivate the account instead.',
+        counts,
+        suggestion: 'Deactivate',
+      });
     }
 
     await user.deleteOne();
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
+    console.error('Unable to delete user:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getUserDeletionCounts = async (userId) => {
+  const [properties, rentalRequests, rentedProperties, payments] = await Promise.all([
+    Property.countDocuments({ landlord: userId }),
+    RentalRequest.find({
+      $or: [{ tenant: userId }, { landlord: userId }],
+    }).select('property status').lean(),
+    Property.find({
+      $or: [
+        { landlord: userId, availabilityStatus: 'rented' },
+        { rentedBy: userId },
+      ],
+    }).select('_id').lean(),
+    Payment.countDocuments({ $or: [{ tenant: userId }, { landlord: userId }] }),
+  ]);
+  const activeRentalPropertyIds = new Set([
+    ...rentalRequests
+      .filter((rental) => ['approved', 'confirmed'].includes(rental.status))
+      .map((rental) => String(rental.property)),
+    ...rentedProperties.map((property) => String(property._id)),
+  ]);
+  return {
+    properties,
+    activeRentals: activeRentalPropertyIds.size,
+    rentalRequests: rentalRequests.length,
+    payments,
+  };
+};
+
+const getAreaAdminRelatedPropertyIds = async (admin) => {
+  const adminAreas = admin.assignedArea
+    ? [admin.assignedArea]
+    : (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+  if (adminAreas.length === 0) return [];
+  const properties = await Property.find(buildAdminAreaQuery(adminAreas)).select('_id').lean();
+  return properties.map((property) => property._id);
+};
+
+const isUserRelatedToAdminArea = async (user, admin) => {
+  const propertyIds = await getAreaAdminRelatedPropertyIds(admin);
+  if (propertyIds.length === 0) return false;
+
+  if (user.role === 'landlord') {
+    const property = await Property.findOne({
+      _id: { $in: propertyIds },
+      landlord: user._id,
+    }).select('_id').lean();
+    if (property) return true;
+  }
+
+  if (user.role === 'tenant') {
+    const [rentedProperty, rentalRequest] = await Promise.all([
+      Property.findOne({
+        _id: { $in: propertyIds },
+        rentedBy: user._id,
+      }).select('_id').lean(),
+      RentalRequest.findOne({
+        property: { $in: propertyIds },
+        tenant: user._id,
+      }).select('_id').lean(),
+    ]);
+    if (rentedProperty || rentalRequest) return true;
+  }
+
+  return false;
+};
+
+const setUserActive = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+    if (typeof req.body?.isActive !== 'boolean') {
+      return res.status(400).json({ message: 'isActive must be a boolean.' });
+    }
+    if (String(req.params.id) === String(req.user.id)) {
+      return res.status(403).json({ message: 'You cannot change your own account status.' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    if (getAdministrativeRole(user) === 'platform_admin') {
+      return res.status(403).json({ message: 'Platform Admin accounts cannot be deactivated or activated here.' });
+    }
+
+    const actorRole = getAdministrativeRole(req.user);
+    if (actorRole === 'area_admin') {
+      if (!['landlord', 'tenant'].includes(user.role) ||
+        !(await isUserRelatedToAdminArea(user, req.user))) {
+        return res.status(403).json({ message: 'This user is outside your assigned area.' });
+      }
+    }
+
+    if (user.isActive === req.body.isActive) {
+      return res.json({ message: req.body.isActive ? 'User is already active.' : 'User is already inactive.' });
+    }
+
+    const isAreaAdmin = getAdministrativeRole(user) === 'area_admin';
+    if (isAreaAdmin && !req.body.isActive) {
+      await clearUnfinishedAreaAdminAssignments(user);
+    }
+    user.isActive = req.body.isActive;
+    await user.save();
+
+    await createSystemLog({
+      user: req.user.id,
+      role: actorRole,
+      action: req.body.isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+      description: `User ${user.name} (${user._id}) was ${req.body.isActive ? 'activated' : 'deactivated'}.`,
+      status: 'success',
+      ipAddress: req.ip || '',
+    });
+
+    return res.json({
+      message: req.body.isActive ? 'User activated successfully.' : 'User deactivated successfully.',
+      user: { _id: user._id, isActive: user.isActive },
+    });
+  } catch (error) {
+    console.error('Unable to update user status:', error);
+    return res.status(500).json({ message: 'Unable to update user status.' });
   }
 };
 
@@ -818,6 +997,9 @@ const changeUserRole = async (req, res) => {
     if (!['tenant', 'landlord', 'area_admin', 'deactivate'].includes(role)) {
       return res.status(400).json({ message: 'Unknown role' });
     }
+    if (req.user?.id && String(id) === String(req.user.id)) {
+      return res.status(403).json({ message: 'You cannot change your own role.' });
+    }
 
     const user = await User.findById(id);
     if (!user) {
@@ -826,7 +1008,7 @@ const changeUserRole = async (req, res) => {
 
     const currentRole = getAdministrativeRole(user);
     if (currentRole === 'platform_admin') {
-      return res.status(403).json({ message: 'Platform Admin cannot be changed with this action.' });
+      return res.status(403).json({ message: 'Platform Admin accounts cannot be changed.' });
     }
 
     if (role === 'area_admin') {
@@ -871,8 +1053,8 @@ const changeUserRole = async (req, res) => {
       user.replacedBy = null;
       await user.save();
       await createSystemLog({
-        user: user._id,
-        role: 'admin',
+        user: req.user?.id || user._id,
+        role: req.user ? getAdministrativeRole(req.user) : 'admin',
         action: 'AREA_ADMIN_DEACTIVATED',
         description: `Area Admin ${user.name} was deactivated from ${previousAreas.join(', ') || 'their area'}.`,
         status: 'success',
@@ -1018,34 +1200,25 @@ const updateAreaAdminAccount = async (req, res) => {
   }
 };
 
-const deleteAreaAdminAccount = async (req, res) => {
-  try {
-    if (req.params.id === req.user.id) {
-      return res.status(403).json({ message: 'The Platform Admin cannot be deleted here' });
-    }
-
-    const admin = await User.findById(req.params.id).select('name email role adminType');
-    if (!admin) return res.status(404).json({ message: 'Area Admin not found' });
-    if (admin.role !== 'admin' || admin.adminType !== 'area') {
-      return res.status(403).json({ message: 'Only Area Admin accounts can be deleted here' });
-    }
-
-    await User.deleteOne({ _id: admin._id });
-    res.json({ message: 'Area Admin deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Unable to delete Area Admin' });
-  }
-};
+const deleteAreaAdminAccount = (_req, res) => res.status(405).json({
+  message: 'Admins cannot be deleted. Use Demote or Deactivate.',
+});
 
 const setAreaAdminActive = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({ message: 'Invalid Area Admin ID.' });
     }
+    if (String(req.params.id) === String(req.user.id)) {
+      return res.status(403).json({ message: 'You cannot change your own account status.' });
+    }
     if (typeof req.body?.isActive !== 'boolean') {
       return res.status(400).json({ message: 'isActive must be a boolean.' });
     }
     const admin = await User.findById(req.params.id);
+    if (admin && getAdministrativeRole(admin) === 'platform_admin') {
+      return res.status(403).json({ message: 'Platform Admin accounts cannot be deactivated or activated here.' });
+    }
     if (!admin || admin.role !== 'admin' || admin.adminType !== 'area') {
       return res.status(404).json({ message: 'Area Admin not found.' });
     }
@@ -1062,10 +1235,19 @@ const setAreaAdminActive = async (req, res) => {
 
     if (!req.body.isActive) {
       await createSystemLog({
-        user: admin._id,
-        role: 'admin',
+        user: req.user.id,
+        role: getAdministrativeRole(req.user),
         action: 'AREA_ADMIN_DEACTIVATED',
         description: `Area Admin ${admin.name} was deactivated for ${areaNames.join(', ') || 'their area'}.`,
+        status: 'success',
+        ipAddress: req.ip || '',
+      });
+    } else {
+      await createSystemLog({
+        user: req.user.id,
+        role: getAdministrativeRole(req.user),
+        action: 'AREA_ADMIN_ACTIVATED',
+        description: `Area Admin ${admin.name} was activated for ${areaNames.join(', ') || 'their area'}.`,
         status: 'success',
         ipAddress: req.ip || '',
       });
@@ -1115,5 +1297,6 @@ module.exports = {
   updateAreaAdminAccount,
   deleteAreaAdminAccount,
   setAreaAdminActive,
+  setUserActive,
   resetAreaAdminPassword,
 };

@@ -92,7 +92,7 @@ const submitContactMessage = async (req, res) => {
   }
 };
 
-const getPlatformContactMessages = async (req, res) => {
+const getAreaAdminContactMessages = async (req, res) => {
   try {
     if (getAdministrativeRole(req.user) !== 'area_admin' || !req.user.assignedArea) {
       return res.json([]);
@@ -107,7 +107,7 @@ const getPlatformContactMessages = async (req, res) => {
   }
 };
 
-const markContactMessageRead = async (req, res) => {
+const markAreaAdminContactMessageRead = async (req, res) => {
   try {
     if (getAdministrativeRole(req.user) !== 'area_admin' || !req.user.assignedArea) {
       return res.status(403).json({ message: 'Area Admin permission required.' });
@@ -136,4 +136,9 @@ const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => (
   "'": '&#39;',
 }[character]));
 
-module.exports = { getContactDetails, submitContactMessage, getPlatformContactMessages, markContactMessageRead };
+module.exports = {
+  getContactDetails,
+  submitContactMessage,
+  getAreaAdminContactMessages,
+  markAreaAdminContactMessageRead,
+};

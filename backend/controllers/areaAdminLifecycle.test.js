@@ -10,9 +10,12 @@ const SystemLog = require('../models/SystemLog');
 const Area = require('../models/Area');
 const {
   createAdminAccount,
+  deleteUser,
   changeUserRole,
   updateAreaAdminAccount,
+  deleteAreaAdminAccount,
   setAreaAdminActive,
+  getAdminProperties,
 } = require('./adminController');
 const { getAreaAdminConflict } = require('../utils/areaAdminUniqueness');
 
@@ -27,6 +30,40 @@ const createResponse = () => ({
     this.body = body;
     return this;
   },
+});
+
+test('hard-deleting an Area Admin is rejected', async () => {
+  const response = createResponse();
+
+  await deleteAreaAdminAccount({ params: { id: 'area-admin-id' } }, response);
+
+  assert.equal(response.statusCode, 405);
+  assert.equal(response.body.message, 'Admins cannot be deleted. Use Demote or Deactivate.');
+});
+
+test('generic user deletion also rejects legacy Area Admin role records', async () => {
+  const originalFindById = User.findById;
+  let documentDeleteCalled = false;
+  User.findById = async () => ({
+    role: 'area_admin',
+    async deleteOne() {
+      documentDeleteCalled = true;
+    },
+  });
+  const response = createResponse();
+
+  try {
+    await deleteUser({
+      params: { id: 'area-admin-id' },
+      user: { id: 'platform-admin-id', role: 'admin', adminType: 'platform' },
+    }, response);
+
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.body.message, 'Admin accounts must be managed through Admin Management.');
+    assert.equal(documentDeleteCalled, false);
+  } finally {
+    User.findById = originalFindById;
+  }
 });
 
 const createAreaAdmin = (areaName = 'Bahirdar') => ({
@@ -137,6 +174,73 @@ test('demotion converts the same account to Tenant and logs the former area', as
   } finally {
     User.findById = originals.findById;
     User.findOne = originals.findOne;
+    SystemLog.create = originals.logCreate;
+    cleanup.restore();
+  }
+});
+
+test('demotion preserves the verified-by snapshot and exposes the former admin in history', async () => {
+  const originals = {
+    find: User.find,
+    findById: User.findById,
+    findOne: User.findOne,
+    propertyFind: Property.find,
+    logCreate: SystemLog.create,
+  };
+  const admin = createAreaAdmin('North');
+  const landlordId = '507f1f77bcf86cd799439020';
+  const historicalProperty = {
+    _id: '507f1f77bcf86cd799439021',
+    landlord: landlordId,
+    area: 'North',
+    verificationStatus: 'approved',
+    isVerified: true,
+    decision: 'verified',
+    handledBy: admin._id,
+    handledByName: admin.name,
+    handledByRole: 'area_admin',
+    handledAt: new Date('2026-10-01T12:00:00.000Z'),
+    history: [{ action: 'verified', byId: admin._id, byName: admin.name }],
+  };
+  const cleanup = stubCleanupModels();
+  User.findById = async () => admin;
+  User.findOne = () => ({ select: () => ({ lean: async () => null }) });
+  SystemLog.create = async (entry) => entry;
+  const demotionResponse = createResponse();
+
+  try {
+    await changeUserRole({ params: { id: admin._id }, body: { role: 'tenant' } }, demotionResponse);
+    assert.equal(demotionResponse.statusCode, null);
+    assert.equal(admin.assignedArea, '');
+
+    User.findById = () => ({ select: () => ({ lean: async () => admin }) });
+    User.find = (filter) => ({
+      select: () => ({
+        lean: async () => (filter.role === 'landlord'
+          ? [{ _id: landlordId, name: 'Property Owner', role: 'landlord' }]
+          : [admin]),
+      }),
+    });
+    Property.find = () => ({
+      sort: () => ({ lean: async () => [historicalProperty] }),
+    });
+    const historyResponse = createResponse();
+    await getAdminProperties({
+      user: { id: admin._id },
+      query: { status: 'approved' },
+      params: {},
+    }, historyResponse);
+
+    assert.equal(historyResponse.statusCode, null);
+    assert.equal(historyResponse.body[0].handledByName, 'North Admin');
+    assert.equal(historyResponse.body[0].handledByIsFormerAdmin, true);
+    assert.equal(historyResponse.body[0].history[0].byName, 'North Admin');
+    assert.equal(historyResponse.body[0].history[0].byId, admin._id);
+  } finally {
+    User.find = originals.find;
+    User.findById = originals.findById;
+    User.findOne = originals.findOne;
+    Property.find = originals.propertyFind;
     SystemLog.create = originals.logCreate;
     cleanup.restore();
   }
@@ -301,11 +405,13 @@ test('deactivation marks the account inactive, cleans unfinished references, and
   const response = createResponse();
 
   try {
-    await setAreaAdminActive({
+    const request = {
       params: { id: admin._id },
       body: { isActive: false },
       ip: '127.0.0.1',
-    }, response);
+      user: { id: '507f1f77bcf86cd799439021', role: 'admin', adminType: 'platform' },
+    };
+    await setAreaAdminActive(request, response);
     assert.equal(response.statusCode, null);
     assert.equal(admin.isActive, false);
     assert.ok(cleanup.updates.every(({ update }) => (
@@ -315,6 +421,16 @@ test('deactivation marks the account inactive, cleans unfinished references, and
     assert.equal(logs.length, 1);
     assert.equal(logs[0].action, 'AREA_ADMIN_DEACTIVATED');
     assert.match(logs[0].description, /Bahirdar/);
+
+    const activateResponse = createResponse();
+    await setAreaAdminActive({
+      ...request,
+      body: { isActive: true },
+    }, activateResponse);
+    assert.equal(activateResponse.statusCode, null);
+    assert.equal(admin.isActive, true);
+    assert.equal(logs.length, 2);
+    assert.equal(logs[1].action, 'AREA_ADMIN_ACTIVATED');
   } finally {
     User.findById = originals.findById;
     SystemLog.create = originals.logCreate;
@@ -366,7 +482,11 @@ test('deactivation disables an Area Admin but retains their area reservation', a
   const response = createResponse();
 
   try {
-    await changeUserRole({ params: { id: admin._id }, body: { role: 'deactivate' } }, response);
+    await changeUserRole({
+      params: { id: admin._id },
+      body: { role: 'deactivate' },
+      user: { id: '507f1f77bcf86cd799439022', role: 'admin', adminType: 'platform' },
+    }, response);
     assert.equal(response.statusCode, null);
     assert.equal(admin.role, 'admin');
     assert.equal(admin.adminType, 'area');

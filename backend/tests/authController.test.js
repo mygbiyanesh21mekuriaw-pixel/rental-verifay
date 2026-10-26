@@ -135,6 +135,39 @@ test('login accepts registered emails for tenant, landlord, and admin roles', as
   }
 });
 
+test('inactive users with valid credentials receive a clear login rejection', async () => {
+  const originals = {
+    find: User.find,
+    createSystemLog: SystemLog.create,
+  };
+  const hashedPassword = await bcrypt.hash('correct-password', 4);
+  let loginLogged = false;
+  User.find = () => ({
+    limit: () => ({
+      select: async () => [{
+        _id: 'inactive-user-id',
+        name: 'Inactive User',
+        email: 'inactive@example.com',
+        password: hashedPassword,
+        role: 'tenant',
+        isActive: false,
+      }],
+    }),
+  });
+  SystemLog.create = async () => { loginLogged = true; };
+  const response = createResponse();
+
+  try {
+    await login({ body: { email: 'inactive@example.com', password: 'correct-password' } }, response);
+    assert.equal(response.statusCode, 403);
+    assert.match(response.body.message, /account is inactive/i);
+    assert.equal(loginLogged, false);
+  } finally {
+    User.find = originals.find;
+    SystemLog.create = originals.createSystemLog;
+  }
+});
+
 test('login returns mustChangePassword for pending Area Admins', async () => {
   const originals = {
     find: User.find,
@@ -420,6 +453,54 @@ test('registration requires a username before querying or creating an account', 
     assert.equal(lookupCount, 0);
   } finally {
     User.findOne = originalFindOne;
+  }
+});
+
+test('landlords and tenants can register without an area', async () => {
+  const originals = {
+    findOne: User.findOne,
+    save: User.prototype.save,
+    areaFindOne: Area.findOne,
+    systemLogCreate: SystemLog.create,
+    jwtSecret: process.env.JWT_SECRET,
+  };
+  const savedUsers = [];
+  const { register } = require('../controllers/authController');
+  User.findOne = async () => null;
+  User.prototype.save = async function save() {
+    this._id = { toString: () => `${this.role}-id` };
+    savedUsers.push(this);
+  };
+  Area.findOne = () => assert.fail('Registration without an area must not query areas');
+  SystemLog.create = async () => null;
+  process.env.JWT_SECRET = 'test-registration-secret';
+
+  try {
+    for (const role of ['landlord', 'tenant']) {
+      const response = createResponse();
+      await register({
+        body: {
+          name: `${role} example`,
+          email: `${role}@example.com`,
+          username: `${role}_example`,
+          phone: '0912345678',
+          password: 'secure-password',
+          role,
+        },
+      }, response);
+
+      assert.equal(response.statusCode, 201);
+      assert.equal(response.body.user.role, role);
+      assert.equal(response.body.user.area, '');
+    }
+    assert.deepEqual(savedUsers.map((user) => user.area), ['', '']);
+  } finally {
+    User.findOne = originals.findOne;
+    User.prototype.save = originals.save;
+    Area.findOne = originals.areaFindOne;
+    SystemLog.create = originals.systemLogCreate;
+    if (originals.jwtSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = originals.jwtSecret;
   }
 });
 

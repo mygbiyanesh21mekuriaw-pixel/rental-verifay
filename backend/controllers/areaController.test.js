@@ -6,7 +6,7 @@ const Property = require('../models/Property');
 const RentalRequest = require('../models/RentalRequest');
 const ContactMessage = require('../models/ContactMessage');
 const areaRoutes = require('../routes/areaRoutes');
-const { deleteArea, getAreas } = require('./areaController');
+const { deleteArea, getAreas, getUnassignedProperties, assignMappedUnassignedProperties } = require('./areaController');
 
 const createResponse = () => ({
   statusCode: null,
@@ -29,6 +29,7 @@ test('all Area CRUD routes follow authentication and platform-admin middleware',
       .filter((layer) => layer.route)
       .map((layer) => [Object.keys(layer.route.methods)[0], layer.route.path]),
     [
+      ['get', '/unassigned-properties'],
       ['get', '/'],
       ['post', '/'],
       ['put', '/:id'],
@@ -152,5 +153,61 @@ test('area list counts active admins and waiting items independently for each ar
     RentalRequest.countDocuments = originals.rentalCount;
     ContactMessage.countDocuments = originals.contactCount;
     User.countDocuments = originals.userCount;
+  }
+});
+
+test('Platform Admin warning list returns only properties with no derived area', async () => {
+  const originalPropertyFind = Property.find;
+  const properties = [{ _id: 'unassigned-id', title: 'Unmapped home', area: 'Unassigned area' }];
+  let requestedFilter;
+  Property.find = (filter) => {
+    requestedFilter = filter;
+    return {
+      select: () => ({ sort: () => ({ lean: async () => properties }) }),
+    };
+  };
+
+  try {
+    const response = createResponse();
+    await getUnassignedProperties({}, response);
+    assert.deepEqual(requestedFilter, { area: 'Unassigned area' });
+    assert.deepEqual(response.body, properties);
+  } finally {
+    Property.find = originalPropertyFind;
+  }
+});
+
+test('saving an address mapping assigns matching unassigned properties only', async () => {
+  const originals = { areaFind: Area.find, propertyFind: Property.find, updateOne: Property.updateOne };
+  let update;
+  Area.find = () => ({
+    select: () => ({ lean: async () => [{
+      name: 'Bahirdar',
+      addressMapping: { region: 'Amhara', city: 'Bahir Dar' },
+    }] }),
+  });
+  Property.find = (filter) => {
+    assert.deepEqual(filter, { area: 'Unassigned area' });
+    return {
+      select: () => ({ lean: async () => [{
+        _id: 'property-id', region: 'Amhara', city: 'Bahir Dar',
+      }] }),
+    };
+  };
+  Property.updateOne = async (filter, values) => {
+    update = { filter, values };
+    return { modifiedCount: 1 };
+  };
+
+  try {
+    await assignMappedUnassignedProperties();
+    assert.deepEqual(update, {
+      filter: { _id: 'property-id', area: 'Unassigned area' },
+      values: { $set: { area: 'Bahirdar' } },
+    });
+  } finally {
+    Area.find = originals.areaFind;
+    Property.find = originals.propertyFind;
+    Property.updateOne = originals.updateOne;
   }
 });

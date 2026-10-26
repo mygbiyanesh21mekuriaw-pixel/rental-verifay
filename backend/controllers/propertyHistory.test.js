@@ -2,12 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const User = require('../models/User');
 const Property = require('../models/Property');
+const Area = require('../models/Area');
 const VerificationRequest = require('../models/VerificationRequest');
 const Notification = require('../models/Notification');
 const SystemLog = require('../models/SystemLog');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { areaAdminOnly } = require('../middleware/auth');
-const { getPropertyHistory } = require('./propertyController');
+const { getPropertyHistory, updateProperty } = require('./propertyController');
 const { verifyProperty, rejectProperty } = require('./adminController');
 
 const adminId = '507f1f77bcf86cd799439011';
@@ -198,5 +199,81 @@ test('Area Admin cannot read a property outside the current database-assigned ar
   } finally {
     User.findById = originals.userFindById;
     Property.findOne = originals.propertyFindOne;
+  }
+});
+
+test('editing an address recalculates area, logs the change, and preserves verification history', async () => {
+  const originals = {
+    areaFind: Area.find,
+    propertyFindById: Property.findById,
+    notificationCreate: Notification.create,
+    systemLogCreate: SystemLog.create,
+  };
+  const history = [{ action: 'verified', byId: adminId, byName: 'Area Admin', at: new Date(), note: '' }];
+  const logs = [];
+  const property = {
+    _id: propertyId,
+    landlord: '507f1f77bcf86cd799439014',
+    title: 'Verified home',
+    description: 'Existing property',
+    price: 1000,
+    bedrooms: 2,
+    area: 'Addis Ababa',
+    region: 'Addis Ababa',
+    zone: 'Central',
+    wereda: 'Bole',
+    city: 'Addis Ababa',
+    history,
+    isVerified: true,
+    verificationStatus: 'approved',
+    async save() {},
+    toObject() { return { ...this }; },
+  };
+  Area.find = () => ({
+    select: () => ({ lean: async () => [{
+      name: 'Dessie',
+      addressMapping: { region: 'Amhara', zone: 'South Wollo', city: 'Dessie' },
+    }] }),
+  });
+  Property.findById = async () => property;
+  Notification.create = async () => {};
+  SystemLog.create = async (log) => logs.push(log);
+
+  try {
+    const response = createResponse();
+    await updateProperty({
+      params: { id: propertyId },
+      user: { id: property.landlord, role: 'landlord' },
+      body: {
+        title: property.title,
+        description: property.description,
+        price: property.price,
+        bedrooms: property.bedrooms,
+        area: 'Client controlled area',
+        region: 'Amhara',
+        zone: 'South Wollo',
+        wereda: 'Dessie',
+        city: 'Dessie',
+        subCity: 'Central',
+        kebele: '1',
+        houseNumber: '1',
+      },
+      files: {},
+    }, response);
+
+    assert.equal(response.statusCode, null);
+    assert.equal(property.area, 'Dessie');
+    assert.equal(property.isVerified, false);
+    assert.equal(property.verificationStatus, 'pending');
+    assert.equal(property.history, history);
+    assert.equal(property.history.length, 1);
+    assert.equal(logs.some((log) => log.action === 'PROPERTY_AREA_CHANGED'
+      && log.description.includes('Addis Ababa')
+      && log.description.includes('Dessie')), true);
+  } finally {
+    Area.find = originals.areaFind;
+    Property.findById = originals.propertyFindById;
+    Notification.create = originals.notificationCreate;
+    SystemLog.create = originals.systemLogCreate;
   }
 });

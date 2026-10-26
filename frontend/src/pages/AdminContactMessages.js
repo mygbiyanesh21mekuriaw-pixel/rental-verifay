@@ -13,7 +13,7 @@ const AdminContactMessages = () => {
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/contact/platform-admin/inbox`, {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/contact/area-admin/inbox`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessages(Array.isArray(response.data) ? response.data : []);
@@ -31,7 +31,7 @@ const AdminContactMessages = () => {
   const markRead = async (messageId) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`${process.env.REACT_APP_API_URL}/api/contact/platform-admin/inbox/${messageId}/read`, {}, {
+      await axios.put(`${process.env.REACT_APP_API_URL}/api/contact/area-admin/inbox/${messageId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessages((current) =>current.map((message) => (
@@ -47,7 +47,7 @@ const AdminContactMessages = () => {
       <BackToDashboard dashboardRoute="/admin-dashboard" />
       <header className="admin-contact-header">
         <div>
-          <p className="admin-profile-eyebrow">PLATFORM ADMIN</p>
+          <p className="admin-profile-eyebrow">AREA ADMIN</p>
           <h1>Contact Messages</h1>
           <p>Messages submitted through the public Contact Us form.</p>
         </div>
@@ -83,5 +83,4 @@ const AdminContactMessages = () => {
 };
 
 export default AdminContactMessages;
-
 

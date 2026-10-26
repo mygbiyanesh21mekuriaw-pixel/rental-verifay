@@ -32,14 +32,12 @@ const propertyMatchesAdminAreas = (property, areas) => {
 
   return areas.some((area) => {
     if (typeof area === 'string') {
-      return ['area', ...adminAreaFields].some((field) => String(property?.[field] || '').trim().toLowerCase()
-        === normalizeAreaValue(area).toLowerCase());
+      return String(property?.area || '').trim().toLowerCase() === normalizeAreaValue(area).toLowerCase();
     }
     const field = getCanonicalAreaField(area);
     if (!field) return false;
     const expectedArea = String(area[field]).trim().toLowerCase();
-    return String(property?.area || '').trim().toLowerCase() === expectedArea
-      || String(property?.[field] || '').trim().toLowerCase() === expectedArea;
+    return String(property?.area || '').trim().toLowerCase() === expectedArea;
   });
 };
 
@@ -48,18 +46,13 @@ const buildAdminAreaQuery = (areas) => ({
     .map((area) => {
       if (typeof area === 'string') {
         const value = normalizeAreaValue(area);
-        return value
-          ? ['area', 'city', 'region', 'zone', 'wereda', 'subCity'].map((field) => ({
-            [field]: new RegExp(`^${escapeRegex(value)}$`, 'i'),
-          }))
-          : null;
+        return value ? { area: new RegExp(`^${escapeRegex(value)}$`, 'i') } : null;
       }
       const field = getCanonicalAreaField(area);
       if (!field) return null;
       const exactMatch = new RegExp(`^${escapeRegex(area[field])}$`, 'i');
-      return [{ [field]: exactMatch }, { area: exactMatch }];
+      return { area: exactMatch };
     })
-    .flat()
     .filter(Boolean),
 });
 

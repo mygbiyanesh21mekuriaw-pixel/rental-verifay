@@ -1,7 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ContactMessage = require('../models/ContactMessage');
-const { getPlatformContactMessages, markContactMessageRead } = require('./contactController');
+const {
+  getAreaAdminContactMessages,
+  markAreaAdminContactMessageRead,
+} = require('./contactController');
 
 const createResponse = () => ({
   statusCode: null,
@@ -26,7 +29,7 @@ test('area admins only load contact messages assigned to their area', async () =
   const response = createResponse();
 
   try {
-    await getPlatformContactMessages({
+    await getAreaAdminContactMessages({
       user: { role: 'admin', adminType: 'area', assignedArea: 'North' },
     }, response);
 
@@ -48,7 +51,7 @@ test('area admins cannot mark another area contact message as read', async () =>
   const response = createResponse();
 
   try {
-    await markContactMessageRead({
+    await markAreaAdminContactMessageRead({
       params: { id: '507f1f77bcf86cd799439011' },
       user: { role: 'admin', adminType: 'area', assignedArea: 'North' },
     }, response);
@@ -62,14 +65,14 @@ test('area admins cannot mark another area contact message as read', async () =>
   }
 });
 
-test('Platform Admin receives no Area Admin contact inbox messages', async () => {
+test('Platform Admin cannot load the Area Admin contact inbox', async () => {
   const originalFind = ContactMessage.find;
   let findCalled = false;
-  ContactMessage.find = () => { findCalled = true; throw new Error('Platform inbox must not query area messages'); };
+  ContactMessage.find = () => { findCalled = true; throw new Error('Area Admin inbox must reject Platform Admins'); };
   const response = createResponse();
 
   try {
-    await getPlatformContactMessages({
+    await getAreaAdminContactMessages({
       user: { role: 'admin', adminType: 'platform' },
     }, response);
     assert.deepEqual(response.body, []);

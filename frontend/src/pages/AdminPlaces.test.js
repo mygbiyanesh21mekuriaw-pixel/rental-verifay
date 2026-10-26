@@ -30,14 +30,16 @@ const renderPage = () => render(
 
 beforeEach(() => {
   localStorage.setItem('token', 'platform-token');
-  axios.get.mockReset().mockResolvedValue({ data: [place] });
+  axios.get.mockReset().mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/unassigned-properties') ? [] : [place],
+  }));
   axios.post.mockReset().mockResolvedValue({ data: { message: 'Place added successfully.' } });
   axios.put.mockReset().mockResolvedValue({ data: { message: 'Place updated successfully.' } });
   axios.delete.mockReset().mockResolvedValue({ data: { message: 'Place deleted successfully.' } });
   window.confirm = jest.fn(() => true);
 });
 
-test('lists places and edits name and region', async () => {
+test('lists places and edits address mapping fields', async () => {
   renderPage();
 
   expect(await screen.findByText('North')).toBeInTheDocument();
@@ -49,11 +51,16 @@ test('lists places and edits name and region', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
   fireEvent.change(screen.getByPlaceholderText('Place name'), { target: { value: 'South' } });
   fireEvent.change(screen.getByPlaceholderText('Region (optional)'), { target: { value: 'Oromia' } });
+  fireEvent.change(screen.getByPlaceholderText('Match City (optional)'), { target: { value: 'Bahir Dar' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save Place' }));
 
   await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
     '/api/areas/place-1',
-    { name: 'South', region: 'Oromia' },
+    {
+      name: 'South',
+      region: 'Oromia',
+      addressMapping: { region: '', zone: '', wereda: '', city: 'Bahir Dar' },
+    },
     { headers: { Authorization: 'Bearer platform-token' } },
   ));
   expect(await screen.findByText('Place updated successfully.')).toBeInTheDocument();
@@ -83,4 +90,16 @@ test('deletes a place after confirmation', async () => {
     headers: { Authorization: 'Bearer platform-token' },
   }));
   expect(await screen.findByText('Place deleted successfully.')).toBeInTheDocument();
+});
+
+test('shows Platform Admin a warning list of properties awaiting address mappings', async () => {
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/unassigned-properties')
+      ? [{ _id: 'unassigned-1', title: 'Unmapped home', location: 'Oromia, Adama' }]
+      : [place],
+  }));
+  renderPage();
+
+  expect(await screen.findByText('Unmapped home')).toBeInTheDocument();
+  expect(screen.getByText('Address mapping required')).toBeInTheDocument();
 });

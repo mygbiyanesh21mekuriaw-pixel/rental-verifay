@@ -94,7 +94,6 @@ export const getDashboardMenuGroups = (user, t) => {
         group('System', [
           item('System Logs', '/admin-dashboard/system-logs', FaClipboardList),
           item('System Settings', '/admin-dashboard/system-settings', FaCog),
-          item('Contact Messages', '/admin-dashboard/contact-messages', FaEnvelope),
         ]),
         group('Account', [
           item('Account Settings', '/admin-dashboard/profile', FaUser),

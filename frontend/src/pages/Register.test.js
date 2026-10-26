@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import { MemoryRouter } from 'react-router-dom';
 import Register from './Register';
@@ -55,6 +55,56 @@ test('registration requires a username before sending the request', () => {
 
   expect(screen.getByText('Username is required')).toBeInTheDocument();
   expect(axios.post).not.toHaveBeenCalled();
+});
+
+test.each(['landlord', 'tenant'])('registers a %s without an area field', async (role) => {
+  const { container } = render(
+    <LanguageProvider>
+      <MemoryRouter>
+        <AuthProvider>
+          <Register />
+        </AuthProvider>
+      </MemoryRouter>
+    </LanguageProvider>
+  );
+
+  expect(container.querySelector('[name="area"]')).not.toBeInTheDocument();
+  fireEvent.change(container.querySelector('input[name="name"]'), {
+    target: { value: `${role} example` },
+  });
+  fireEvent.change(container.querySelector('input[name="email"]'), {
+    target: { value: `${role}@example.com` },
+  });
+  fireEvent.change(container.querySelector('input[name="username"]'), {
+    target: { value: `${role}_example` },
+  });
+  fireEvent.change(container.querySelector('input[name="phone"]'), {
+    target: { value: '0912345678' },
+  });
+  fireEvent.change(container.querySelector('input[name="password"]'), {
+    target: { value: 'secure-password' },
+  });
+  fireEvent.change(container.querySelector('input[name="confirmPassword"]'), {
+    target: { value: 'secure-password' },
+  });
+  fireEvent.change(container.querySelector('select[name="role"]'), {
+    target: { value: role },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Register' }));
+
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+    expect.stringMatching(/\/api\/auth\/register$/),
+    {
+      name: `${role} example`,
+      email: `${role}@example.com`,
+      username: `${role}_example`,
+      password: 'secure-password',
+      phone: '0912345678',
+      profilePhoto: '',
+      role,
+    },
+  ));
+  expect(axios.get).not.toHaveBeenCalledWith(expect.stringContaining('/api/public/areas'));
 });
 
 test('registration accepts usernames with 3-20 letters, numbers, and underscores', () => {

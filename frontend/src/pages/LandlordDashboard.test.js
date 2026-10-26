@@ -119,6 +119,21 @@ test('renders the welcome header, linked stat cards, and recent requests', async
   expect(main.getByRole('link', { name: /Rental Requests/ })).toHaveTextContent('1 pending');
 });
 
+test('property form derives area from the address and has no manual area dropdown', async () => {
+  configureResponses();
+  render(
+    <LanguageProvider>
+      <MemoryRouter initialEntries={['/landlord/add-property']}>
+        <LandlordDashboard initialShowForm />
+      </MemoryRouter>
+    </LanguageProvider>,
+  );
+
+  expect(await screen.findByText('Address *')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Area *')).not.toBeInTheDocument();
+  expect(document.querySelector('[name="area"]')).not.toBeInTheDocument();
+});
+
 test('shows total and pending rental request counts when requests are closed', async () => {
   configureResponses({
     requests: Array.from({ length: 22 }, (_, index) => ({
