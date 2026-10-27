@@ -20,6 +20,7 @@ const createResponse = () => ({
 
 const setupAdminCreation = () => {
   const originals = {
+    find: User.find,
     findOne: User.findOne,
     find: User.find,
     create: User.create,
@@ -30,6 +31,7 @@ const setupAdminCreation = () => {
 
   process.env.EMAIL_USER = 'configured@example.com';
   process.env.EMAIL_PASS = 'configured-but-unused';
+  User.find = () => ({ select: () => ({ lean: async () => [] }) });
   User.findOne = async () => null;
   User.find = () => ({ select: () => ({ lean: async () => [] }) });
   Area.findOne = () => ({ select: () => ({ lean: async () => ({ name: 'North' }) }) });
@@ -44,6 +46,7 @@ const setupAdminCreation = () => {
   return {
     getSavedAdmin: () => savedAdmin,
     restore() {
+      User.find = originals.find;
       User.findOne = originals.findOne;
       User.find = originals.find;
       User.create = originals.create;

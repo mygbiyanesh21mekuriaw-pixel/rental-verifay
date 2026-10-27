@@ -67,6 +67,7 @@ const ensureSingleAreaAdminIndex = async () => {
         console.error(`Area ${admins[0].area}: ${admins.map((admin) => `${admin.name} (${admin._id})${admin.isActive ? '' : ' [inactive]'}`).join(', ')}`);
       });
       console.error('Resolve each conflict manually by reassigning an area or demoting an admin. Deactivation alone does not free the area reservation. Then restart the backend.');
+      console.error('Run `node scripts/reportAreaAdminConflicts.js` for a read-only conflict report.');
       return false;
     }
 
