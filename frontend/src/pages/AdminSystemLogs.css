@@ -1,4 +1,4 @@
-.system-logs-page .system-logs-search-input {
+﻿.system-logs-page .system-logs-search-input {
   min-height: 38px;
   border-color: #cbd5e1;
   border-radius: 12px;
@@ -32,16 +32,15 @@
 }
 
 .system-logs-page .system-logs-clear-button {
-  border: 1px solid #2563eb;
-  background-color: #2563eb;
-  color: #fff;
+  border: 1px solid #e2e8f0;
+  background-color: #fff;
+  color: #334155;
 }
 
 .system-logs-page .system-logs-clear-button:hover {
-  border-color: #1d4ed8;
-  background-color: #1d4ed8;
-  color: #fff;
-  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.2);
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.04);
 }
 
 .system-logs-page .system-logs-filter-button:focus-visible {
@@ -62,7 +61,41 @@
 }
 
 .system-logs-page .system-logs-page-button:disabled {
-  border-color: #2563eb;
-  background-color: #2563eb;
-  color: #fff;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.system-logs-page .audit-log-summary-grid .rounded-2xl {
+  min-height: 104px;
+}
+
+.system-logs-page .audit-log-chip-button {
+  transition: all 0.18s ease;
+}
+
+.system-logs-page .audit-log-chip-button:hover {
+  border-color: #94a3b8;
+  background-color: #fff;
+}
+
+.system-logs-page .audit-log-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+@media (max-width: 767px) {
+  .system-logs-page .audit-log-desktop {
+    display: none;
+  }
+
+  .system-logs-page .audit-log-mobile {
+    display: block;
+  }
+}
+
+@media (min-width: 768px) {
+  .system-logs-page .audit-log-mobile {
+    display: none;
+  }
 }

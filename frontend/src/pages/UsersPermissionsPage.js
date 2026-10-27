@@ -23,7 +23,6 @@ const permissionLabels = {
   rentalRequests: 'Rental Requests',
   messages: 'Messages',
   contactMessages: 'Contact Messages',
-  users: 'Users',
   notifications: 'Notifications',
   accountSettings: 'Account Settings',
   changePassword: 'Change Password',
@@ -45,7 +44,6 @@ const PERMISSION_GROUPS = [
   { label: 'Rentals & Payments', keys: ['rentalRequests', 'rentPayments', 'bankInformation'] },
   { label: 'Communication', keys: ['messages', 'notifications', 'contactMessages', 'reviews'] },
   { label: 'Discovery', keys: ['favorites', 'searchProperties', 'recentlyViewed'] },
-  { label: 'Management', keys: ['users'] },
   { label: 'Account', keys: ['dashboard', 'accountSettings', 'changePassword'] },
 ];
 

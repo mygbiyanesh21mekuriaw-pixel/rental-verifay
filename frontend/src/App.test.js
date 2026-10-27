@@ -496,6 +496,36 @@ test('area admin keeps the session and falls back to always-on links when permis
   expect(localStorage.getItem('token')).toBe('area-admin-token');
 });
 
+test.each([
+  { description: 'explicit admin type', adminFields: { adminType: 'area' } },
+  { description: 'legacy area assignment', adminFields: { adminAreas: [{ name: 'North' }] } },
+])('area admin with $description is redirected from All Users to the admin dashboard', async ({ adminFields }) => {
+  const areaAdmin = {
+    id: 'area-admin-id',
+    name: 'Area Admin',
+    role: 'admin',
+    permissions: { users: true },
+    ...adminFields,
+  };
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/api/auth/me')) return Promise.resolve({ data: { user: areaAdmin } });
+    if (url.endsWith('/api/permissions/me')) {
+      return Promise.resolve({ data: { permissions: ['dashboard', 'users'] } });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  localStorage.setItem('token', 'area-admin-token');
+  localStorage.setItem('user', JSON.stringify(areaAdmin));
+  window.history.pushState({}, '', '/admin-dashboard/all-users');
+
+  renderApp();
+
+  await waitFor(() => {
+    expect(window.location.pathname).toBe('/admin-dashboard');
+  });
+  expect(axios.get).not.toHaveBeenCalledWith(expect.stringContaining('/api/admin/users'));
+});
+
 test('toggles the mobile navigation and closes it after navigation', async () => {
   renderApp();
 

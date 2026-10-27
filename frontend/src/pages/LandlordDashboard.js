@@ -69,6 +69,26 @@ const getRentalRequestDate = (createdAt, formatDate) => {
     : '—';
 };
 
+const PropertyImagePreview = ({ file }) => {
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (typeof URL.createObjectURL !== 'function') return undefined;
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+
+  return previewUrl ? (
+    <img className="landlord-add-property-image-preview" src={previewUrl} alt={file.name} />
+  ) : (
+    <div className="landlord-add-property-image-placeholder" aria-label={`${file.name} preview`}>
+      Image preview
+    </div>
+  );
+};
+
 export const LandlordLayout = ({ children, user: suppliedUser = null, notificationCount = 0 }) => {
   const { user: authUser } = useAuth();
   const location = useLocation();
@@ -203,6 +223,11 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   const [unavailablePermissions, setUnavailablePermissions] = useState({});
   const [documentFile, setDocumentFile] = useState(null);
   const [existingProofOfOwnership, setExistingProofOfOwnership] = useState(false);
+  const formFieldCount = Object.keys(formData).length + 2;
+  const filledFormFieldCount = Object.values(formData).filter(
+    (value) => String(value).trim().length > 0
+  ).length + (imageFiles.length > 0 ? 1 : 0) + (documentFile ? 1 : 0);
+  const formProgress = Math.round((filledFormFieldCount / formFieldCount) * 100);
 
   useEffect(() => {
     setShowForm(initialShowForm || isEditMode);
@@ -386,6 +411,20 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
 
       setFormError('');
       setDocumentFile(chosenFile);
+    }
+  };
+
+  const handleRemoveImage = (imageIndex) => {
+    const remainingFiles = imageFiles.filter((_, index) => index !== imageIndex);
+    setImageFiles(remainingFiles);
+
+    const imageInput = document.querySelector('input[name="images"]');
+    if (imageInput && typeof DataTransfer !== 'undefined') {
+      const transfer = new DataTransfer();
+      remainingFiles.forEach((file) => transfer.items.add(file));
+      imageInput.files = transfer.files;
+    } else if (imageInput && remainingFiles.length === 0) {
+      imageInput.value = '';
     }
   };
 
@@ -744,113 +783,187 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
       {!showForm && renderMainSection()}
 
       {showForm && (
-        <div className="w-full min-w-0">
+        <div className={`w-full min-w-0 ${!isEditMode ? 'landlord-add-property-page' : ''}`}>
           {isEditMode && <BackToPreviousPage />}
-          <div className="mb-3">
-            <h3 className="m-0 text-2xl font-bold text-slate-800">
-              {isEditMode ? 'Update property' : 'Add a new property'}
-            </h3>
-          </div>
+          {isEditMode ? (
+            <div className="mb-3">
+              <h3 className="m-0 text-2xl font-bold text-slate-800">Update property</h3>
+            </div>
+          ) : (
+            <header className="landlord-add-property-header">
+              <h1>Add a new property</h1>
+              <div
+                className="landlord-add-property-progress"
+                role="progressbar"
+                aria-label="Form completion"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={formProgress}
+              >
+                <span style={{ width: `${formProgress}%` }} />
+              </div>
+              <span className="landlord-add-property-progress-label">{formProgress}% complete</span>
+            </header>
+          )}
 
-            {formError && <div style={styles.errorMsg}>{formError}</div>}
-            {formSuccess && <div style={styles.successMsg}>{formSuccess}</div>}
-            {editLoading ? (
-              <div style={styles.loadingMsg}>Loading property...</div>
-            ) : (
-              <form onSubmit={handleSubmit} style={styles.form} className="landlord-property-form-fields space-y-5">
-                <div className="landlord-property-field space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">Property title *</label>
-                  <input type="text" name="title" placeholder="Example: House in Bole" value={formData.title} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                </div>
+          {formError && <div style={styles.errorMsg}>{formError}</div>}
+          {formSuccess && <div style={styles.successMsg}>{formSuccess}</div>}
+          {editLoading ? (
+            <div style={styles.loadingMsg}>Loading property...</div>
+          ) : (
+            <form
+              onSubmit={handleSubmit}
+              aria-label={isEditMode ? undefined : 'Add property form'}
+              style={isEditMode ? styles.form : undefined}
+              className={`landlord-property-form-fields space-y-5 ${
+                isEditMode ? 'landlord-property-edit-form' : 'landlord-add-property-form'
+              }`}
+            >
+              <div className={isEditMode ? 'landlord-property-edit-layout' : 'landlord-add-property-layout'}>
+                <div className={isEditMode ? 'landlord-property-edit-main' : 'landlord-add-property-main'}>
+                  <section className={isEditMode ? 'landlord-property-edit-basic' : 'landlord-add-property-card'}>
+                    {!isEditMode && <h2>Basic information</h2>}
+                    <div className="landlord-property-field landlord-add-property-title-field space-y-2">
+                      <label className="block text-sm font-semibold text-slate-700">Property title *</label>
+                      <input type="text" name="title" placeholder="Example: House in Bole" value={formData.title} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                    </div>
 
-                <div className="landlord-property-field space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">Description *</label>
-                  <textarea name="description" placeholder="Enter a property description" value={formData.description} onChange={handleFormChange} required className="min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                </div>
+                    <div className="landlord-property-field landlord-add-property-description-field space-y-2">
+                      <label className="block text-sm font-semibold text-slate-700">Description *</label>
+                      <textarea name="description" placeholder="Enter a property description" value={formData.description} onChange={handleFormChange} required className="min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                    </div>
 
-                <div className="landlord-property-field space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">Price in ETB *</label>
-                  <input type="number" name="price" placeholder="Price" min="1" value={formData.price} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                </div>
-
-                <fieldset className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <legend className="px-2 text-base font-bold text-slate-800">Address *</legend>
-                  <div className="landlord-property-field space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">Region *</label>
-                    <input type="text" name="region" placeholder="Region" value={formData.region} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                  </div>
-
-                  <div className="landlord-property-field space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">Zone *</label>
-                    <input type="text" name="zone" placeholder="Zone" value={formData.zone} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                  </div>
-
-                  <div className="landlord-property-field space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">Wereda *</label>
-                    <input type="text" name="wereda" placeholder="Wereda" value={formData.wereda} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                  </div>
-
-                  <div className="landlord-property-field space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">City *</label>
-                    <input type="text" name="city" placeholder="City" value={formData.city} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                  </div>
-
-                  <div className="landlord-property-field space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">Sub-city *</label>
-                    <input type="text" name="subCity" placeholder="Sub-city" value={formData.subCity} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                  </div>
-
-                  <div className="landlord-property-field space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">Kebele *</label>
-                    <input type="text" name="kebele" placeholder="Kebele" value={formData.kebele} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                  </div>
-
-                  <div className="landlord-property-field space-y-2">
-                    <label className="block text-sm font-semibold text-slate-700">House Number *</label>
-                    <input type="text" name="houseNumber" placeholder="House number" value={formData.houseNumber} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                  </div>
-                </fieldset>
-
-                <div className="landlord-property-field space-y-2">
-                  <label className="block text-sm font-semibold text-slate-700">Number of bedrooms *</label>
-                  <input type="number" name="bedrooms" placeholder="Number of bedrooms" min="1" value={formData.bedrooms} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
-                </div>
-
-                <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="block text-sm font-semibold text-slate-700">Property images (up to 5)</label>
-                  {isEditMode && existingPropertyImages.length > 0 && (
-                    <div className="mb-3">
-                      <p className="mb-2 text-sm font-medium text-slate-600">
-                        Current house photos (kept unless you add photos below)
-                      </p>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        {existingPropertyImages.map((image, index) => (
-                          <PropertyImage
-                            key={`${image}-${index}`}
-                            src={image}
-                            alt={`${formData.title || 'Property'} photo ${index + 1}`}
-                            className="h-32 w-full rounded-lg border border-slate-200 bg-white object-cover"
-                          />
-                        ))}
+                    <div className={isEditMode ? 'landlord-property-edit-price' : 'landlord-add-property-field-row'}>
+                      <div className="landlord-property-field landlord-add-property-price-field space-y-2">
+                        <label className="block text-sm font-semibold text-slate-700">Price in ETB *</label>
+                        <input type="number" name="price" placeholder="Price" min="1" value={formData.price} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                      </div>
+                      <div className="landlord-property-field landlord-add-property-bedroom-field space-y-2">
+                        <label className="block text-sm font-semibold text-slate-700">Number of bedrooms *</label>
+                        <input type="number" name="bedrooms" placeholder="Number of bedrooms" min="1" value={formData.bedrooms} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                       </div>
                     </div>
-                  )}
-                  <input
-                    type="file"
-                    name="images"
-                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                    multiple
-                    required={!isEditMode}
-                    onChange={handleFileChange}
-                    className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
-                  />
-                  {imageFiles.length > 0 && <span className="block text-sm font-medium text-emerald-700"> {imageFiles.map((file) =>file.name).join(', ')}</span>}
+                  </section>
+
+                  <section className={isEditMode ? 'landlord-property-edit-address' : 'landlord-add-property-card landlord-add-property-address-card'}>
+                    <fieldset className={isEditMode ? 'space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4' : 'landlord-add-property-address-fields'}>
+                      <legend className="px-2 text-base font-bold text-slate-800">Address *</legend>
+                      <div className="landlord-add-property-address-grid">
+                        <div className="landlord-property-field landlord-add-property-region-field space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700">Region *</label>
+                          <input type="text" name="region" placeholder="Region" value={formData.region} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                        </div>
+
+                        <div className="landlord-property-field landlord-add-property-zone-field space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700">Zone *</label>
+                          <input type="text" name="zone" placeholder="Zone" value={formData.zone} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                        </div>
+
+                        <div className="landlord-property-field landlord-add-property-wereda-field space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700">Wereda *</label>
+                          <input type="text" name="wereda" placeholder="Wereda" value={formData.wereda} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                        </div>
+
+                        <div className="landlord-property-field landlord-add-property-city-field space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700">City *</label>
+                          <input type="text" name="city" placeholder="City" value={formData.city} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                        </div>
+
+                        <div className="landlord-property-field landlord-add-property-subcity-field space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700">Sub-city *</label>
+                          <input type="text" name="subCity" placeholder="Sub-city" value={formData.subCity} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                        </div>
+
+                        <div className="landlord-property-field landlord-add-property-kebele-field space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700">Kebele *</label>
+                          <input type="text" name="kebele" placeholder="Kebele" value={formData.kebele} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                        </div>
+
+                        <div className="landlord-property-field landlord-add-property-house-number-field space-y-2">
+                          <label className="block text-sm font-semibold text-slate-700">House Number *</label>
+                          <input type="text" name="houseNumber" placeholder="House number" value={formData.houseNumber} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                        </div>
+                      </div>
+                    </fieldset>
+                  </section>
                 </div>
 
-                <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="block text-sm font-semibold text-slate-700">Proof of ownership</label>
-                  {existingProofOfOwnership && (
-                    <>
+                <aside className={isEditMode ? 'landlord-property-edit-side' : 'landlord-add-property-side'}>
+                  <section className={isEditMode ? 'landlord-property-edit-images space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4' : 'landlord-add-property-card'}>
+                    {isEditMode ? (
+                      <label className="block text-sm font-semibold text-slate-700">Property images (up to 5)</label>
+                    ) : (
+                      <h2>Property images ({imageFiles.length}/5)</h2>
+                    )}
+                    {isEditMode && existingPropertyImages.length > 0 && (
+                      <div className="mb-3">
+                        <p className="mb-2 text-sm font-medium text-slate-600">
+                          Current house photos (kept unless you add photos below)
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          {existingPropertyImages.map((image, index) => (
+                            <PropertyImage
+                              key={`${image}-${index}`}
+                              src={image}
+                              alt={`${formData.title || 'Property'} photo ${index + 1}`}
+                              className="h-32 w-full rounded-lg border border-slate-200 bg-white object-cover"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {isEditMode ? (
+                      <input
+                        type="file"
+                        name="images"
+                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        multiple
+                        required={!isEditMode}
+                        onChange={handleFileChange}
+                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
+                      />
+                    ) : (
+                      <label className="landlord-add-property-dropzone">
+                        <span className="landlord-add-property-upload-icon" aria-hidden="true">↑</span>
+                        <span><strong>Choose property images</strong><small>JPG, PNG or WEBP · up to 5 images</small></span>
+                        <input
+                          type="file"
+                          name="images"
+                          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                          multiple
+                          required={!isEditMode}
+                          onChange={handleFileChange}
+                          className="landlord-add-property-file-input"
+                        />
+                      </label>
+                    )}
+                    {isEditMode && imageFiles.length > 0 && <span className="block text-sm font-medium text-emerald-700"> {imageFiles.map((file) => file.name).join(', ')}</span>}
+                    {!isEditMode && imageFiles.length > 0 && (
+                      <div className="landlord-add-property-thumbnails">
+                        {imageFiles.map((file, index) => (
+                          <div className="landlord-add-property-thumbnail" key={`${file.name}-${file.lastModified}-${index}`}>
+                            <PropertyImagePreview file={file} />
+                            <button
+                              type="button"
+                              className="landlord-add-property-remove-image"
+                              aria-label={`Remove ${file.name}`}
+                              onClick={() => handleRemoveImage(index)}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className={isEditMode ? 'landlord-property-edit-proof space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4' : 'landlord-add-property-card'}>
+                    {isEditMode ? (
+                      <label className="block text-sm font-semibold text-slate-700">Proof of ownership</label>
+                    ) : (
+                      <h2>Proof of ownership</h2>
+                    )}
+                    {isEditMode && existingProofOfOwnership && (
                       <PropertyOwnershipProof
                         propertyId={propertyId}
                         hasProof={existingProofOfOwnership}
@@ -859,23 +972,44 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                         imageClassName="max-h-40 w-full rounded-lg object-contain"
                         showLabel={false}
                       />
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    name="document"
-                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                    onChange={handleFileChange}
-                    className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
-                  />
-                  {documentFile && <span className="block text-sm font-medium text-emerald-700"> {documentFile.name}</span>}
-                </div>
+                    )}
+                    {isEditMode ? (
+                      <input
+                        type="file"
+                        name="document"
+                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        onChange={handleFileChange}
+                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
+                      />
+                    ) : (
+                      <label className="landlord-add-property-dropzone landlord-add-property-proof-dropzone">
+                        <span className="landlord-add-property-upload-icon" aria-hidden="true">↑</span>
+                        <span>
+                          <strong>{documentFile ? 'Proof selected' : 'Choose proof of ownership'}</strong>
+                          <small>{documentFile ? documentFile.name : 'JPG, PNG or WEBP'}</small>
+                        </span>
+                        <input
+                          type="file"
+                          name="document"
+                          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                          onChange={handleFileChange}
+                          className="landlord-add-property-file-input"
+                        />
+                      </label>
+                    )}
+                    {isEditMode && documentFile && <span className="block text-sm font-medium text-emerald-700"> {documentFile.name}</span>}
+                  </section>
 
-                <button type="submit" className="w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300">
-                  {isEditMode ? 'Save changes' : 'Submit property'}
-                </button>
-              </form>
-            )}
+                  <button
+                    type="submit"
+                    className={isEditMode ? 'landlord-property-edit-submit w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300' : 'landlord-add-property-submit'}
+                  >
+                    {isEditMode ? 'Save changes' : 'Submit property'}
+                  </button>
+                </aside>
+              </div>
+            </form>
+          )}
         </div>
       )}
     </>

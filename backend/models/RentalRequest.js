@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { canonicalAreaKey } = require('../utils/canonicalArea');
 
 const AdminHandlingHistorySchema = new mongoose.Schema({
   action: {
@@ -32,6 +33,16 @@ const RentalRequestSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Property',
     required: true,
+  },
+  area: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Area',
+    default: null,
+  },
+  areaKey: {
+    type: String,
+    default: '',
+    trim: true,
   },
   tenant: {
     type: mongoose.Schema.Types.ObjectId,
@@ -97,5 +108,9 @@ RentalRequestSchema.index(
     partialFilterExpression: { status: { $in: ['pending', 'approved', 'confirmed'] } },
   }
 );
+
+RentalRequestSchema.pre('validate', function normalizeRentalAreaKey() {
+  if (this.areaKey) this.areaKey = canonicalAreaKey(this.areaKey);
+});
 
 module.exports = mongoose.model('RentalRequest', RentalRequestSchema);

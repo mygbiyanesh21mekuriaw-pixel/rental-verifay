@@ -83,12 +83,20 @@ const Navbar = () => {
         setUnreadCount(count);
         setDashboardUnreadCount?.(count);
       } catch (error) {
-        setUnreadCount(0);
-        setDashboardUnreadCount?.(0);
+        console.error('Unable to refresh notification count:', error);
       }
     };
 
+    const handleNotificationCount = (event) => {
+      const count = Number(event.detail?.unreadCount);
+      if (!Number.isFinite(count)) return;
+      setUnreadCount(count);
+      setDashboardUnreadCount?.(count);
+    };
+
     fetchUnreadCount();
+    window.addEventListener('focus', fetchUnreadCount);
+    window.addEventListener('notifications:unread-count', handleNotificationCount);
 
     const refreshInterval = window.setInterval(
       fetchUnreadCount,
@@ -97,6 +105,8 @@ const Navbar = () => {
 
     return () => {
       window.clearInterval(refreshInterval);
+      window.removeEventListener('focus', fetchUnreadCount);
+      window.removeEventListener('notifications:unread-count', handleNotificationCount);
     };
   }, [user, location.pathname, setDashboardUnreadCount]);
 

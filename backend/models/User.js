@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { canonicalAreaKey, normalizeAreaName } = require('../utils/canonicalArea');
 
 const UserSchema = new mongoose.Schema({
   name: {
@@ -49,6 +50,11 @@ const UserSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: '',
+  },
+  assignedAreaKey: {
+    type: String,
+    default: '',
+    trim: true,
   },
   profilePhoto: {
     type: String,
@@ -113,6 +119,15 @@ const UserSchema = new mongoose.Schema({
     default: Date.now,
   },
 }, { autoIndex: false });
+
+UserSchema.pre('validate', function normalizeAssignedArea() {
+  if (this.assignedArea) {
+    this.assignedArea = normalizeAreaName(this.assignedArea);
+    this.assignedAreaKey = canonicalAreaKey(this.assignedArea);
+  } else {
+    this.assignedAreaKey = '';
+  }
+});
 
 UserSchema.index({ username: 1 }, { unique: true, sparse: true });
 UserSchema.index(

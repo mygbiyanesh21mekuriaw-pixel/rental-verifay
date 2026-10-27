@@ -4,7 +4,15 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Area = require('../models/Area');
 const SystemLog = require('../models/SystemLog');
-const { login, serializeUser, changePasswordOnFirstLogin } = require('../controllers/authController');
+const SystemSettings = require('../models/SystemSettings');
+const {
+  login,
+  serializeUser,
+  getMe,
+  updateProfile,
+  changePassword,
+  changePasswordOnFirstLogin,
+} = require('../controllers/authController');
 const { encryptBankAccountNumber } = require('../utils/bankAccountCrypto');
 const { planMissingUsernames } = require('../migrate-missing-usernames');
 
@@ -648,4 +656,200 @@ test('user serialization includes the first-login password-change flag', () => {
   });
 
   assert.equal(user.mustChangePassword, true);
+});
+
+test('getMe returns only the authenticated user security history without sensitive log fields', async () => {
+  const originals = {
+    findById: User.findById,
+    findLogs: SystemLog.find,
+    findSettings: SystemSettings.findOne,
+  };
+  const ownUser = {
+    _id: 'authenticated-user-id',
+    name: 'Own User',
+    email: 'own@example.com',
+    password: 'must-not-return',
+    role: 'tenant',
+    bankAccountNumber: 'private-bank-number',
+    profilePhoto: '',
+  };
+  const loginLogs = [
+    { createdAt: new Date('2025-03-02T10:00:00Z'), userAgent: 'Chrome/123', ip: '192.0.2.1', details: { secret: 'hidden' } },
+    { createdAt: new Date('2025-03-01T10:00:00Z'), userAgent: 'Firefox/123', ip: '192.0.2.2' },
+  ];
+  const passwordLogs = [{ createdAt: new Date('2025-02-20T08:00:00Z'), details: { password: 'hidden' } }];
+  const queries = [];
+  User.findById = (id) => {
+    assert.equal(id, 'authenticated-user-id');
+    return { select: async () => ownUser };
+  };
+  SystemSettings.findOne = () => ({ lean: async () => ({ notifications: { inAppEnabled: true, emailEnabled: false } }) });
+  SystemLog.find = (query) => {
+    queries.push(query);
+    const records = query.action === 'USER_LOGIN' ? loginLogs : passwordLogs;
+    return {
+      sort() { return this; },
+      limit() { return this; },
+      select() { return this; },
+      lean: async () => records,
+    };
+  };
+  const response = createResponse();
+
+  try {
+    await getMe({ user: { id: 'authenticated-user-id', permissions: { dashboard: true } } }, response);
+    assert.equal(response.statusCode, null);
+    assert.deepEqual(queries.map((query) => query.user), ['authenticated-user-id', 'authenticated-user-id']);
+    assert.deepEqual(queries[1].action, { $in: ['PASSWORD_CHANGED', 'PASSWORD_RESET'] });
+    assert.equal(response.body.lastLoginAt.toISOString(), '2025-03-02T10:00:00.000Z');
+    assert.equal(response.body.lastPasswordChangeAt.toISOString(), '2025-02-20T08:00:00.000Z');
+    assert.deepEqual(response.body.recentSignIns, [
+      { at: loginLogs[0].createdAt, userAgent: 'Chrome/123' },
+      { at: loginLogs[1].createdAt, userAgent: 'Firefox/123' },
+    ]);
+    assert.doesNotMatch(JSON.stringify(response.body), /must-not-return|private-bank-number|192\.0\.2|hidden/);
+  } finally {
+    User.findById = originals.findById;
+    SystemLog.find = originals.findLogs;
+    SystemSettings.findOne = originals.findSettings;
+  }
+});
+
+test('profile updates are scoped to the authenticated user and cannot change role, area, or active status', async () => {
+  const originals = {
+    findById: User.findById,
+    createLog: SystemLog.create,
+  };
+  const user = {
+    _id: 'own-user-id',
+    name: 'Before',
+    email: 'own@example.com',
+    phone: '',
+    role: 'admin',
+    adminType: 'area',
+    area: 'Own Area',
+    isActive: true,
+    async save() {},
+  };
+  let queriedId;
+  User.findById = (id) => {
+    queriedId = id;
+    return { select: async () => user };
+  };
+  SystemLog.create = async () => null;
+
+  try {
+    const response = createResponse();
+    await updateProfile({
+      user: { id: 'own-user-id' },
+      body: { name: 'Updated Name', phone: '0912345678' },
+    }, response);
+    assert.equal(response.statusCode, null);
+    assert.equal(queriedId, 'own-user-id');
+    assert.equal(user.name, 'Updated Name');
+    assert.equal(user.phone, '0912345678');
+    assert.equal(user.role, 'admin');
+    assert.equal(user.area, 'Own Area');
+    assert.equal(user.isActive, true);
+
+    const immutableResponse = createResponse();
+    await updateProfile({
+      user: { id: 'own-user-id' },
+      body: { role: 'platform_admin', area: 'Other Area', isActive: false },
+    }, immutableResponse);
+    assert.equal(immutableResponse.statusCode, 400);
+    assert.equal(user.area, 'Own Area');
+    assert.equal(user.isActive, true);
+  } finally {
+    User.findById = originals.findById;
+    SystemLog.create = originals.createLog;
+  }
+});
+
+test('profile email changes require the current password and phone uses the requested Ethiopian formats', async () => {
+  const originals = {
+    findById: User.findById,
+    findOne: User.findOne,
+    createLog: SystemLog.create,
+  };
+  const user = {
+    _id: '507f1f77bcf86cd799439011',
+    name: 'Email User',
+    email: 'before@example.com',
+    password: await bcrypt.hash('correct-password', 4),
+    phone: '',
+    role: 'tenant',
+    async save() {},
+  };
+  User.findById = () => ({ select: async () => user });
+  User.findOne = () => ({ select: async () => null });
+  SystemLog.create = async () => null;
+
+  try {
+    const missingPassword = createResponse();
+    await updateProfile({ user: { id: 'email-user-id' }, body: { email: 'after@example.com' } }, missingPassword);
+    assert.equal(missingPassword.statusCode, 400);
+    assert.equal(user.email, 'before@example.com');
+
+    const invalidPhone = createResponse();
+    await updateProfile({ user: { id: 'email-user-id' }, body: { phone: '0712345678' } }, invalidPhone);
+    assert.equal(invalidPhone.statusCode, 400);
+    assert.equal(user.phone, '');
+
+    const emailResponse = createResponse();
+    await updateProfile({
+      user: { id: 'email-user-id' },
+      body: { email: 'after@example.com', currentPassword: 'correct-password' },
+    }, emailResponse);
+    assert.equal(emailResponse.statusCode, null);
+    assert.equal(user.email, 'after@example.com');
+  } finally {
+    User.findById = originals.findById;
+    User.findOne = originals.findOne;
+    SystemLog.create = originals.createLog;
+  }
+});
+
+test('password changes enforce minimum length and reject reusing the current password', async () => {
+  const originals = {
+    findById: User.findById,
+    createLog: SystemLog.create,
+  };
+  const user = {
+    _id: 'password-user-id',
+    name: 'Password User',
+    email: 'password@example.com',
+    password: await bcrypt.hash('current-password', 4),
+    async save() {},
+  };
+  User.findById = async () => user;
+  SystemLog.create = async () => null;
+
+  try {
+    const shortPassword = createResponse();
+    await changePassword({
+      user: { id: 'password-user-id' },
+      body: { currentPassword: 'current-password', newPassword: 'short' },
+    }, shortPassword);
+    assert.equal(shortPassword.statusCode, 400);
+
+    const samePassword = createResponse();
+    await changePassword({
+      user: { id: 'password-user-id' },
+      body: { currentPassword: 'current-password', newPassword: 'current-password' },
+    }, samePassword);
+    assert.equal(samePassword.statusCode, 400);
+    assert.match(samePassword.body.message, /different from the current password/i);
+
+    const changedPassword = createResponse();
+    await changePassword({
+      user: { id: 'password-user-id' },
+      body: { currentPassword: 'current-password', newPassword: 'new-secure-password' },
+    }, changedPassword);
+    assert.equal(changedPassword.statusCode, null);
+    assert.equal(await bcrypt.compare('new-secure-password', user.password), true);
+  } finally {
+    User.findById = originals.findById;
+    SystemLog.create = originals.createLog;
+  }
 });

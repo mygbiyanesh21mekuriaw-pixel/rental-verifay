@@ -1,7 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { FaStar } from 'react-icons/fa';
+import {
+  FaCalendarAlt,
+  FaArrowRight,
+  FaCheckCircle,
+  FaBed,
+  FaHeart,
+  FaMapMarkerAlt,
+  FaMoneyBillAlt,
+  FaRegHeart,
+  FaStar,
+  FaUser,
+} from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { fetchFavoriteIds, getFavoriteIds, toggleFavorite } from '../utils/favorites';
 import BackToDashboard from '../components/BackToDashboard';
@@ -193,8 +204,19 @@ const sectionConfig = {
   rented: { title: 'Rented Property', empty: 'You do not have an approved rented property yet.' },
 };
 
-const PropertyCard = ({ property, userId, onFavoriteChange, token, favoriteIds, favoritesReady, favoritesError }) => {
-  const isFavorite = favoriteIds.has(String(property._id));
+const PropertyCard = ({
+  property,
+  userId,
+  onFavoriteChange,
+  token,
+  favoriteIds,
+  favoritesReady,
+  favoritesError,
+  isVerifiedPage = false,
+  isFavoritePage = false,
+}) => {
+  const isFavorite = isFavoritePage || favoriteIds.has(String(property._id));
+  const isStyledPropertyCard = isVerifiedPage || isFavoritePage;
   const [isUpdating, setIsUpdating] = useState(false);
   const [favoriteError, setFavoriteError] = useState('');
 
@@ -214,47 +236,135 @@ const PropertyCard = ({ property, userId, onFavoriteChange, token, favoriteIds, 
   };
 
   return (
-  <div className="tenant-card">
-    <div className="tenant-card-image">
-    <PropertyImage
-      src={getPropertyImages(property)}
-      alt={property.title}
-      className="tenant-card-property-image"
-      fallbackClassName="tenant-card-no-image"
-      fallbackText="No photo"
-    />
-    <span className="tenant-card-badge">Verified</span>
-    </div>
-    <div className="tenant-card-content">
-      <h3 className="tenant-card-title">{property.title}</h3>
-      <p className="tenant-card-location"> {property.location}</p>
-      <p className="tenant-card-price">ETB {property.price?.toLocaleString()}</p>
-      <p className="tenant-card-detail"> {property.bedrooms} rooms</p>
-      <p className="tenant-card-detail">Landlord: {property.landlord?.name || 'Not available'}</p>
-      <p className="tenant-card-description">{property.description}</p>
-      <p className="tenant-card-detail">Verification status: Approved</p>
-      <div className="tenant-card-actions">
-        <button
-          type="button"
-          className={`tenant-card-action tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`}
-          onClick={handleFavorite}
-          disabled={isUpdating || !favoritesReady}
-        >
-          {isUpdating ? 'Saving...' : favoritesError ? 'Favorite unavailable' : !favoritesReady ? 'Loading...' : isFavorite ? 'Favorited' : 'Favorite'}
-        </button>
-        <Link to={`/property/${property._id}`} className="tenant-card-action tenant-card-btn">Request to Rent</Link>
-      </div>
-      {(favoriteError || favoritesError) && (
-        <p className="tenant-favorite-error" role="alert">{favoriteError || favoritesError}</p>
+    <div className={`tenant-card ${isStyledPropertyCard ? 'tenant-verified-card property-card' : ''}`}>
+      {isStyledPropertyCard ? (
+        <>
+          <div className="tenant-verified-card-media">
+            <PropertyImage
+              src={getPropertyImages(property)}
+              alt={property.title}
+              className="tenant-card-property-image"
+              fallbackClassName="tenant-card-no-image"
+              fallbackText="No photo"
+            />
+            {property.verificationStatus === 'approved' && (
+              <span className="tenant-verified-badge">
+                <FaCheckCircle aria-hidden="true" />
+                Verified
+              </span>
+            )}
+            <button
+              type="button"
+              className={`tenant-verified-favorite ${isFavorite ? 'active' : ''} ${isFavoritePage ? 'tenant-favorite-remove-button' : ''}`}
+              onClick={handleFavorite}
+              disabled={isUpdating || !favoritesReady}
+              aria-label={isFavoritePage ? 'Remove from favorites' : isFavorite ? 'Favorited' : 'Favorite'}
+              aria-busy={!favoritesReady || isUpdating}
+              title={isFavoritePage ? 'Remove from favorites' : isFavorite ? 'Favorited' : 'Favorite'}
+            >
+              {isFavorite
+                ? <FaHeart aria-hidden="true" />
+                : <FaRegHeart aria-hidden="true" />}
+            </button>
+          </div>
+          <div className="tenant-verified-card-content">
+            <h3 className="tenant-verified-card-title" title={property.title}>{property.title}</h3>
+            <p className="tenant-verified-card-location">
+              <FaMapMarkerAlt aria-hidden="true" />
+              <span>{property.location}</span>
+            </p>
+            <p className="tenant-verified-card-price">
+              ETB {property.price?.toLocaleString()}
+              <span>/ month</span>
+            </p>
+            <div className="tenant-verified-card-chips">
+              <span className="tenant-verified-card-chip">
+                <FaBed aria-hidden="true" />
+                {property.bedrooms} {property.bedrooms === 1 ? 'room' : 'rooms'}
+              </span>
+              <span className="tenant-verified-card-chip">
+                <FaUser aria-hidden="true" />
+                {property.landlord?.name || 'Not available'}
+              </span>
+            </div>
+            <p className="tenant-verified-card-description">{property.description}</p>
+            {property.verificationStatus !== 'approved' && (
+              <p className="tenant-verified-card-status">
+                Verification status: {property.verificationStatus || 'Unknown'}
+              </p>
+            )}
+            {(favoriteError || favoritesError) && (
+              <p className="tenant-favorite-error" role="alert">{favoriteError || favoritesError}</p>
+            )}
+            <div className="tenant-verified-card-actions">
+              <Link to={`/property/${property._id}`} className="tenant-card-btn">
+                Request to Rent
+              </Link>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="tenant-card-image">
+            <PropertyImage
+              src={getPropertyImages(property)}
+              alt={property.title}
+              className="tenant-card-property-image"
+              fallbackClassName="tenant-card-no-image"
+              fallbackText="No photo"
+            />
+            <span className="tenant-card-badge">Verified</span>
+          </div>
+          <div className="tenant-card-content">
+            <h3 className="tenant-card-title">{property.title}</h3>
+            <p className="tenant-card-location"> {property.location}</p>
+            <p className="tenant-card-price">ETB {property.price?.toLocaleString()}</p>
+            <p className="tenant-card-detail"> {property.bedrooms} rooms</p>
+            <p className="tenant-card-detail">Landlord: {property.landlord?.name || 'Not available'}</p>
+            <p className="tenant-card-description">{property.description}</p>
+            <p className="tenant-card-detail">Verification status: Approved</p>
+            <div className="tenant-card-actions">
+              <button
+                type="button"
+                className={`tenant-card-action tenant-card-favorite-btn ${isFavorite ? 'active' : ''}`}
+                onClick={handleFavorite}
+                disabled={isUpdating || !favoritesReady}
+              >
+                {isUpdating ? 'Saving...' : favoritesError ? 'Favorite unavailable' : !favoritesReady ? 'Loading...' : isFavorite ? 'Favorited' : 'Favorite'}
+              </button>
+              <Link to={`/property/${property._id}`} className="tenant-card-action tenant-card-btn">Request to Rent</Link>
+            </div>
+            {(favoriteError || favoritesError) && (
+              <p className="tenant-favorite-error" role="alert">{favoriteError || favoritesError}</p>
+            )}
+          </div>
+        </>
       )}
     </div>
-  </div>
   );
 };
 
 const RequestList = ({ requests, userId, notifications = [], showActiveRentalActions = false, originPath }) => {
   const navigate = useNavigate();
   const [openingRequestId, setOpeningRequestId] = useState(null);
+  const [rentalBadgeNow, setRentalBadgeNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!showActiveRentalActions) return undefined;
+    const now = Date.now();
+    const nextExpiration = requests
+      .filter((request) => request.is_new === true)
+      .map((request) => new Date(request.is_new_until).getTime())
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp > now)
+      .sort((left, right) => left - right)[0];
+    if (!nextExpiration) return undefined;
+
+    const timer = window.setTimeout(
+      () => setRentalBadgeNow(Date.now()),
+      nextExpiration - now + 1,
+    );
+    return () => window.clearTimeout(timer);
+  }, [requests, showActiveRentalActions]);
 
   const openMessage = async (request) => {
     setOpeningRequestId(request._id);
@@ -273,44 +383,148 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
     }
   };
 
-  return <div className="tenant-request-list">
-    {requests.map((request) => (
-      <div key={request._id} className="tenant-request-card">
-        <div>
-          {showActiveRentalActions && (
+  return <div className={showActiveRentalActions ? 'tenant-rented-property-list' : 'tenant-request-list'}>
+    {requests.map((request) => showActiveRentalActions ? (
+      <article key={request._id} className="tenant-rented-property-card">
+        {request.is_new === true
+          && Number.isFinite(new Date(request.is_new_until).getTime())
+          && rentalBadgeNow < new Date(request.is_new_until).getTime() && (
+          <span className="tenant-rented-new-badge">New</span>
+        )}
+        <div className="tenant-rented-hero">
+          <div className="tenant-rented-hero-image-wrap">
             <PropertyImage
-              className="tenant-request-image"
-              fallbackClassName="tenant-request-image tenant-card-no-image"
+              className="tenant-rented-hero-image"
+              fallbackClassName="tenant-rented-hero-image tenant-rented-image-placeholder"
               src={getPropertyImages(request.property)}
               alt={request.property?.title || 'Rented property'}
               fallbackText="No property photo"
             />
-          )}
-          <h3 className="tenant-request-title"> {request.property?.title}</h3>
-          <p className="tenant-request-detail"> {request.property?.location}</p>
-          <p className="tenant-request-detail">Rent: ETB {Number(request.property?.price || 0).toLocaleString()}</p>
-          <p className="tenant-request-detail">Landlord: {request.landlord?.name || 'Not available'}</p>
-          <p className="tenant-request-detail">Move-in date: {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString() : 'Not provided'}</p>
-          {showActiveRentalActions && request.property?.rentedAt && <p className="tenant-request-detail">Rental started: {new Date(request.property.rentedAt).toLocaleDateString()}</p>}
-          {isActiveRental(request, userId) && <div className="tenant-rented-notice">This property has been rented in your name.</div>}
-          {showActiveRentalActions && isConfirmedRental(request, userId) && (
-            <RentalReview propertyId={request.property?._id} />
-          )}
-          {!showActiveRentalActions && notifications.find(notification =>String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id))?.message && (
-            <div className={`tenant-rental-notification tenant-rental-notification-${request.status}`}>
-              {notifications.find(notification =>String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id)).message}
+            <span className="tenant-rented-active-badge">
+              <FaCheckCircle aria-hidden="true" />
+              Active Rental
+            </span>
+          </div>
+          <div className="tenant-rented-hero-content">
+            <h2 className="tenant-rented-title">{request.property?.title || 'Rented property'}</h2>
+            <p className="tenant-rented-address">
+              <FaMapMarkerAlt aria-hidden="true" />
+              <span>{[
+                request.property?.location,
+                request.property?.subCity || request.property?.subcity,
+                request.property?.city,
+              ].filter(Boolean).join(', ') || 'Location unavailable'}</span>
+            </p>
+            <p className="tenant-rented-monthly-rent">
+              ETB {Number(request.property?.price || 0).toLocaleString()}
+              <span>/ month</span>
+            </p>
+            {isActiveRental(request, userId) && (
+              <div className="tenant-rented-success" role="status">
+                <FaCheckCircle aria-hidden="true" />
+                <span>This property has been rented in your name.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="tenant-rented-info-grid">
+          <div className="tenant-rented-info-card">
+            <span className="tenant-rented-info-icon"><FaUser aria-hidden="true" /></span>
+            <div><span>Landlord</span><strong>{request.landlord?.name || 'Not available'}</strong></div>
+          </div>
+          <div className="tenant-rented-info-card">
+            <span className="tenant-rented-info-icon"><FaCalendarAlt aria-hidden="true" /></span>
+            <div>
+              <span>Move-in date</span>
+              <strong>{request.moveInDate ? new Date(request.moveInDate).toLocaleDateString() : 'Not provided'}</strong>
             </div>
+          </div>
+          <div className="tenant-rented-info-card">
+            <span className="tenant-rented-info-icon"><FaCalendarAlt aria-hidden="true" /></span>
+            <div>
+              <span>Rental started</span>
+              <strong>{request.property?.rentedAt ? new Date(request.property.rentedAt).toLocaleDateString() : 'Not provided'}</strong>
+            </div>
+          </div>
+          <div className="tenant-rented-info-card">
+            <span className="tenant-rented-info-icon"><FaCheckCircle aria-hidden="true" /></span>
+            <div>
+              <span>Monthly rent</span>
+              <strong>ETB {Number(request.property?.price || 0).toLocaleString()}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="tenant-rented-actions">
+          {isConfirmedRental(request, userId) && (
+            <>
+              <button
+                type="button"
+                className="tenant-rented-pay-btn"
+                onClick={() => navigate(`/tenant/rent-payment/${request.property?._id}`, {
+                  state: { from: '/tenant/rented-property' },
+                })}
+              >Pay Rent</button>
+              <button
+                type="button"
+                className="tenant-rented-message-btn"
+                onClick={() => openMessage(request)}
+                disabled={openingRequestId === request._id}
+              >{openingRequestId === request._id ? 'Opening...' : 'Message Landlord'}</button>
+              <RentalReview propertyId={request.property?._id} />
+            </>
           )}
         </div>
-        <div className="tenant-request-confirmed-actions">
+      </article>
+    ) : (
+      <article
+        key={request._id}
+        className={`tenant-request-card request-card tenant-request-card-${isApprovedRequest(request) ? 'approved' : String(request.status || 'other').toLowerCase()}`}
+      >
+        <div className="tenant-request-header">
+          <div className="tenant-request-heading">
+            <h3 className="tenant-request-title">{request.property?.title}</h3>
+            <p className="tenant-request-address tenant-request-detail">
+              <FaMapMarkerAlt aria-hidden="true" />
+              <span>{request.property?.location}</span>
+            </p>
+          </div>
           {!showActiveRentalActions && (
             <span
               role="status"
-              className={`tenant-request-status tenant-request-status-${isApprovedRequest(request) ? 'approved' : request.status}`}
+              className={`tenant-request-status tenant-request-status-${isApprovedRequest(request) ? 'approved' : String(request.status || 'other').toLowerCase()}`}
             >
               {isApprovedRequest(request) ? 'Approved' : request.status === 'rejected' ? 'Rejected' : ` ${displayRequestStatus(request.status)}`}
             </span>
           )}
+        </div>
+
+        <div className="tenant-request-info-grid">
+          <div className="tenant-request-info-item">
+            <span className="tenant-request-info-label">Rent</span>
+            <strong><FaMoneyBillAlt aria-hidden="true" /> ETB {Number(request.property?.price || 0).toLocaleString()}</strong>
+          </div>
+          <div className="tenant-request-info-item">
+            <span className="tenant-request-info-label">Landlord</span>
+            <strong><FaUser aria-hidden="true" /> {request.landlord?.name || 'Not available'}</strong>
+          </div>
+          <div className="tenant-request-info-item">
+            <span className="tenant-request-info-label">Move-in date</span>
+            <strong>
+              <FaCalendarAlt aria-hidden="true" />
+              {request.moveInDate ? new Date(request.moveInDate).toLocaleDateString() : 'Not provided'}
+            </strong>
+          </div>
+        </div>
+
+        {!showActiveRentalActions && notifications.find(notification =>String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id))?.message && (
+          <div className={`tenant-rental-notification tenant-rental-notification-${String(request.status || 'other').toLowerCase()}`}>
+            {notifications.find(notification =>String(notification.rentalRequest?._id || notification.rentalRequest) === String(request._id)).message}
+          </div>
+        )}
+
+        <div className="tenant-request-footer">
           {!showActiveRentalActions && request._id && (() => {
             const propertyId = request.property?._id;
             if (!propertyId) return null;
@@ -319,27 +533,14 @@ const RequestList = ({ requests, userId, notifications = [], showActiveRentalAct
                 to={`/property/${propertyId}`}
                 state={request.status === 'rejected' ? { fromRejectedRequest: true, property: request.property } : undefined}
                 className="tenant-request-details-btn"
-              >View Details
+              >
+                View Details
+                <FaArrowRight aria-hidden="true" />
               </Link>
             );
           })()}
-          {showActiveRentalActions && isConfirmedRental(request, userId) && (
-            <>
-              <button type="button" className="tenant-request-message-btn" onClick={() =>openMessage(request)} disabled={openingRequestId === request._id}>
-                {openingRequestId === request._id ? 'Opening...' : 'Message Landlord'}
-              </button>
-              <button
-                type="button"
-                className="tenant-request-pay-btn"
-                onClick={() =>navigate(`/tenant/rent-payment/${request.property?._id}`, {
-                  state: { from: '/tenant/rented-property' },
-                })}
-              >Pay Rent
-              </button>
-            </>
-          )}
         </div>
-      </div>
+      </article>
     ))}
   </div>;
 };
@@ -452,7 +653,22 @@ const TenantSectionPage = ({ type }) => {
       </div>
       <section className="tenant-section">
         {items.length === 0 ? (
-          <div className="tenant-empty"><span className="tenant-empty-icon"></span><p>{config.empty}</p></div>
+          <div className={`tenant-empty${type === 'favorites' ? ' tenant-favorites-empty' : ''}`}>
+            {type === 'favorites' ? (
+              <FaHeart className="tenant-favorites-empty-icon" aria-hidden="true" />
+            ) : (
+              <span className="tenant-empty-icon" aria-hidden="true"></span>
+            )}
+            <p>{config.empty}</p>
+            {type === 'favorites' && (
+              <Link to="/tenant/verified-properties" className="tenant-rented-browse-btn">
+                Browse Verified Properties
+              </Link>
+            )}
+            {type === 'rented' && (
+              <Link to="/tenant/verified-properties" className="tenant-rented-browse-btn">Browse Properties</Link>
+            )}
+          </div>
         ) : type === 'rentalRequests' || type === 'rented' ? (
           <RequestList
             requests={items}
@@ -462,7 +678,7 @@ const TenantSectionPage = ({ type }) => {
             originPath={`${location.pathname}${location.search}`}
           />
         ) : (
-          <div className="tenant-grid">{items.map(property => (
+          <div className={`tenant-grid${type === 'verified' ? ' tenant-verified-grid' : ''}${type === 'favorites' ? ' tenant-favorite-grid' : ''}`}>{items.map(property => (
             <PropertyCard 
               key={property._id} 
               property={property} 
@@ -472,6 +688,8 @@ const TenantSectionPage = ({ type }) => {
               favoritesReady={favoritesReady}
               favoritesError={favoritesError}
               onFavoriteChange={handleFavoriteChange} 
+              isVerifiedPage={type === 'verified'}
+              isFavoritePage={type === 'favorites'}
             />
           ))}</div>
         )}

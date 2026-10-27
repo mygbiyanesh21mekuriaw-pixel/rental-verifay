@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import AdminSectionPage from './AdminSectionPage';
 import PropertyDetail from './PropertyDetail';
@@ -29,6 +29,7 @@ const property = {
   verificationStatus: 'pending',
   isVerified: false,
 };
+const originalFetch = global.fetch;
 
 const CurrentLocation = () => {
   const location = useLocation();
@@ -44,6 +45,7 @@ const CurrentLocation = () => {
 
 beforeEach(() => {
   localStorage.setItem('token', 'area-admin-token');
+  localStorage.removeItem('admin-properties-view');
   useAuth.mockReturnValue({ user: areaAdmin });
   axios.get.mockReset().mockImplementation((url) => {
     if (url.includes('/api/properties/property-id')) {
@@ -60,7 +62,6 @@ beforeEach(() => {
 test.each([
   ['pending', '/admin-dashboard/pending'],
   ['verified', '/admin-dashboard/verified'],
-  ['allProperties', '/admin-dashboard/all-properties'],
 ])(
   'returns from property details to the originating %s listing and preserves its query',
   async (type, route) => {
@@ -89,6 +90,63 @@ test.each([
     }));
   },
 );
+
+test('All Properties opens full details and only requests proof after the details view opens', async () => {
+  const details = {
+    ...property,
+    description: 'Full private description',
+    location: '12 Main Road',
+    city: 'Mekelle',
+    area: 'Mekelle',
+    history: [],
+    hasVerificationDocument: true,
+    landlord: { name: 'Owner Example' },
+  };
+  axios.get.mockImplementation((url) => {
+    if (url.includes('/api/admin/properties?')) {
+      return Promise.resolve({
+        data: {
+          properties: [property],
+          totals: { total: 1, verified: 0, underReview: 1, rejected: 0 },
+          areas: ['Mekelle'],
+          pagination: { page: 1, limit: 12, total: 1, totalPages: 1, hasNextPage: false, hasPrevPage: false },
+        },
+      });
+    }
+    if (url.includes('/api/admin/properties/property-id/details')) {
+      return Promise.resolve({ data: details });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 404 });
+
+  render(
+    <MemoryRouter initialEntries={['/admin-dashboard/all-properties']}>
+      <AdminSectionPage type="allProperties" />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole('heading', { name: 'Test Property' })).toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'List' }));
+  expect(localStorage.getItem('admin-properties-view')).toBe('list');
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search properties' }), { target: { value: 'house' } });
+  await waitFor(() => expect(axios.get).toHaveBeenCalledWith(
+    expect.stringContaining('q=house'),
+    expect.any(Object),
+  ));
+  fireEvent.click(screen.getAllByRole('button', { name: 'View details' })[0]);
+  expect(await screen.findByText('Full private description')).toBeInTheDocument();
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    expect.stringContaining('/api/properties/property-id/ownership-proof'),
+    expect.any(Object),
+  ));
+});
+
+afterEach(() => {
+  global.fetch = originalFetch;
+});
 
 test('Area Admin property details displays handling history with the original name and former-admin label', async () => {
   axios.get.mockImplementation((url) => {

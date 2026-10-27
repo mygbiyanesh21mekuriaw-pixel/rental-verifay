@@ -123,6 +123,34 @@ test('owning landlord receives private proof bytes through a non-cacheable autho
   });
 });
 
+test('platform_admin accounts receive private ownership proof bytes', async () => {
+  await withCloudinaryConfig(async () => {
+    const originalFetch = global.fetch;
+    const bytes = Buffer.from('platform-admin-proof');
+    global.fetch = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: (name) => (name === 'content-type' ? 'image/png' : String(bytes.length)) },
+      arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    });
+
+    try {
+      await withMocks(privateProperty(), async () => {
+        const response = createResponse();
+        await getOwnershipProof(
+          { params: { id: propertyId }, user: { id: '507f1f77bcf86cd799439016', role: 'platform_admin' } },
+          response,
+        );
+
+        assert.equal(response.contentType, 'image/png');
+        assert.equal(response.body.toString(), 'platform-admin-proof');
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});
+
 test('tenant and unrelated landlord cannot request an ownership proof', async () => {
   await withMocks(privateProperty(), async () => {
     for (const user of [

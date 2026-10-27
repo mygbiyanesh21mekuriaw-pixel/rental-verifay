@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import {
+  FaBed,
+  FaCheckCircle,
+  FaEnvelope,
+  FaHeart,
+  FaMapMarkerAlt,
+  FaPhoneAlt,
+  FaRegHeart,
+  FaUser,
+} from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import './PropertyDetail.css';
 import { getFavoriteIds, toggleFavorite as toggleFavoriteStorage } from '../utils/favorites';
@@ -29,8 +39,9 @@ const PropertyDetail = () => {
     ? location.state.from
     : null;
   const isAreaAdmin = user?.role === 'admin' && user?.adminType === 'area';
-  const backButtonLabel = isAreaAdmin ? '← Back to Previous' : 'Back to search';
+  const backButtonLabel = isAreaAdmin ? '← Back to Previous' : '← Back';
   const [property, setProperty] = useState(null);
+  const [selectedImage, setSelectedImage] = useState('');
   const [handlingHistory, setHandlingHistory] = useState([]);
   const [handlingHistoryLoading, setHandlingHistoryLoading] = useState(false);
   const [handlingHistoryError, setHandlingHistoryError] = useState('');
@@ -184,6 +195,10 @@ const PropertyDetail = () => {
     fetchReviews();
   }, [checkIfFavorite, fetchProperty, fetchReviews]);
 
+  useEffect(() => {
+    setSelectedImage('');
+  }, [id]);
+
   // =====   / =====
   const toggleFavorite = async () => {
     if (user?.role !== 'tenant' || !user.id) return;
@@ -301,183 +316,260 @@ const PropertyDetail = () => {
       <button onClick={returnFromPropertyDetails} className="property-back-btn">{backButtonLabel}
       </button>
 
-      {/* =====   ===== */}
-      <div className="property-card">
-        {/*   */}
-        <div className="property-image-section">
-          {getPropertyImages(property).length > 0 ? (
-            <>
-              <PropertyImage
-                src={getPropertyImages(property)}
-                alt={property.title}
-                className="property-image"
-              />
-              {getPropertyImages(property).length > 1 && (
-                <div className="property-image-thumbnails">
-                  {getPropertyImages(property).slice(1, 5).map((image, index) => (
-                    <PropertyImage
-                      key={`${image}-${index}`}
-                      src={image}
-                      alt={`${property.title} ${index + 2}`}
-                      className="property-image-thumbnail"
-                    />
-                  ))}
+      <div className="property-layout">
+        <div className="property-primary-column">
+          <div className="property-image-section">
+            {getPropertyImages(property).length > 0 ? (
+              <>
+                <div className="property-main-image-wrap">
+                  <PropertyImage
+                    src={selectedImage || getPropertyImages(property)[0]}
+                    alt={property.title}
+                    className="property-image"
+                  />
                 </div>
+                {getPropertyImages(property).length > 1 && (
+                  <div className="property-image-thumbnails" aria-label="Property photos">
+                    {getPropertyImages(property).map((image, index) => (
+                      <button
+                        key={`${image}-${index}`}
+                        type="button"
+                        className={`property-image-thumbnail-button${(selectedImage || getPropertyImages(property)[0]) === image ? ' active' : ''}`}
+                        onClick={() => setSelectedImage(image)}
+                        aria-label={`View property photo ${index + 1}`}
+                        aria-pressed={(selectedImage || getPropertyImages(property)[0]) === image}
+                      >
+                        <PropertyImage
+                          src={image}
+                          alt=""
+                          className="property-image-thumbnail"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="property-main-image-wrap">
+                <div className="property-no-image">No image</div>
+              </div>
+            )}
+          </div>
+
+          <section className="property-content-card property-description-card">
+            <h2 className="property-section-title">Description</h2>
+            <p className="property-description">{property?.description}</p>
+          </section>
+
+          <section className="property-content-card property-address-card">
+            <h2 className="property-section-title">Address</h2>
+            <div className="property-address-grid">
+              {[
+                ['Region', property?.region],
+                ['Zone', property?.zone],
+                ['Wereda', property?.wereda],
+                ['City', property?.city],
+                ['Sub-city', property?.subCity],
+                ['Kebele', property?.kebele],
+                ['House Number', property?.houseNumber],
+              ].map(([label, value]) => (
+                <div className="property-address-item" key={label}>
+                  <span>{label}</span>
+                  <strong>{value || 'Not provided'}</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {reviews.length > 0 && (
+            <section className="property-content-card property-reviews-section">
+              <div className="property-reviews-header">
+                <h2 className="property-section-title">Reviews</h2>
+              </div>
+              <div className="property-reviews-list">
+                {reviews.map((review) => (
+                  <div key={review._id} className="property-review-item">
+                    <div className="property-review-header">
+                      <strong>{review.tenant?.name || 'Tenant'}</strong>
+                      <span className="property-review-rating">{''.repeat(review.rating)}</span>
+                      <small className="property-review-date">{new Date(review.createdAt).toLocaleDateString()}</small>
+                    </div>
+                    <p className="property-review-comment">{review.comment}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {isAreaAdmin && (
+            <section className="property-content-card property-handling-history" aria-labelledby="property-history-title">
+              <h2 id="property-history-title" className="property-section-title">{t('History')}</h2>
+              {handlingHistoryLoading ? (
+                <p>{t('Loading history...')}</p>
+              ) : handlingHistoryError ? (
+                <p role="alert">{t(handlingHistoryError)}</p>
+              ) : handlingHistory.length > 0 ? (
+                <ol className="property-history-timeline">
+                  {handlingHistory.map((entry, index) => {
+                    const isUnknownHandler = !entry.byName
+                      || entry.byName === 'Unknown (before history tracking)';
+                    const actionLabel = entry.action === 'verified'
+                      ? 'Verified'
+                      : entry.action === 'returned' ? 'Returned' : 'Rejected';
+                    return (
+                      <li key={`${entry.byId || entry.byName}-${entry.at}-${index}`} className="property-history-entry">
+                        <strong>{t(actionLabel)}</strong>
+                        <span>
+                          {t('Handled by')}: {isUnknownHandler ? t('Handled before history tracking') : entry.byName}
+                          {!isUnknownHandler && entry.isFormerAdmin ? ` ${t('(former admin)')}` : ''}
+                        </span>
+                        <time dateTime={entry.at}>{entry.at ? formatDate(entry.at, { dateStyle: 'medium', timeStyle: 'short' }) : t('Date unavailable')}</time>
+                        {entry.note && <span>{t('Note')}: {entry.note}</span>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <p>{t('No history recorded yet.')}</p>
               )}
-            </>
-          ) : (
-            <div className="property-no-image">No image</div>
+            </section>
+          )}
+
+          {reviews.length > 0 && (
+            <section className="property-content-card property-reviews-section">
+              <div className="property-reviews-header">
+                <h2 className="property-section-title">Reviews</h2>
+              </div>
+              <div className="property-reviews-list">
+                {reviews.map((review) => (
+                  <div key={review._id} className="property-review-item">
+                    <div className="property-review-header">
+                      <strong>{review.tenant?.name || 'Tenant'}</strong>
+                      <span className="property-review-rating">{''.repeat(review.rating)}</span>
+                      <small className="property-review-date">{new Date(review.createdAt).toLocaleDateString()}</small>
+                    </div>
+                    <p className="property-review-comment">{review.comment}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
         </div>
 
-        {/*   */}
-        <div className="property-info">
-          {user?.role !== 'tenant' && (
-            <PropertyOwnershipProof
-              propertyId={property?._id}
-              hasProof={property?.hasVerificationDocument}
-              title={property?.title}
-              imageClassName="property-image-thumbnail"
-            />
-          )}
-          <div className="property-header">
-            <h1 className="property-title">{property?.title}</h1>
-            <div className="property-header-actions">
-              {property?.isVerified && property?.verificationStatus === 'approved' ? (
-                <span className="property-badge property-badge-verified">Verified</span>
-              ) : (
-                <span className="property-badge property-badge-pending">Not yet verified</span>
-              )}
-              
-              {/*   (Tenant ) */}
-              {user?.role === 'tenant' && (
-                <button 
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    toggleFavorite();
-                  }}
-                  className={`property-fav-btn ${isFavorite ? 'active' : ''}`}
-                >
-                  {isFavorite ? '' : ''}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <p className="property-location"> {property?.location}</p>
-          {property?.region && (
-            <div className="property-address-details">
-              <p>Region: {property.region}</p>
-              <p>Zone: {property.zone}</p>
-              <p>Wereda: {property.wereda}</p>
-              <p>City: {property.city}</p>
-              <p>Sub-city: {property.subCity}</p>
-              <p>Kebele: {property.kebele}</p>
-              <p>House Number: {property.houseNumber}</p>
-            </div>
-          )}
-          <p className="property-price">ETB {property?.price?.toLocaleString()}</p>
-          <p className="property-bedrooms"> {property?.bedrooms} bedrooms</p>
-          
-          <div className="property-divider"></div>
-          
-          <h3 className="property-section-title">Description</h3>
-          <p className="property-description">{property?.description}</p>
-
-          {isAreaAdmin && (
-            <>
-              <div className="property-divider"></div>
-              <section className="property-handling-history" aria-labelledby="property-history-title">
-                <h3 id="property-history-title" className="property-section-title">{t('History')}</h3>
-                {handlingHistoryLoading ? (
-                  <p>{t('Loading history...')}</p>
-                ) : handlingHistoryError ? (
-                  <p role="alert">{t(handlingHistoryError)}</p>
-                ) : handlingHistory.length > 0 ? (
-                  <ol className="property-history-timeline">
-                    {handlingHistory.map((entry, index) => {
-                      const isUnknownHandler = !entry.byName
-                        || entry.byName === 'Unknown (before history tracking)';
-                      const actionLabel = entry.action === 'verified'
-                        ? 'Verified'
-                        : entry.action === 'returned' ? 'Returned' : 'Rejected';
-                      return (
-                        <li key={`${entry.byId || entry.byName}-${entry.at}-${index}`} className="property-history-entry">
-                          <strong>{t(actionLabel)}</strong>
-                          <span>
-                            {t('Handled by')}: {isUnknownHandler ? t('Handled before history tracking') : entry.byName}
-                            {!isUnknownHandler && entry.isFormerAdmin ? ` ${t('(former admin)')}` : ''}
-                          </span>
-                          <time dateTime={entry.at}>{entry.at ? formatDate(entry.at, { dateStyle: 'medium', timeStyle: 'short' }) : t('Date unavailable')}</time>
-                          {entry.note && <span>{t('Note')}: {entry.note}</span>}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                ) : (
-                  <p>{t('No history recorded yet.')}</p>
-                )}
-              </section>
-            </>
-          )}
-
-          <div className="property-divider"></div>
-
-          {/* =====   ===== */}
-          <h3 className="property-section-title">Landlord information</h3>
-          <div className="property-landlord-profile">
-            {property?.landlord?.profilePhoto ? (
-              <img
-                src={property.landlord.profilePhoto}
-                alt={property.landlord.name || 'Landlord'}
-                className="property-landlord-photo"
+        <aside className="property-sidebar">
+          <section className="property-info property-main-info-card">
+            {user?.role !== 'tenant' && (
+              <PropertyOwnershipProof
+                propertyId={property?._id}
+                hasProof={property?.hasVerificationDocument}
+                title={property?.title}
+                imageClassName="property-image-thumbnail"
               />
-            ) : (
-              <div className="property-landlord-photo-fallback"></div>
             )}
-            <div>
-              <p className="property-landlord">
-                <strong>Name:</strong> {property?.landlord?.name || 'Unknown'}
-              </p>
-              <p className="property-landlord">
-                <strong>Phone:</strong> {property?.landlord?.phone || 'Not available'}
-              </p>
-              <p className="property-landlord">
-                <strong>Email:</strong> {property?.landlord?.email || 'Not available'}
-              </p>
+            <div className="property-header">
+              <h1 className="property-title">{property?.title}</h1>
+              <div className="property-header-actions">
+                {property?.isVerified && property?.verificationStatus === 'approved' ? (
+                  <span className="property-badge property-badge-verified">
+                    <FaCheckCircle aria-hidden="true" />
+                    Verified
+                  </span>
+                ) : (
+                  <span className="property-badge property-badge-pending">Not yet verified</span>
+                )}
+                {user?.role === 'tenant' && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      toggleFavorite();
+                    }}
+                    className={`property-fav-btn ${isFavorite ? 'active' : ''}`}
+                    aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                    title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  >
+                    {isFavorite
+                      ? <FaHeart aria-hidden="true" />
+                      : <FaRegHeart aria-hidden="true" />}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-
-          {/* ===== Admin verification actions ===== */}
-          {user?.role === 'admin' && user?.adminType === 'area' && property && property.verificationStatus === 'pending' && !property.isVerified && (
-            <div className="property-contact-section">
-              <button
-                type="button"
-                className="property-rent-btn"
-                onClick={() =>handleAdminPropertyAction('verify')}
-                disabled={adminActionLoading !== false}
-              >
-                {adminActionLoading === 'verify' ? 'Verifying...' : 'Verify / Approve'}
-              </button>
-              <button
-                type="button"
-                className="property-modal-btn property-modal-btn-cancel"
-                onClick={() =>handleAdminPropertyAction('reject')}
-                disabled={adminActionLoading !== false}
-              >
-                {adminActionLoading === 'reject' ? 'Rejecting...' : 'Reject'}
-              </button>
+            <p className="property-location">
+              <FaMapMarkerAlt aria-hidden="true" />
+              <span>{[property?.city, property?.subCity].filter(Boolean).join(', ') || property?.location}</span>
+            </p>
+            <p className="property-price">
+              ETB {property?.price?.toLocaleString()}
+              <span>/ month</span>
+            </p>
+            <div className="property-feature-chips">
+              <span className="property-feature-chip">
+                <FaBed aria-hidden="true" />
+                {property?.bedrooms} {property?.bedrooms === 1 ? 'bedroom' : 'bedrooms'}
+              </span>
             </div>
-          )}
 
-          {/* =====   (Tenant ) ===== */}
+            {user?.role === 'admin' && user?.adminType === 'area' && property && property.verificationStatus === 'pending' && !property.isVerified && (
+              <div className="property-contact-section property-admin-actions">
+                <button
+                  type="button"
+                  className="property-rent-btn"
+                  onClick={() =>handleAdminPropertyAction('verify')}
+                  disabled={adminActionLoading !== false}
+                >
+                  {adminActionLoading === 'verify' ? 'Verifying...' : 'Verify / Approve'}
+                </button>
+                <button
+                  type="button"
+                  className="property-modal-btn property-modal-btn-cancel"
+                  onClick={() =>handleAdminPropertyAction('reject')}
+                  disabled={adminActionLoading !== false}
+                >
+                  {adminActionLoading === 'reject' ? 'Rejecting...' : 'Reject'}
+                </button>
+              </div>
+            )}
+          </section>
+
           {user?.role === 'tenant' && (
-            <div className="property-contact-section">
-              <button 
+            <section className="property-landlord-card">
+              <h2 className="property-section-title">Landlord information</h2>
+              <div className="property-landlord-profile">
+                {property?.landlord?.profilePhoto ? (
+                  <img
+                    src={property.landlord.profilePhoto}
+                    alt={property.landlord.name || 'Landlord'}
+                    className="property-landlord-photo"
+                  />
+                ) : (
+                  <div className="property-landlord-photo-fallback"><FaUser aria-hidden="true" /></div>
+                )}
+                <strong className="property-landlord-name">{property?.landlord?.name || 'Unknown'}</strong>
+              </div>
+              <div className="property-landlord-contacts">
+                <p>
+                  <FaPhoneAlt aria-hidden="true" />
+                  <span>Phone</span>
+                  {property?.landlord?.phone
+                    ? <a href={`tel:${property.landlord.phone}`}>{property.landlord.phone}</a>
+                    : <strong>Not available</strong>}
+                </p>
+                <p>
+                  <FaEnvelope aria-hidden="true" />
+                  <span>Email</span>
+                  {property?.landlord?.email
+                    ? <a href={`mailto:${property.landlord.email}`}>{property.landlord.email}</a>
+                    : <strong>Not available</strong>}
+                </p>
+              </div>
+              <button
+                type="button"
                 onClick={contactLandlord}
                 className="property-contact-btn"
-              >Contact now
+              >
+                Contact now
               </button>
               {showContact && (
                 <div className="property-contact-info">
@@ -486,22 +578,21 @@ const PropertyDetail = () => {
                   <p><small>Contact the landlord directly for more information.</small></p>
                 </div>
               )}
-            </div>
+            </section>
           )}
 
-          {/* ===== ""  (Tenant ) ===== */}
           {user?.role === 'tenant' && (
             (property?.isVerified && property?.verificationStatus === 'approved' && property?.availabilityStatus === 'available') ||
             (location.state?.fromRejectedRequest && location.state.property?._id === id)
           ) && (
-            <div className="property-rent-section">
-              <button 
+            <div className="property-rent-section property-rent-cta">
+              <button
                 onClick={() =>setShowRentModal(true)}
                 className="property-rent-btn"
-              >Request to Rent
+              >
+                Request to Rent
               </button>
-              <p className="property-rent-info">Click the button to request this property. An admin will review your request.
-              </p>
+              <p className="property-rent-info">Click the button to request this property. An admin will review your request.</p>
               {rentalMessage && (
                 <p className={`property-rental-message ${rentalMessage.includes('') ? 'success' : 'error'}`}>
                   {rentalMessage}
@@ -512,104 +603,75 @@ const PropertyDetail = () => {
           {user?.role === 'tenant' && property?.isVerified && property?.availabilityStatus === 'rented' && (
             <p className="property-rental-message error">This property has been rented.</p>
           )}
-
           {user?.role === 'tenant' && rentalRequest &&
             (rentalRequest.status === 'approved' || rentalRequest.status === 'confirmed') &&
             property?.availabilityStatus === 'rented' &&
             String(property?.rentedBy) === String(user.id) && (
-              <div className="property-rent-section">
-                <button type="button" onClick={() =>navigate(`/tenant/rented-property?propertyId=${property._id}`)} className="property-rent-btn">Rented Property
+              <div className="property-rent-section property-rent-existing">
+                <button type="button" onClick={() =>navigate(`/tenant/rented-property?propertyId=${property._id}`)} className="property-rent-btn">
+                  Rented Property
                 </button>
               </div>
             )}
-
-          {/* =====    ===== */}
-          {showRentModal && (
-            <div className="property-modal-overlay" onClick={() =>setShowRentModal(false)}>
-              <div className="property-modal" onClick={(e) =>e.stopPropagation()}>
-                <h3 className="property-modal-title">Submit a rental request</h3>
-                <p className="property-modal-subtitle">You are requesting <strong>{property?.title}</strong>
-                </p>
-                
-                <form onSubmit={handleRentRequest} className="property-modal-form">
-                  <div className="property-modal-field">
-                    <label className="property-modal-label">Phone *</label>
-                    <input
-                      type="tel"
-                      className="property-modal-input"
-                      value={rentPhone}
-                      required
-                      onChange={(e) =>setRentPhone(e.target.value)}
-                    />
-                  </div>
-                  <div className="property-modal-field">
-                    <label className="property-modal-label">Message *</label>
-                    <textarea
-                      className="property-modal-input property-modal-textarea"
-                      placeholder="What would you like to tell the landlord?"
-                      value={rentMessage}
-                      required
-                      onChange={(e) =>setRentMessage(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="property-modal-field">
-                    <label className="property-modal-label">Move-in date *</label>
-                    <input
-                      type="date"
-                      className="property-modal-input"
-                      value={rentMoveInDate}
-                      required
-                      onChange={(e) =>setRentMoveInDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="property-modal-actions">
-                    <button
-                      type="button"
-                      className="property-modal-btn property-modal-btn-submit"
-                      onClick={() =>setShowRentModal(false)}
-                    >Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="property-modal-btn property-modal-btn-submit"
-                      disabled={submittingRent}
-                    >
-                      {submittingRent ? 'Sending...' : 'Submit request'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {reviews.length > 0 && (
-            <>
-              <div className="property-divider"></div>
-              <div className="property-reviews-section">
-                <div className="property-reviews-header">
-                  <h3 className="property-section-title">Reviews</h3>
-                </div>
-                <div className="property-reviews-list">
-                  {reviews.map((review) => (
-                    <div key={review._id} className="property-review-item">
-                      <div className="property-review-header">
-                        <strong>{review.tenant?.name || 'Tenant'}</strong>
-                        <span className="property-review-rating">
-                          {''.repeat(review.rating)}
-                        </span>
-                        <small className="property-review-date">{new Date(review.createdAt).toLocaleDateString()}</small>
-                      </div>
-                      <p className="property-review-comment">{review.comment}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        </aside>
       </div>
+
+      {showRentModal && (
+        <div className="property-modal-overlay" onClick={() =>setShowRentModal(false)}>
+          <div className="property-modal" onClick={(e) =>e.stopPropagation()}>
+            <h3 className="property-modal-title">Submit a rental request</h3>
+            <p className="property-modal-subtitle">You are requesting <strong>{property?.title}</strong></p>
+            <form onSubmit={handleRentRequest} className="property-modal-form">
+              <div className="property-modal-field">
+                <label className="property-modal-label">Phone *</label>
+                <input
+                  type="tel"
+                  className="property-modal-input"
+                  value={rentPhone}
+                  required
+                  onChange={(e) =>setRentPhone(e.target.value)}
+                />
+              </div>
+              <div className="property-modal-field">
+                <label className="property-modal-label">Message *</label>
+                <textarea
+                  className="property-modal-input property-modal-textarea"
+                  placeholder="What would you like to tell the landlord?"
+                  value={rentMessage}
+                  required
+                  onChange={(e) =>setRentMessage(e.target.value)}
+                />
+              </div>
+              <div className="property-modal-field">
+                <label className="property-modal-label">Move-in date *</label>
+                <input
+                  type="date"
+                  className="property-modal-input"
+                  value={rentMoveInDate}
+                  required
+                  onChange={(e) =>setRentMoveInDate(e.target.value)}
+                />
+              </div>
+              <div className="property-modal-actions">
+                <button
+                  type="button"
+                  className="property-modal-btn property-modal-btn-submit"
+                  onClick={() =>setShowRentModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="property-modal-btn property-modal-btn-submit"
+                  disabled={submittingRent}
+                >
+                  {submittingRent ? 'Sending...' : 'Submit request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

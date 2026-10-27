@@ -80,7 +80,6 @@ const featureKeyForPath = (path) => ({
   '/admin-dashboard/rental-requests': 'rentalRequests',
   '/admin-dashboard/messages': 'messages',
   '/admin-dashboard/contact-messages': 'contactMessages',
-  '/admin-dashboard/all-users': 'users',
   '/admin-dashboard/profile': 'accountSettings',
 }[path]);
 
@@ -167,7 +166,6 @@ export const getDashboardMenuGroups = (user, t) => {
         item('Rejected', '/admin-dashboard/rejected', FaTimes),
       ]),
       group('Management', [
-        item('Users', '/admin-dashboard/all-users', FaUsers),
         item('Contact Messages', '/admin-dashboard/contact-messages', FaEnvelope),
       ]),
       group('Rentals', [
@@ -188,12 +186,21 @@ export const getDashboardMenuGroups = (user, t) => {
 export const filterDashboardMenuGroups = (menuGroups, user, permissionLoading = false) => {
   const safeMenuGroups = Array.isArray(menuGroups) ? menuGroups : [];
   const role = user?.effectiveRole || user?.role;
+  const seenPaths = new Set();
+  const uniqueMenuGroups = safeMenuGroups.map((section) => ({
+    ...section,
+    items: section.items.filter(({ path }) => {
+      if (seenPaths.has(path)) return false;
+      seenPaths.add(path);
+      return true;
+    }),
+  }));
   if (['platform_admin'].includes(role) ||
     (user?.role === 'admin' && (
       user.adminType === 'platform' ||
       (!user.adminType && (user.adminAreas || []).length === 0)
     ))) {
-    return safeMenuGroups;
+    return uniqueMenuGroups;
   }
 
   const permissions = user?.permissions &&
@@ -204,10 +211,11 @@ export const filterDashboardMenuGroups = (menuGroups, user, permissionLoading = 
     : null;
   const useOnlyAlwaysOn = permissionLoading || !permissions;
 
-  return safeMenuGroups
+  return uniqueMenuGroups
   .map((section) => ({
     ...section,
     items: section.items.filter(({ path }) => {
+      if (path === '/admin-dashboard/all-users') return false;
       const featureKey = featureKeyForPath(path);
       if (!featureKey) return true;
       if (useOnlyAlwaysOn) return ALWAYS_ON_PERMISSION_KEYS.includes(featureKey);

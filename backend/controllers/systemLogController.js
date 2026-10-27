@@ -3,6 +3,17 @@ const SystemLog = require('../models/SystemLog');
 const User = require('../models/User');
 const { permissionRoleForUser } = require('../config/permissionCatalog');
 
+const IMPORTANT_ACTIONS = new Set([
+  'USER_ROLE_UPDATED',
+  'USER_PERMISSIONS_UPDATED',
+  'PASSWORD_RESET',
+  'USER_DEACTIVATED',
+  'AREA_ADMIN_DEMOTED',
+  'AREA_ADMIN_CREATED',
+  'AREA_ADMIN_DEACTIVATED',
+  'USER_SUSPENDED',
+]);
+
 const createSystemLog = async ({
   user = null,
   role = null,
@@ -38,51 +49,93 @@ const createSystemLog = async ({
   }
 };
 
-const buildLogQuery = async (params) => {
+const normalizeDateRange = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getSortObject = (sortValue) => {
+  const nextValue = (sortValue || '').toString().trim();
+  if (!nextValue) return { createdAt: -1 };
+  if (nextValue === 'oldest' || nextValue === 'createdAt-asc' || nextValue === 'createdAt') return { createdAt: 1 };
+  if (nextValue === 'newest' || nextValue === 'createdAt-desc' || nextValue === '-createdAt') return { createdAt: -1 };
+  if (nextValue === 'role') return { role: 1, createdAt: -1 };
+  if (nextValue === 'status') return { status: 1, createdAt: -1 };
+  return { createdAt: -1 };
+};
+
+const buildLogQuery = async (params = {}) => {
   const query = {};
   const clauses = [];
-  if (params.search) {
-    const searchTerm = String(params.search).trim();
-    if (searchTerm) {
-      query.$or = [
-        { action: { $regex: searchTerm, $options: 'i' } },
-        { description: { $regex: searchTerm, $options: 'i' } },
-        { targetLabel: { $regex: searchTerm, $options: 'i' } },
-        { actorName: { $regex: searchTerm, $options: 'i' } },
-        { actorEmail: { $regex: searchTerm, $options: 'i' } },
-      ];
-      clauses.push({ $or: query.$or });
-      delete query.$or;
+  const searchTerm = String(params.q || params.search || '').trim();
+
+  if (searchTerm) {
+    query.$or = [
+      { action: { $regex: searchTerm, $options: 'i' } },
+      { description: { $regex: searchTerm, $options: 'i' } },
+      { targetLabel: { $regex: searchTerm, $options: 'i' } },
+      { actorName: { $regex: searchTerm, $options: 'i' } },
+      { actorEmail: { $regex: searchTerm, $options: 'i' } },
+    ];
+    clauses.push({ $or: query.$or });
+    delete query.$or;
+  }
+
+  const userId = params.user || params.userId;
+  if (userId && mongoose.isValidObjectId(String(userId))) query.user = userId;
+
+  const requestedRole = String(params.role || '').trim();
+  if (requestedRole && requestedRole !== 'All' && requestedRole !== 'all') {
+    if (requestedRole === 'area_admin' || requestedRole === 'platform_admin') {
+      const legacyAdminFilter = requestedRole === 'area_admin'
+        ? { role: 'admin', $or: [{ adminType: 'area' }, { adminAreas: { $exists: true, $ne: [] } }] }
+        : { role: 'admin', $or: [{ adminType: 'platform' }, { adminType: { $exists: false } }, { adminAreas: { $size: 0 } }] };
+      const legacyAdmins = await User.find(legacyAdminFilter).select('_id').lean();
+      clauses.push({
+        $or: [
+          { role: requestedRole },
+          { role: 'admin', user: { $in: legacyAdmins.map(({ _id }) => _id) } },
+        ],
+      });
+    } else {
+      query.role = requestedRole;
     }
   }
-  if (params.user && mongoose.isValidObjectId(String(params.user))) query.user = params.user;
-  if (params.role === 'area_admin' || params.role === 'platform_admin') {
-    const legacyAdminFilter = params.role === 'area_admin'
-      ? { role: 'admin', $or: [{ adminType: 'area' }, { adminAreas: { $exists: true, $ne: [] } }] }
-      : { role: 'admin', $or: [{ adminType: 'platform' }, { adminType: { $exists: false } }, { adminAreas: { $size: 0 } }] };
-    const legacyAdmins = await User.find(legacyAdminFilter).select('_id').lean();
-    clauses.push({
-      $or: [
-        { role: params.role },
-        { role: 'admin', user: { $in: legacyAdmins.map(({ _id }) => _id) } },
-      ],
-    });
-  } else if (params.role) {
-    query.role = params.role;
-  }
-  if (params.action) query.action = params.action;
-  if (params.status) query.status = params.status;
-  if (params.module) query.module = params.module;
-  if (params.dateFrom || params.dateTo) {
+
+  const requestedAction = String(params.action || '').trim();
+  if (requestedAction && requestedAction !== 'All' && requestedAction !== 'all') query.action = requestedAction;
+
+  const requestedStatus = String(params.status || '').trim();
+  if (requestedStatus && requestedStatus !== 'All' && requestedStatus !== 'all') query.status = requestedStatus;
+
+  const requestedModule = String(params.module || '').trim();
+  if (requestedModule && requestedModule !== 'All' && requestedModule !== 'all') query.module = requestedModule;
+
+  const fromDate = normalizeDateRange(params.from || params.dateFrom);
+  const toDate = normalizeDateRange(params.to || params.dateTo);
+  if (fromDate || toDate) {
     query.createdAt = {};
-    if (params.dateFrom) query.createdAt.$gte = new Date(params.dateFrom);
-    if (params.dateTo) {
-      const endOfDay = new Date(params.dateTo);
+    if (fromDate) query.createdAt.$gte = fromDate;
+    if (toDate) {
+      const endOfDay = new Date(toDate);
       endOfDay.setHours(23, 59, 59, 999);
       query.createdAt.$lte = endOfDay;
     }
   }
-  if (clauses.length) query.$and = clauses;
+
+  if (params.important === 'true' || params.important === true) {
+    clauses.push({ action: { $in: [...IMPORTANT_ACTIONS] } });
+  }
+
+  if (params.failedOnly === 'true' || params.failedOnly === true) {
+    query.status = 'failed';
+  }
+
+  if (clauses.length) {
+    query.$and = clauses;
+  }
+
   return query;
 };
 
@@ -99,28 +152,41 @@ const serializeLog = (log) => ({
   actorEmail: log.actorEmail || log.user?.email || '',
 });
 
+const getSystemLogTotals = async (query) => {
+  const [total, success, failed, adminChanges] = await Promise.all([
+    SystemLog.countDocuments(query),
+    SystemLog.countDocuments({ ...query, status: 'success' }),
+    SystemLog.countDocuments({ ...query, status: 'failed' }),
+    SystemLog.countDocuments({ ...query, action: { $in: [...IMPORTANT_ACTIONS] } }),
+  ]);
+
+  return { total, success, failed, adminChanges };
+};
+
 const getSystemLogs = async (req, res) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
     const skip = (page - 1) * limit;
-
     const query = await buildLogQuery(req.query);
+    const sort = getSortObject(req.query.sort);
 
-    const [logs, total] = await Promise.all([
+    const [logs, total, totals] = await Promise.all([
       populatedLogs(query)
-        .sort({ createdAt: -1 })
+        .sort(sort)
         .skip(skip)
         .limit(limit)
         .lean()
         .then((records) => records.map(serializeLog)),
       SystemLog.countDocuments(query),
+      getSystemLogTotals(query),
     ]);
 
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     res.json({
       logs,
+      totals,
       pagination: {
         page,
         limit,
@@ -160,8 +226,9 @@ const csvCell = (value) => {
 
 const exportSystemLogsCsv = async (req, res) => {
   try {
-    const logs = await populatedLogs(await buildLogQuery(req.query))
-      .sort({ createdAt: -1 })
+    const query = await buildLogQuery(req.query);
+    const logs = await populatedLogs(query)
+      .sort(getSortObject(req.query.sort))
       .limit(10000)
       .lean();
     const columns = ['Date & Time', 'User', 'Email', 'Role', 'Action', 'Module', 'Target', 'Description', 'Status'];

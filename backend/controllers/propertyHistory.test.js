@@ -167,8 +167,9 @@ test('Area Admin reads newest-first property history using the database-assigned
       user: { id: adminId, assignedArea: 'Bahirdar' },
     }, response);
 
+    assert.ok(propertyFilter.$and[0].$or.some((condition) => condition.areaKey === 'dessie'));
     assert.ok(propertyFilter.$and[0].$or.some((condition) => condition.area?.test('Dessie')));
-    assert.equal(propertyFilter.$and[0].$or.some((condition) => condition.area?.test('Bahirdar')), false);
+    assert.equal(propertyFilter.$and[0].$or.some((condition) => condition.areaKey === 'bahirdar'), false);
     assert.equal(response.statusCode, null);
     assert.deepEqual(response.body.map((entry) => entry.action), ['verified', 'rejected']);
     assert.equal(response.body[0].byName, 'Former Area Admin');

@@ -321,3 +321,28 @@ test('user status and role endpoints reject self-actions and Platform Admin targ
     assert.equal(saved, false);
   });
 });
+
+test('generic user status endpoint rejects Area Admin targets', async () => {
+  const targetAreaAdmin = makeUser({
+    role: 'admin',
+    adminType: 'area',
+  });
+  let saved = false;
+  targetAreaAdmin.save = async () => { saved = true; };
+
+  await withReplacements({
+    'User.findById': async () => targetAreaAdmin,
+  }, async () => {
+    const response = createResponse();
+    await setUserActive({
+      params: { id: userId },
+      body: { isActive: false },
+      user: { id: adminId, role: 'admin', adminType: 'platform' },
+    }, response);
+
+    assert.equal(response.statusCode, 403);
+    assert.match(response.body.message, /Area Admin accounts must be managed through Admin Management/);
+    assert.equal(targetAreaAdmin.isActive, true);
+    assert.equal(saved, false);
+  });
+});

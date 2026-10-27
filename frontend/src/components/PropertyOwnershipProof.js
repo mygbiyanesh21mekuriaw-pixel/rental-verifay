@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 
 const PropertyOwnershipProof = ({
   propertyId,
@@ -11,6 +12,7 @@ const PropertyOwnershipProof = ({
   fallbackClassName,
   showLabel = true,
 }) => {
+  const { t } = useLanguage();
   const [asset, setAsset] = useState(null);
   const [contentType, setContentType] = useState('');
   const [error, setError] = useState(false);
@@ -64,16 +66,16 @@ const PropertyOwnershipProof = ({
 
   return (
     <div className={className} style={style}>
-      {showLabel && <strong>Proof of Ownership</strong>}
-      {!asset && !error && <span role="status">Loading proof of ownership...</span>}
+      {showLabel && <strong className="property-ownership-proof-label">{t('Proof of Ownership')}</strong>}
+      {!asset && !error && <span className="property-ownership-proof-loading" role="status">{t('Loading proof of ownership...')}</span>}
       {error && (
         <span className={fallbackClassName} role="status">
-          Proof of ownership is unavailable or requires secure migration.
+          {t('Proof of ownership is unavailable or requires secure migration.')}
         </span>
       )}
       {asset && contentType.toLowerCase().includes('pdf') ? (
         <a href={asset} target="_blank" rel="noreferrer">
-          Open proof of ownership (PDF)
+          {t('Open proof of ownership (PDF)')}
         </a>
       ) : asset ? (
         <img

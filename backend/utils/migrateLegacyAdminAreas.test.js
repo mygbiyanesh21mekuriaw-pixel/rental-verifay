@@ -52,6 +52,7 @@ test('legacy area-admin migration preserves platform admins and canonicalizes as
         $set: {
           adminType: 'area',
           assignedArea: 'North Ridge',
+          assignedAreaKey: 'northridge',
           adminAreas: [{ city: 'North Ridge' }],
         },
       },

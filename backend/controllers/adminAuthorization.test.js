@@ -49,7 +49,8 @@ test('legacy area admins remain scoped when loading administrative properties', 
     );
 
     assert.equal(response.statusCode, null);
-    assert.ok(propertyFilter.$and[0].$or[0].area instanceof RegExp);
+    assert.equal(propertyFilter.$and[0].$or[0].areaKey, 'mekelle');
+    assert.ok(propertyFilter.$and[0].$or[1].area instanceof RegExp);
     assert.equal(propertyFilter.$and[0].$or[0].city, undefined);
     assert.deepEqual(response.body, []);
   } finally {
@@ -74,13 +75,13 @@ test('role changes are restricted to Platform Admins', () => {
   assert.equal(route.route.stack[1].handle, platformAdminOnly);
 });
 
-test('user status route allows only authenticated admins', () => {
+test('user status route requires Platform Admin authorization', () => {
   const route = adminRoutes.stack.find((layer) =>
     layer.route?.path === '/users/:id/active' && layer.route.methods.patch);
 
   assert.ok(route);
   assert.equal(route.route.stack[0].handle.name, 'auth');
-  assert.deepEqual(route.route.stack[1].handle.toString(), requireRole('platform_admin', 'area_admin').toString());
+  assert.equal(route.route.stack[1].handle, platformAdminOnly);
 });
 
 test('Area Admin delete routes reject deletion and require Platform Admin authorization', () => {
@@ -148,7 +149,8 @@ test('Area Admin user list is derived from properties and rentals in the assigne
       user: { role: 'admin', adminType: 'area', assignedArea: 'Mekelle' },
     }, response);
 
-    assert.ok(propertyFilter.$or[0].area instanceof RegExp);
+    assert.equal(propertyFilter.$or[0].areaKey, 'mekelle');
+    assert.ok(propertyFilter.$or[1].area instanceof RegExp);
     assert.deepEqual(rentalFilter, { property: { $in: ['area-property'] } });
     assert.deepEqual(userFilter, {
       _id: { $in: ['landlord-id', 'tenant-id'] },
@@ -189,7 +191,8 @@ test('area-admin property query matches only the assigned area', async () => {
       response,
     );
 
-    assert.ok(propertyFilter.$and[0].area instanceof RegExp);
+    assert.equal(propertyFilter.$and[0].$or[0].areaKey, 'north');
+    assert.ok(propertyFilter.$and[0].$or[1].area instanceof RegExp);
     assert.equal(propertyFilter.$and[0].city, undefined);
     assert.deepEqual(response.body, []);
   } finally {
@@ -227,7 +230,8 @@ test('Under Review property query uses only the Area Admin assigned property are
     await getPendingProperties({ user: { id: 'area-admin-id' }, params: {} }, response);
     assert.equal(propertyFilter.verificationStatus, 'pending');
     assert.equal(propertyFilter.isVerified, false);
-    assert.ok(propertyFilter.$and[0].area instanceof RegExp);
+    assert.equal(propertyFilter.$and[0].$or[0].areaKey, 'dessie');
+    assert.ok(propertyFilter.$and[0].$or[1].area instanceof RegExp);
     assert.equal(propertyFilter.$and[0].city, undefined);
     assert.deepEqual(response.body, []);
   } finally {

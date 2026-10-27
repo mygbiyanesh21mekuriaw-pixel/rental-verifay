@@ -1017,6 +1017,420 @@
   background: #fff;
 }
 
+.landlord-add-property-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}
+
+.landlord-add-property-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 20px;
+  margin: 0 0 20px;
+}
+
+.landlord-add-property-header h1 {
+  margin: 0;
+  color: #17324a;
+  font-size: 28px;
+  font-weight: 750;
+}
+
+.landlord-add-property-progress {
+  width: min(230px, 30vw);
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6edf3;
+}
+
+.landlord-add-property-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #215a8a, #2563eb);
+  transition: width 180ms ease;
+}
+
+.landlord-add-property-progress-label {
+  grid-column: 2;
+  justify-self: end;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.landlord-add-property-form {
+  display: block;
+  width: 100%;
+}
+
+.landlord-add-property-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
+  gap: 20px;
+}
+
+.landlord-add-property-main,
+.landlord-add-property-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.landlord-add-property-side {
+  position: sticky;
+  top: 12px;
+}
+
+.landlord-add-property-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #dde5ec;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(15, 41, 64, 0.045);
+}
+
+.landlord-add-property-card h2 {
+  margin: 0 0 18px;
+  color: #17324a;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.landlord-add-property-form .landlord-property-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.landlord-add-property-form .landlord-property-field > label {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.landlord-add-property-form .landlord-property-field > input,
+.landlord-add-property-form .landlord-property-field > textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 11px 13px;
+  border: 1px solid #d5dee7;
+  border-radius: 10px;
+  background: #f4f7fa;
+  color: #1e293b;
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.landlord-add-property-form .landlord-property-field > textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.landlord-add-property-form .landlord-property-field > input:focus-visible,
+.landlord-add-property-form .landlord-property-field > textarea:focus-visible {
+  border-color: #2563eb;
+  outline: 0;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.landlord-add-property-page .landlord-add-property-field-row,
+.landlord-add-property-page .landlord-add-property-address-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.landlord-add-property-field-row {
+  margin-top: 16px;
+}
+
+.landlord-add-property-page .landlord-add-property-description-field {
+  margin-top: 16px;
+}
+
+.landlord-add-property-address-card fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.landlord-add-property-address-card legend {
+  margin: 0 0 14px;
+  padding: 0;
+  color: #17324a;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.landlord-add-property-page .landlord-add-property-address-grid .landlord-property-field {
+  margin: 0 0 14px;
+}
+
+.landlord-add-property-page .landlord-add-property-subcity-field {
+  grid-column: 1 / -1;
+}
+
+.landlord-add-property-dropzone {
+  position: relative;
+  display: flex;
+  min-height: 110px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px dashed #9bb4c9;
+  border-radius: 12px;
+  background: #f8fbfd;
+  color: #215a8a;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.landlord-add-property-dropzone:hover,
+.landlord-add-property-dropzone:focus-within {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.landlord-add-property-dropzone:focus-within {
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 2px;
+}
+
+.landlord-add-property-dropzone > span:nth-child(2) {
+  display: grid;
+  gap: 5px;
+}
+
+.landlord-add-property-dropzone strong {
+  font-size: 13px;
+}
+
+.landlord-add-property-dropzone small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.landlord-add-property-upload-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #e8f1f8;
+  color: #215a8a;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.landlord-add-property-file-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.landlord-add-property-thumbnails {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.landlord-add-property-thumbnail {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #f1f5f9;
+}
+
+.landlord-add-property-image-preview,
+.landlord-add-property-image-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.landlord-add-property-image-placeholder {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  color: #64748b;
+  font-size: 11px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.landlord-add-property-remove-image {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0 0 2px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.82);
+  color: #fff;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.landlord-add-property-remove-image:focus-visible,
+.landlord-add-property-submit:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.3);
+  outline-offset: 3px;
+}
+
+.landlord-add-property-submit {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 18px;
+  border: 1px solid #215a8a;
+  border-radius: 10px;
+  background: #215a8a;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.landlord-add-property-submit:hover {
+  background: #17466f;
+  box-shadow: 0 5px 12px rgba(33, 90, 138, 0.18);
+}
+
+.landlord-property-edit-layout,
+.landlord-property-edit-main,
+.landlord-property-edit-basic,
+.landlord-property-edit-price,
+.landlord-property-edit-address,
+.landlord-property-edit-side {
+  display: contents;
+}
+
+.landlord-property-edit-address .landlord-add-property-address-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.landlord-property-edit-form .landlord-add-property-title-field {
+  order: 1;
+}
+
+.landlord-property-edit-form .landlord-add-property-description-field {
+  order: 2;
+}
+
+.landlord-property-edit-form .landlord-add-property-price-field {
+  order: 3;
+}
+
+.landlord-property-edit-form fieldset {
+  order: 4;
+}
+
+.landlord-property-edit-form .landlord-add-property-bedroom-field {
+  order: 5;
+}
+
+.landlord-property-edit-form .landlord-property-edit-images {
+  order: 6;
+}
+
+.landlord-property-edit-form .landlord-property-edit-proof {
+  order: 7;
+}
+
+.landlord-property-edit-form .landlord-property-edit-submit {
+  order: 8;
+}
+
+@media (max-width: 900px) {
+  .landlord-add-property-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .landlord-add-property-side {
+    position: static;
+  }
+}
+
+@media (max-width: 520px) {
+  .landlord-add-property-header {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .landlord-add-property-header h1 {
+    font-size: 24px;
+  }
+
+  .landlord-add-property-progress {
+    width: 100%;
+  }
+
+  .landlord-add-property-progress-label {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .landlord-add-property-field-row,
+  .landlord-add-property-address-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .landlord-add-property-subcity-field {
+    grid-column: auto;
+  }
+
+  .landlord-add-property-card {
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landlord-add-property-page *,
+  .landlord-add-property-page *::before,
+  .landlord-add-property-page *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .landlord-review-topline {
   display: flex;
   align-items: flex-start;

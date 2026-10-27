@@ -83,7 +83,8 @@ test('handover clears only the departing admin and their database-assigned area'
     assert.equal(messageUpdate.filter.read, false);
     assert.deepEqual(rentalUpdate.filter.property, { $in: ['dessie-property'] });
     assert.deepEqual(verificationUpdate.filter.property, { $in: ['dessie-property'] });
-    assert.deepEqual(messageUpdate.filter.area, { $in: ['Dessie'] });
+    assert.ok(queryMatchesArea(messageUpdate.filter, 'Dessie'));
+    assert.equal(queryMatchesArea(messageUpdate.filter, 'Bahirdar'), false);
   } finally {
     Property.find = originals.propertyFind;
     Property.updateMany = originals.propertyUpdate;

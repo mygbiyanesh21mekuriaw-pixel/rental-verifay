@@ -96,10 +96,11 @@ describe('TenantSearch filter controls', () => {
     expect(screen.queryByRole('button', { name: 'Search by Address' })).not.toBeInTheDocument();
   });
 
-  it('groups the same address fields used by the landlord Add House form', () => {
+  it('groups the same address fields in an initially expanded collapsible section', () => {
     renderSearch();
     const addressGroup = screen.getByRole('group', { name: 'Address' });
 
+    expect(addressGroup).toHaveAttribute('open');
     expect(screen.queryByPlaceholderText('Address')).not.toBeInTheDocument();
     ['Region', 'Zone', 'Wereda', 'City', 'Sub-city', 'Kebele', 'House Number'].forEach((field) => {
       expect(addressGroup).toContainElement(screen.getByPlaceholderText(field));
@@ -138,7 +139,6 @@ describe('TenantSearch filter controls', () => {
     expect(await screen.findByText(/Found 1 property/i)).toBeInTheDocument();
     const favoriteButton = screen.getByRole('button', { name: 'Favorite' });
     const requestLink = screen.getByRole('link', { name: 'Request to Rent' });
-    expect(favoriteButton.closest('.tenant-card-actions')).toBe(requestLink.closest('.tenant-card-actions'));
     expect(favoriteButton).toHaveClass('tenant-card-action');
     expect(requestLink).toHaveClass('tenant-card-action');
   });
@@ -237,5 +237,81 @@ describe('TenantSearch filter controls', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Search$/i }));
 
     await expectFilterSearch('region', 'Oromia');
+  });
+
+  it('submits every search field together with availability and sort values', async () => {
+    renderSearch();
+    const values = {
+      Title: 'Loft',
+      Description: 'Sunny',
+      Bedrooms: '2',
+      Price: '14000',
+      Region: 'Oromia',
+      Zone: 'Addis Ababa',
+      Wereda: 'wereda03',
+      City: 'Addis Ababa',
+      'Sub-city': 'Bole',
+      Kebele: '05',
+      'House Number': '12',
+    };
+
+    Object.entries(values).forEach(([field, value]) => {
+      fireEvent.change(screen.getByPlaceholderText(field), { target: { value } });
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Availability' }), {
+      target: { value: 'available' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
+      target: { value: 'desc' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Search$/i }));
+
+    await waitFor(() => {
+      const request = axios.get.mock.calls.find(([url]) => url.includes('/api/properties?'));
+      expect(request).toBeDefined();
+      const params = new URLSearchParams(request[0].split('?')[1]);
+      Object.entries({
+        title: 'Loft',
+        description: 'Sunny',
+        bedrooms: '2',
+        price: '14000',
+        region: 'Oromia',
+        zone: 'Addis Ababa',
+        wereda: 'wereda03',
+        city: 'Addis Ababa',
+        subCity: 'Bole',
+        kebele: '05',
+        houseNumber: '12',
+        availability: 'available',
+        sortPrice: 'desc',
+      }).forEach(([key, value]) => {
+        expect(params.get(key)).toBe(value);
+      });
+    });
+  });
+
+  it('clears filter values and searches with the default availability and sort', async () => {
+    renderSearch();
+    fireEvent.change(screen.getByPlaceholderText('Title'), { target: { value: 'Loft' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Availability' }), {
+      target: { value: 'available' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort' }), {
+      target: { value: 'asc' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' }));
+
+    expect(screen.getByPlaceholderText('Title')).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Availability' })).toHaveValue('any');
+    expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveValue('recommended');
+    let request;
+    await waitFor(() => {
+      request = axios.get.mock.calls.find(([url]) => url.includes('/api/properties?'));
+      expect(request).toBeDefined();
+    });
+    const params = new URLSearchParams(request[0].split('?')[1]);
+    expect(params.has('title')).toBe(false);
+    expect(params.has('availability')).toBe(false);
+    expect(params.has('sortPrice')).toBe(false);
   });
 });

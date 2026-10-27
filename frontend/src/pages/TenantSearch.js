@@ -352,213 +352,115 @@ const TenantSearch = () => {
     <div className="tenant-container !m-0 !w-full !min-w-0 !max-w-none !p-0">
       <BackToDashboard className="!mt-0 !mb-3 !w-fit !max-w-full" />
 
-      <div className="mb-3 min-w-0">
-        <h1 className="m-0 text-2xl font-bold text-slate-800">Advanced Property Search</h1>
-        <p className="m-0 mt-1 text-slate-500">Find verified rental properties</p>
-      </div>
-
-      <div className="tenant-search-form !m-0 !w-full !min-w-0 !max-w-none">
+      <div className="tenant-search-form search-card !m-0 !w-full !min-w-0 !max-w-none">
         <form onSubmit={handleSearch} className="tenant-search-main-form">
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Title</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="title"
-                value={filters.title}
-                onChange={handleFieldChange}
-                placeholder="Title"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-field-search-btn" aria-label="Search by Title">
-                <FiSearch aria-hidden="true" />
-              </button>
+          <div className="search-card-header">
+            <h1>Search Properties</h1>
+            <p>Find verified rentals that match your needs.</p>
+          </div>
+
+          <div className="tenant-search-grid">
+            <div className="tenant-search-field">
+              <label className="tenant-field-label">Title</label>
+              <div className="tenant-search-input-wrap">
+                <input type="search" name="title" value={filters.title} onChange={handleFieldChange} placeholder="Title" className="tenant-search-input" />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Title"><FiSearch aria-hidden="true" /></button>
+              </div>
+            </div>
+
+            <div className="tenant-search-field">
+              <label className="tenant-field-label">Description</label>
+              <div className="tenant-search-input-wrap">
+                <input type="search" name="description" value={filters.description} onChange={handleFieldChange} placeholder="Description" className="tenant-search-input" />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Description"><FiSearch aria-hidden="true" /></button>
+              </div>
+            </div>
+
+            <div className="tenant-search-field">
+              <label className="tenant-field-label">Bedrooms</label>
+              <div className="tenant-search-input-wrap">
+                <input type="number" min="0" step="1" name="bedrooms" value={filters.bedrooms} onChange={handleFieldChange} placeholder="Bedrooms" className="tenant-search-input" />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Bedrooms"><FiSearch aria-hidden="true" /></button>
+              </div>
+            </div>
+
+            <div className="tenant-search-field">
+              <label className="tenant-field-label">Price</label>
+              <div className="tenant-search-input-wrap">
+                <input type="number" min="0" name="price" value={filters.price} onChange={handleFieldChange} placeholder="Price" className="tenant-search-input" />
+                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Price"><FiSearch aria-hidden="true" /></button>
+              </div>
             </div>
           </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Description</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="search"
-                name="description"
-                value={filters.description}
-                onChange={handleFieldChange}
-                placeholder="Description"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-field-search-btn" aria-label="Search by Description">
-                <FiSearch aria-hidden="true" />
-              </button>
-            </div>
-          </div>
+          <details open className="tenant-address-search-group" aria-labelledby="tenant-search-address-heading">
+            <summary id="tenant-search-address-heading">Address</summary>
+            <div className="tenant-address-search-grid">
+              <div className="tenant-search-field">
+                <label className="tenant-field-label">Region</label>
+                <div className="tenant-search-input-wrap">
+                  <input type="search" name="region" value={filters.region} onChange={handleFieldChange} placeholder="Region" className="tenant-search-input" />
+                  <button type="submit" className="tenant-field-search-btn" aria-label="Search by Region"><FiSearch aria-hidden="true" /></button>
+                </div>
+              </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Bedrooms</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="number"
-                min="0"
-                step="1"
-                name="bedrooms"
-                value={filters.bedrooms}
-                onChange={handleFieldChange}
-                placeholder="Bedrooms"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-field-search-btn" aria-label="Search by Bedrooms">
-                <FiSearch aria-hidden="true" />
-              </button>
-            </div>
-          </div>
+              <div className="tenant-search-field">
+                <label className="tenant-field-label">Zone</label>
+                <div className="tenant-search-input-wrap">
+                  <input type="search" name="zone" value={filters.zone} onChange={handleFieldChange} placeholder="Zone" className="tenant-search-input" />
+                  <button type="submit" className="tenant-field-search-btn" aria-label="Search by Zone"><FiSearch aria-hidden="true" /></button>
+                </div>
+              </div>
 
-          <div className="tenant-search-controls tenant-search-layout">
-            <label className="tenant-field-label">Price</label>
-            <div className="tenant-search-input-wrap">
-              <input
-                type="number"
-                min="0"
-                name="price"
-                value={filters.price}
-                onChange={handleFieldChange}
-                placeholder="Price"
-                className="tenant-search-input"
-              />
-              <button type="submit" className="tenant-field-search-btn" aria-label="Search by Price">
-                <FiSearch aria-hidden="true" />
-              </button>
-            </div>
-          </div>
+              <div className="tenant-search-field">
+                <label className="tenant-field-label">Wereda</label>
+                <div className="tenant-search-input-wrap">
+                  <input type="search" name="wereda" value={filters.wereda} onChange={handleFieldChange} placeholder="Wereda" className="tenant-search-input" />
+                  <button type="submit" className="tenant-field-search-btn" aria-label="Search by Wereda"><FiSearch aria-hidden="true" /></button>
+                </div>
+              </div>
 
-          <fieldset className="tenant-address-search-group">
-            <legend>Address</legend>
-            <div className="tenant-search-controls tenant-search-layout">
-              <label className="tenant-field-label">Region</label>
-              <div className="tenant-search-input-wrap">
-                <input
-                  type="search"
-                  name="region"
-                  value={filters.region}
-                  onChange={handleFieldChange}
-                  placeholder="Region"
-                  className="tenant-search-input"
-                />
-                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Region">
-                  <FiSearch aria-hidden="true" />
-                </button>
+              <div className="tenant-search-field">
+                <label className="tenant-field-label">City</label>
+                <div className="tenant-search-input-wrap">
+                  <input type="search" name="city" value={filters.city} onChange={handleFieldChange} placeholder="City" className="tenant-search-input" />
+                  <button type="submit" className="tenant-field-search-btn" aria-label="Search by City"><FiSearch aria-hidden="true" /></button>
+                </div>
+              </div>
+
+              <div className="tenant-search-field">
+                <label className="tenant-field-label">Sub-city</label>
+                <div className="tenant-search-input-wrap">
+                  <input type="search" name="subCity" value={filters.subCity} onChange={handleFieldChange} placeholder="Sub-city" className="tenant-search-input" />
+                  <button type="submit" className="tenant-field-search-btn" aria-label="Search by Sub-city"><FiSearch aria-hidden="true" /></button>
+                </div>
+              </div>
+
+              <div className="tenant-search-field">
+                <label className="tenant-field-label">Kebele</label>
+                <div className="tenant-search-input-wrap">
+                  <input type="search" name="kebele" value={filters.kebele} onChange={handleFieldChange} placeholder="Kebele" className="tenant-search-input" />
+                  <button type="submit" className="tenant-field-search-btn" aria-label="Search by Kebele"><FiSearch aria-hidden="true" /></button>
+                </div>
+              </div>
+
+              <div className="tenant-search-field">
+                <label className="tenant-field-label">House Number</label>
+                <div className="tenant-search-input-wrap">
+                  <input type="search" name="houseNumber" value={filters.houseNumber} onChange={handleFieldChange} placeholder="House Number" className="tenant-search-input" />
+                  <button type="submit" className="tenant-field-search-btn" aria-label="Search by House Number"><FiSearch aria-hidden="true" /></button>
+                </div>
               </div>
             </div>
+          </details>
 
-            <div className="tenant-search-controls tenant-search-layout">
-              <label className="tenant-field-label">Zone</label>
-              <div className="tenant-search-input-wrap">
-                <input
-                  type="search"
-                  name="zone"
-                  value={filters.zone}
-                  onChange={handleFieldChange}
-                  placeholder="Zone"
-                  className="tenant-search-input"
-                />
-                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Zone">
-                  <FiSearch aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-
-            <div className="tenant-search-controls tenant-search-layout">
-              <label className="tenant-field-label">Wereda</label>
-              <div className="tenant-search-input-wrap">
-                <input
-                  type="search"
-                  name="wereda"
-                  value={filters.wereda}
-                  onChange={handleFieldChange}
-                  placeholder="Wereda"
-                  className="tenant-search-input"
-                />
-                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Wereda">
-                  <FiSearch aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-
-            <div className="tenant-search-controls tenant-search-layout">
-              <label className="tenant-field-label">City</label>
-              <div className="tenant-search-input-wrap">
-                <input
-                  type="search"
-                  name="city"
-                  value={filters.city}
-                  onChange={handleFieldChange}
-                  placeholder="City"
-                  className="tenant-search-input"
-                />
-                <button type="submit" className="tenant-field-search-btn" aria-label="Search by City">
-                  <FiSearch aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-
-            <div className="tenant-search-controls tenant-search-layout">
-              <label className="tenant-field-label">Sub-city</label>
-              <div className="tenant-search-input-wrap">
-                <input
-                  type="search"
-                  name="subCity"
-                  value={filters.subCity}
-                  onChange={handleFieldChange}
-                  placeholder="Sub-city"
-                  className="tenant-search-input"
-                />
-                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Sub-city">
-                  <FiSearch aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-
-            <div className="tenant-search-controls tenant-search-layout">
-              <label className="tenant-field-label">Kebele</label>
-              <div className="tenant-search-input-wrap">
-                <input
-                  type="search"
-                  name="kebele"
-                  value={filters.kebele}
-                  onChange={handleFieldChange}
-                  placeholder="Kebele"
-                  className="tenant-search-input"
-                />
-                <button type="submit" className="tenant-field-search-btn" aria-label="Search by Kebele">
-                  <FiSearch aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-
-            <div className="tenant-search-controls tenant-search-layout">
-              <label className="tenant-field-label">House Number</label>
-              <div className="tenant-search-input-wrap">
-                <input
-                  type="search"
-                  name="houseNumber"
-                  value={filters.houseNumber}
-                  onChange={handleFieldChange}
-                  placeholder="House Number"
-                  className="tenant-search-input"
-                />
-                <button type="submit" className="tenant-field-search-btn" aria-label="Search by House Number">
-                  <FiSearch aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          </fieldset>
-
-          <div className="tenant-search-controls tenant-search-layout-secondary">
-            <select name="availability" value={filters.availability} onChange={handleFieldChange} className="tenant-search-input">
+          <div className="tenant-search-actions">
+            <select name="availability" aria-label="Availability" value={filters.availability} onChange={handleFieldChange} className="tenant-search-input">
               <option value="any">Availability: Any</option>
               <option value="available">Available only</option>
             </select>
 
-            <select name="sortPrice" value={filters.sortPrice} onChange={handleFieldChange} className="tenant-search-input">
+            <select name="sortPrice" aria-label="Sort" value={filters.sortPrice} onChange={handleFieldChange} className="tenant-search-input">
               <option value="recommended">Sort: Recommended</option>
               <option value="asc">Sort: Price low to high</option>
               <option value="desc">Sort: Price high to low</option>

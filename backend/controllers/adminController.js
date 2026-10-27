@@ -31,6 +31,7 @@ const {
 } = require('../config/permissionCatalog');
 const { clearUnfinishedAreaAdminAssignments, getAdminAreaNames } = require('../utils/areaAdminHandover');
 const { appendAdminDecision } = require('../utils/adminHandlingHistory');
+const { canonicalAreaKey } = require('../utils/canonicalArea');
 const {
   getAreaAdminConflict,
   getAreaAdminConflictMessage,
@@ -126,6 +127,80 @@ const sanitizeAdminProperty = (property) => {
   return sanitized;
 };
 
+const sanitizeAdminPropertyListItem = (property) => {
+  const sanitized = sanitizeAdminProperty(property);
+  if (sanitized.landlord) {
+    sanitized.landlord = {
+      _id: sanitized.landlord._id,
+      name: sanitized.landlord.name || '',
+    };
+  }
+  delete sanitized.description;
+  delete sanitized.history;
+  delete sanitized.decision;
+  delete sanitized.handledBy;
+  delete sanitized.handledByName;
+  delete sanitized.handledByRole;
+  delete sanitized.handledAt;
+  delete sanitized.handledByIsFormerAdmin;
+  delete sanitized.hasVerificationDocument;
+  return sanitized;
+};
+
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getPropertyStatusFilter = (status) => {
+  if (status === 'approved') return { verificationStatus: 'approved', isVerified: true };
+  if (status === 'pending') return { verificationStatus: 'pending', isVerified: false };
+  if (status === 'rejected') return { verificationStatus: 'rejected', isVerified: false };
+  return {};
+};
+
+const addPropertyLandlords = async (properties) => {
+  const landlordIds = properties
+    .map((property) => property.landlord)
+    .filter((landlordId) => mongoose.isValidObjectId(landlordId));
+  const landlords = landlordIds.length === 0
+    ? []
+    : await User.find({ _id: { $in: landlordIds }, role: 'landlord' })
+      .select('name email phone profilePhoto role')
+      .lean();
+  const landlordById = new Map(landlords.map((landlord) => [String(landlord._id), landlord]));
+
+  properties.forEach((property) => {
+    property.landlord = landlordById.get(String(property.landlord)) || null;
+  });
+
+  const propertiesWithoutLandlord = properties.filter((property) => !property.landlord);
+  if (propertiesWithoutLandlord.length) {
+    const propertyIds = propertiesWithoutLandlord
+      .map((property) => property._id)
+      .filter((propertyId) => mongoose.isValidObjectId(propertyId));
+    if (propertyIds.length) {
+      try {
+        const verificationRequests = await VerificationRequest.find({ property: { $in: propertyIds } })
+          .populate({
+            path: 'landlord',
+            select: 'name email phone profilePhoto role',
+            match: { role: 'landlord' },
+          })
+          .select('property landlord')
+          .lean();
+        const landlordByProperty = new Map(
+          verificationRequests
+            .filter((request) => request.landlord && mongoose.isValidObjectId(request.property))
+            .map((request) => [String(request.property), request.landlord]),
+        );
+        properties.forEach((property) => {
+          if (!property.landlord) property.landlord = landlordByProperty.get(String(property._id)) || null;
+        });
+      } catch (lookupError) {
+        console.warn('Unable to resolve legacy property owners:', lookupError.message);
+      }
+    }
+  }
+};
+
 const addHandlerStatus = async (properties) => {
   const handledByIds = [...new Set(properties
     .map((property) => String(property.handledBy || ''))
@@ -192,7 +267,10 @@ const createAdminAccount = async (req, res) => {
     let areaRecord = null;
     if (adminType === 'area') {
       if (!requestedArea) return res.status(400).json({ message: 'An assigned area is required for an area admin.' });
-      areaRecord = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+      areaRecord = await Area.findOne({
+        normalizedName: requestedArea.toLowerCase(),
+        isActive: { $ne: false },
+      }).select('name').lean();
       if (!areaRecord) return res.status(400).json({ message: 'Select an existing area.' });
       requestedAreaName = areaRecord.name;
       const conflictingAdmin = await getAreaAdminConflict(areaRecord.name);
@@ -492,79 +570,169 @@ const getAdminProperties = async (req, res) => {
     const requestedStatus = typeof req.query.status === 'string' ? req.query.status : 'all';
     const status = allowedStatuses.includes(requestedStatus) ? requestedStatus : 'all';
     const isAreaAdmin = getAdministrativeRole(req.user) === 'area_admin';
-    if (!isAreaAdmin && status === 'pending') return res.json([]);
-    let filter = status === 'all'
-      ? (isAreaAdmin ? {} : { verificationStatus: { $ne: 'pending' } })
-      : status === 'approved'
-        ? { verificationStatus: 'approved', isVerified: true }
-        : { verificationStatus: status, isVerified: false };
-    filter = await applyAdminAreaScope(req.user.id, filter);
-    const properties = await Property.find(filter)
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const landlordIds = properties
-      .map(property => property.landlord)
-      .filter(landlordId => mongoose.isValidObjectId(landlordId));
-    const landlords = landlordIds.length === 0
-      ? []
-      : await User.find({ _id: { $in: landlordIds }, role: 'landlord' })
-        .select('name email phone profilePhoto role')
-        .lean();
-    const landlordById = new Map(landlords.map(landlord => [landlord._id.toString(), landlord]));
-
-    properties.forEach(property => {
-      const landlord = landlordById.get(String(property.landlord));
-      property.landlord = landlord || null;
-    });
-
-    const propertiesWithoutLandlord = properties.filter(property => !property.landlord);
-    if (propertiesWithoutLandlord.length > 0) {
-      const propertyIds = propertiesWithoutLandlord
-        .map(property => property._id)
-        .filter(propertyId => mongoose.isValidObjectId(propertyId));
-      let verificationRequests = [];
-      if (propertyIds.length > 0) {
-        try {
-          verificationRequests = await VerificationRequest.find({ property: { $in: propertyIds } })
-            .populate({
-              path: 'landlord',
-              select: 'name email phone profilePhoto role',
-              match: { role: 'landlord' },
-            })
-            .select('property landlord')
-            .lean();
-        } catch (lookupError) {
-          console.warn('Unable to resolve legacy property owners:', lookupError.message);
-        }
-      }
-      const landlordByProperty = new Map(
-        verificationRequests
-          .filter(request => request.landlord && mongoose.isValidObjectId(request.property))
-          .map(request => [request.property.toString(), request.landlord])
-      );
-
-      properties.forEach(property => {
-        const landlord = landlordByProperty.get(property._id.toString());
-        if (landlord) property.landlord = landlord;
-      });
+    const paginated = Object.prototype.hasOwnProperty.call(req.query, 'page')
+      || Object.prototype.hasOwnProperty.call(req.query, 'limit');
+    if (!isAreaAdmin && status === 'pending' && !paginated) return res.json([]);
+    let baseFilter = {};
+    if (isAreaAdmin && status === 'all' && paginated) {
+      const allowedStatuses = [];
+      if (req.user.permissions?.verifiedProperties === true) allowedStatuses.push('approved');
+      if (req.user.permissions?.pendingProperties === true) allowedStatuses.push('pending');
+      if (req.user.permissions?.rejectedProperties === true) allowedStatuses.push('rejected');
+      baseFilter.$or = allowedStatuses.length
+        ? allowedStatuses.map((allowedStatus) => getPropertyStatusFilter(allowedStatus))
+        : [{ _id: null }];
+    } else if (!paginated && !isAreaAdmin && status === 'all') {
+      baseFilter.verificationStatus = { $ne: 'pending' };
     }
 
+    const search = String(req.query.q || req.query.search || '').trim();
+    if (search) {
+      const searchRegex = new RegExp(escapeRegex(search), 'i');
+      const matchingLandlords = await User.find({ role: 'landlord', name: searchRegex })
+        .select('_id')
+        .lean();
+      baseFilter.$and = [
+        ...(baseFilter.$and || []),
+        {
+          $or: [
+            { title: searchRegex },
+            { location: searchRegex },
+            { area: searchRegex },
+            { city: searchRegex },
+            { region: searchRegex },
+            { zone: searchRegex },
+            { wereda: searchRegex },
+            { subCity: searchRegex },
+            { kebele: searchRegex },
+            { houseNumber: searchRegex },
+            { landlord: { $in: matchingLandlords.map((landlord) => landlord._id) } },
+          ],
+        },
+      ];
+    }
+
+    const area = String(req.query.area || '').trim();
+    if (area && area !== 'all') baseFilter.area = new RegExp(`^${escapeRegex(area)}$`, 'i');
+
+    const minPrice = req.query.minPrice === undefined || req.query.minPrice === '' ? undefined : Number(req.query.minPrice);
+    const maxPrice = req.query.maxPrice === undefined || req.query.maxPrice === '' ? undefined : Number(req.query.maxPrice);
+    if ((minPrice !== undefined && (!Number.isFinite(minPrice) || minPrice < 0))
+      || (maxPrice !== undefined && (!Number.isFinite(maxPrice) || maxPrice < 0))) {
+      return res.status(400).json({ message: 'Price filters must be non-negative numbers.' });
+    }
+    if (minPrice !== undefined && maxPrice !== undefined && minPrice > maxPrice) {
+      return res.status(400).json({ message: 'Minimum price cannot be greater than maximum price.' });
+    }
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      baseFilter.price = {};
+      if (minPrice !== undefined) baseFilter.price.$gte = minPrice;
+      if (maxPrice !== undefined) baseFilter.price.$lte = maxPrice;
+    }
+
+    const areaFilter = await applyAdminAreaScope(req.user.id, { ...baseFilter });
+    const withoutStatusFilter = areaFilter;
+    const filter = status === 'all'
+      ? areaFilter
+      : { ...areaFilter, ...getPropertyStatusFilter(status) };
+
+    if (!paginated) {
+      let properties = await Property.find(filter).sort({ createdAt: -1 }).lean();
+      await addPropertyLandlords(properties);
+      await addHandlerStatus(properties);
+      if (isAreaAdmin && status === 'all') {
+        properties = properties.filter((property) => {
+          const permissionKey = property.verificationStatus === 'approved'
+            ? 'verifiedProperties'
+            : property.verificationStatus === 'rejected'
+              ? 'rejectedProperties'
+              : 'pendingProperties';
+          return req.user.permissions?.[permissionKey] === true;
+        });
+      }
+      return res.json(properties.map(sanitizeAdminProperty));
+    }
+
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 12));
+    const sort = {
+      'price-asc': { price: 1, createdAt: -1 },
+      'price-desc': { price: -1, createdAt: -1 },
+      newest: { createdAt: -1 },
+    }[req.query.sort] || { createdAt: -1 };
+    const resultFilter = withoutStatusFilter;
+    const [properties, filteredTotal, total, verified, underReview, rejected, areas] = await Promise.all([
+      Property.find(filter)
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Property.countDocuments(filter),
+      Property.countDocuments(resultFilter),
+      Property.countDocuments({ ...resultFilter, ...getPropertyStatusFilter('approved') }),
+      Property.countDocuments({ ...resultFilter, ...getPropertyStatusFilter('pending') }),
+      Property.countDocuments({ ...resultFilter, ...getPropertyStatusFilter('rejected') }),
+      Property.distinct('area', { ...resultFilter, area: { $exists: true, $ne: '' } }),
+    ]);
+
+    await addPropertyLandlords(properties);
     await addHandlerStatus(properties);
-    const visibleProperties = isAreaAdmin && status === 'all'
-      ? properties.filter((property) => {
-        const permissionKey = property.verificationStatus === 'approved'
-          ? 'verifiedProperties'
-          : property.verificationStatus === 'rejected'
-            ? 'rejectedProperties'
-            : 'pendingProperties';
-        return req.user.permissions?.[permissionKey] === true;
-      })
-      : properties;
-    res.json(visibleProperties.map(sanitizeAdminProperty));
+    const totalPages = Math.max(1, Math.ceil(filteredTotal / limit));
+    return res.json({
+      properties: properties.map(sanitizeAdminPropertyListItem),
+      areas: areas.filter(Boolean).sort((left, right) => left.localeCompare(right)),
+      totals: { total, verified, underReview, rejected },
+      pagination: {
+        page,
+        limit,
+        total: filteredTotal,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
   } catch (error) {
-    console.error('Reject property failed', { propertyId: req.params.id, adminId: req.user?.id, message: error.message });
-    res.status(500).json({ message: 'Unable to reject property', error: error.message });
+    console.error('Unable to load admin properties:', error);
+    res.status(500).json({ message: 'Unable to load admin properties.' });
+  }
+};
+
+const getAdminPropertyDetails = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    const [admin, property] = await Promise.all([
+      User.findById(req.user.id).select('role adminType adminAreas assignedArea isActive').lean(),
+      Property.findById(req.params.id).lean(),
+    ]);
+    if (!admin || admin.isActive === false || !property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    const role = getAdministrativeRole(admin);
+    const isPlatformAdmin = role === 'platform_admin';
+    const isOwner = role === 'landlord' && String(property.landlord) === String(admin._id);
+    const adminAreas = admin.assignedArea
+      ? [admin.assignedArea]
+      : (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+    const isOwnAreaAdmin = role === 'area_admin'
+      && adminAreas.length > 0
+      && propertyMatchesAdminAreas(property, adminAreas);
+    if (!isPlatformAdmin && !isOwner && !isOwnAreaAdmin) {
+      return res.status(403).json({ message: 'You do not have access to this property.' });
+    }
+
+    const landlord = await User.findById(property.landlord)
+      .select('name role')
+      .lean();
+    const details = sanitizeAdminProperty(property);
+    details.landlord = landlord?.role === 'landlord' ? landlord : null;
+    return res.json(details);
+  } catch (error) {
+    console.error('Unable to load admin property details:', error);
+    return res.status(500).json({ message: 'Unable to load property details.' });
   }
 };
 
@@ -830,7 +998,10 @@ const updateUserPermissions = async (req, res) => {
       if (!assignedArea) {
         return res.status(400).json({ message: 'Assign a valid area before promoting this user to Area Admin.' });
       }
-      areaRecord = await Area.findOne({ normalizedName: assignedArea.toLowerCase() }).select('name').lean();
+      areaRecord = await Area.findOne({
+        normalizedName: assignedArea.toLowerCase(),
+        isActive: { $ne: false },
+      }).select('name').lean();
       if (!areaRecord) return res.status(400).json({ message: 'Assign a valid area before promoting this user to Area Admin.' });
       if (currentRole !== 'area_admin') {
         const conflictingAdmin = await getAreaAdminConflict(areaRecord.name, user._id);
@@ -1013,28 +1184,180 @@ const getAnalytics = async (req, res) => {
   }
 };
 
+const parsePaymentPeriodQuery = (query) => {
+  const getString = (key) => {
+    const value = query[key];
+    return value === undefined ? '' : typeof value === 'string' ? value.trim() : null;
+  };
+  const pageValue = getString('page');
+  const limitValue = getString('limit');
+  const page = pageValue ? Number(pageValue) : 1;
+  const limit = limitValue ? Number(limitValue) : 10;
+  const q = getString('q');
+  const period = getString('period');
+  const area = getString('area');
+  const status = getString('status');
+  const from = getString('from');
+  const to = getString('to');
+  const rawSortValue = getString('sort');
+  const sortValue = rawSortValue || 'date:desc';
+
+  if ([pageValue, limitValue, q, period, area, status, from, to, rawSortValue].includes(null)
+    || !Number.isInteger(page) || page < 1
+    || !Number.isInteger(limit) || ![10, 25, 50].includes(limit)) {
+    return { error: 'Invalid payment period query parameters.' };
+  }
+  if (q.length > 100) return { error: 'Search query must be 100 characters or fewer.' };
+  if (period && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+    return { error: 'Period must use YYYY-MM format.' };
+  }
+  if (status && !['paid', 'pending', 'failed', 'cancelled'].includes(status.toLowerCase())) {
+    return { error: 'Status must be paid, pending, failed, or cancelled.' };
+  }
+  const isValidDate = (value) => !value || (
+    /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`))
+    && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value
+  );
+  if (!isValidDate(from) || !isValidDate(to) || (from && to && from > to)) {
+    return { error: 'Date range is invalid.' };
+  }
+
+  const sortMatch = sortValue.match(/^(amount|date|period)(?::(asc|desc))?$/);
+  if (!sortMatch) return { error: 'Sort must be amount, date, or period with an optional direction.' };
+
+  return {
+    value: {
+      page,
+      limit,
+      q,
+      period,
+      area,
+      status: status.toLowerCase(),
+      from,
+      to,
+      sort: sortMatch[1],
+      direction: sortMatch[2] || 'desc',
+    },
+  };
+};
+
+const escapePaymentSearch = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const getAdminPaymentPeriods = async (req, res) => {
   try {
-    const payments = await Payment.find({})
-      .populate('tenant', 'name email role')
-      .populate('landlord', 'name email role')
-      .populate('property', 'title location city region subCity zone wereda')
-      .sort({ createdAt: -1 })
-      .lean();
+    const parsedQuery = parsePaymentPeriodQuery(req.query || {});
+    if (parsedQuery.error) return res.status(400).json({ message: parsedQuery.error });
 
-    res.json(payments.map((payment) => ({
-      _id: payment._id,
-      tenant: payment.tenant || null,
-      landlord: payment.landlord || null,
-      property: payment.property || null,
-      paymentPeriod: payment.paymentPeriod,
-      amount: payment.amount,
-      currency: payment.currency,
-      status: payment.status,
-      paymentReference: payment.paymentReference,
-      createdAt: payment.createdAt,
-      updatedAt: payment.updatedAt,
-    })));
+    const {
+      page, limit, q, period, area, status, from, to, sort, direction,
+    } = parsedQuery.value;
+    const filter = {};
+    if (period) filter.paymentPeriod = period;
+    if (status) filter.status = status;
+    if (from || to) {
+      filter.verifiedAt = {};
+      if (from) filter.verifiedAt.$gte = new Date(`${from}T00:00:00.000Z`);
+      if (to) filter.verifiedAt.$lte = new Date(`${to}T23:59:59.999Z`);
+    }
+
+    const searchRegex = q ? new RegExp(escapePaymentSearch(q), 'i') : null;
+    const filterConditions = [];
+    if (area) {
+      const matchingAreaProperties = await Property.find({
+        area: new RegExp(escapePaymentSearch(area), 'i'),
+      }).select('_id').lean();
+      filterConditions.push({
+        property: { $in: matchingAreaProperties.map((property) => property._id) },
+      });
+    }
+    if (searchRegex) {
+      const [matchingProperties, matchingTenants] = await Promise.all([
+        Property.find({ title: searchRegex }).select('_id').lean(),
+        User.find({ role: 'tenant', name: searchRegex }).select('_id').lean(),
+      ]);
+      filterConditions.push({
+        $or: [
+          { paymentReference: searchRegex },
+          { property: { $in: matchingProperties.map((property) => property._id) } },
+          { tenant: { $in: matchingTenants.map((tenant) => tenant._id) } },
+        ],
+      });
+    }
+    if (filterConditions.length > 0) filter.$and = filterConditions;
+
+    const sortDirection = direction === 'asc' ? 1 : -1;
+    const sortOptions = sort === 'amount'
+      ? { amount: sortDirection, _id: 1 }
+      : sort === 'period'
+        ? { paymentPeriod: sortDirection, _id: 1 }
+        : { verifiedAt: sortDirection, createdAt: sortDirection, _id: 1 };
+    const [payments, aggregateTotals] = await Promise.all([
+      Payment.find(filter)
+        .select('_id tenant property paymentPeriod amount currency status paymentReference verifiedAt createdAt updatedAt')
+        .populate('tenant', 'name')
+        .populate('property', 'title area city region subCity zone wereda')
+        .sort(sortOptions)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Payment.aggregate([
+        { $match: filter },
+        {
+          $group: {
+            _id: null,
+            totalPayments: { $sum: 1 },
+            totalCollected: {
+              $sum: { $cond: [{ $eq: ['$status', 'paid'] }, '$amount', 0] },
+            },
+            paidCount: { $sum: { $cond: [{ $eq: ['$status', 'paid'] }, 1, 0] } },
+            pendingFailedCount: {
+              $sum: { $cond: [{ $in: ['$status', ['pending', 'failed']] }, 1, 0] },
+            },
+          },
+        },
+      ]),
+    ]);
+    const totals = aggregateTotals[0] || {
+      totalPayments: 0,
+      totalCollected: 0,
+      paidCount: 0,
+      pendingFailedCount: 0,
+    };
+
+    return res.json({
+      payments: payments.map((payment) => ({
+        _id: payment._id,
+        tenant: payment.tenant ? { name: payment.tenant.name || '' } : null,
+        property: payment.property ? {
+          title: payment.property.title || '',
+          area: payment.property.area || '',
+          city: payment.property.city || '',
+          region: payment.property.region || '',
+          subCity: payment.property.subCity || '',
+          zone: payment.property.zone || '',
+          wereda: payment.property.wereda || '',
+        } : null,
+        paymentPeriod: payment.paymentPeriod,
+        amount: payment.amount,
+        currency: payment.currency,
+        status: payment.status,
+        paymentReference: payment.paymentReference,
+        paidOn: payment.verifiedAt || null,
+      })),
+      totals: {
+        totalPayments: totals.totalPayments,
+        totalCollected: totals.totalCollected,
+        paidCount: totals.paidCount,
+        pendingFailedCount: totals.pendingFailedCount,
+      },
+      pagination: {
+        page,
+        limit,
+        total: totals.totalPayments,
+        pages: Math.ceil(totals.totalPayments / limit),
+      },
+    });
   } catch (error) {
     console.error('Payment period fetch failed:', error);
     res.status(500).json({ message: 'Unable to load payment period data', error: error.message });
@@ -1163,8 +1486,12 @@ const setUserActive = async (req, res) => {
 
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found.' });
-    if (getAdministrativeRole(user) === 'platform_admin') {
+    const targetAdministrativeRole = getAdministrativeRole(user);
+    if (targetAdministrativeRole === 'platform_admin') {
       return res.status(403).json({ message: 'Platform Admin accounts cannot be deactivated or activated here.' });
+    }
+    if (targetAdministrativeRole === 'area_admin') {
+      return res.status(403).json({ message: 'Area Admin accounts must be managed through Admin Management.' });
     }
 
     const actorRole = getAdministrativeRole(req.user);
@@ -1241,7 +1568,10 @@ const changeUserRole = async (req, res) => {
       if (!requestedArea) {
         return res.status(400).json({ message: 'Select an area for the Area Admin.' });
       }
-      const area = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+      const area = await Area.findOne({
+        normalizedName: requestedArea.toLowerCase(),
+        isActive: { $ne: false },
+      }).select('name').lean();
       if (!area) return res.status(400).json({ message: 'Select an existing area for the Area Admin.' });
       requestedAreaName = area.name;
       const conflictingAdmin = await getAreaAdminConflict(area.name, user._id);
@@ -1384,7 +1714,10 @@ const updateAreaAdminAccount = async (req, res) => {
     if (normalizedPhone && !/^(?:\+2519\d{8}|09\d{8})$/.test(normalizedPhone)) {
       return res.status(400).json({ message: 'Use +2519XXXXXXXX or 09XXXXXXXX for the phone number.' });
     }
-    const areaRecord = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+    const areaRecord = await Area.findOne({
+      normalizedName: requestedArea.toLowerCase(),
+      isActive: { $ne: false },
+    }).select('name').lean();
     if (!areaRecord) return res.status(400).json({ message: 'Select an existing area.' });
     requestedAreaName = areaRecord.name;
 
@@ -1393,7 +1726,7 @@ const updateAreaAdminAccount = async (req, res) => {
     if (admin.role !== 'admin' || admin.adminType !== 'area') {
       return res.status(403).json({ message: 'Only Area Admin accounts can be edited here' });
     }
-    if (String(admin.assignedArea || '').trim().toLowerCase() !== areaRecord.name.toLowerCase()) {
+    if (canonicalAreaKey(admin.assignedArea) !== canonicalAreaKey(areaRecord.name)) {
       const conflictingAdmin = await getAreaAdminConflict(areaRecord.name, admin._id);
       if (conflictingAdmin) {
         return res.status(409).json({
@@ -1405,7 +1738,7 @@ const updateAreaAdminAccount = async (req, res) => {
     const existingUser = await User.findOne({ email: normalizedEmail, _id: { $ne: admin._id } });
     if (existingUser) return res.status(409).json({ message: 'A user with this email already exists' });
 
-    if (String(admin.assignedArea || '').trim().toLowerCase() !== areaRecord.name.toLowerCase()) {
+    if (canonicalAreaKey(admin.assignedArea) !== canonicalAreaKey(areaRecord.name)) {
       await clearUnfinishedAreaAdminAssignments(admin);
     }
 
@@ -1509,6 +1842,7 @@ const resetAreaAdminPassword = async (req, res) => {
 module.exports = {
   getPendingProperties,
   getAdminProperties,
+  getAdminPropertyDetails,
   verifyProperty,
   rejectProperty,
   getAllUsers,

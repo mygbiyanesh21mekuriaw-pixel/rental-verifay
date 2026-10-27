@@ -8,7 +8,7 @@ import { useLanguage } from '../context/LanguageContext';
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-const ProfilePhotoControl = ({ user, className = '', showLabel = false }) => {
+const ProfilePhotoControl = ({ user, className = '', showLabel = false, onUserUpdated }) => {
   const { updateUser } = useAuth();
   const { t } = useLanguage();
   const inputRef = useRef(null);
@@ -42,6 +42,7 @@ const ProfilePhotoControl = ({ user, className = '', showLabel = false }) => {
         throw new Error('The server did not return the updated profile.');
       }
       updateUser(response.data.user);
+      onUserUpdated?.(response.data.user);
       setMessage(response.data.message || 'Profile photo updated.');
     } catch (error) {
       setMessage(error.response?.data?.message || error.message || 'Unable to update profile photo.');

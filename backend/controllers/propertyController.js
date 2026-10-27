@@ -27,7 +27,7 @@ const {
 const { matchAreaFromAddress, UNASSIGNED_AREA } = require('../utils/propertyArea');
 
 const resolvePropertyArea = async (address) => {
-  const areas = await Area.find().select('name addressMapping').lean();
+  const areas = await Area.find({ isActive: { $ne: false } }).select('name addressMapping').lean();
   return matchAreaFromAddress(address, areas) || UNASSIGNED_AREA;
 };
 
@@ -35,9 +35,10 @@ const canViewVerificationDocument = (user, property) => {
   if (!user) return false;
 
   const landlordId = property.landlord?._id || property.landlord;
-  if (user.role === 'landlord' && String(landlordId) === String(user.id)) return true;
-  if (user.role !== 'admin') return false;
-  if (user.adminType === 'platform') return true;
+  const role = getAdministrativeRole(user);
+  if (role === 'landlord' && String(landlordId) === String(user.id || user._id)) return true;
+  if (role === 'platform_admin') return true;
+  if (role !== 'area_admin') return false;
 
   if (user.assignedArea) {
     return propertyMatchesAdminAreas(property, [user.assignedArea]);

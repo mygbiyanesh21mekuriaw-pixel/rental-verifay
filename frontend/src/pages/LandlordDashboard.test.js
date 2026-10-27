@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import axios from 'axios';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LanguageProvider } from '../context/LanguageContext';
@@ -8,6 +8,7 @@ import LandlordDashboard, { LandlordLayout } from './LandlordDashboard';
 
 jest.mock('axios', () => ({
   get: jest.fn(),
+  post: jest.fn(),
 }));
 
 let mockLandlordPermissions;
@@ -85,6 +86,7 @@ const renderDashboard = () => render(
 
 beforeEach(() => {
   axios.get.mockReset();
+  axios.post.mockReset();
   mockLandlordPermissions = {
     addProperty: true,
     myProperties: true,
@@ -120,8 +122,6 @@ test('renders the welcome header, linked stat cards, and recent requests', async
     .not.toBeInTheDocument();
   expect(main.queryByText(/rental requests waiting and .* unread notifications/))
     .not.toBeInTheDocument();
-  expect(document.querySelector('.dashboard-welcome-banner'))
-    .toHaveClass('!bg-green-700', '!rounded-2xl', '!shadow-sm');
   expect(screen.getAllByText('Pending').length).toBeGreaterThan(0);
   expect(screen.getAllByText('Approved').length).toBeGreaterThan(0);
 
@@ -194,7 +194,94 @@ test('property form derives area from the address and has no manual area dropdow
 
   expect(await screen.findByText('Address *')).toBeInTheDocument();
   expect(screen.queryByLabelText('Area *')).not.toBeInTheDocument();
-  expect(document.querySelector('[name="area"]')).not.toBeInTheDocument();
+});
+
+test('Add Property shows completion progress and removable image previews', async () => {
+  configureResponses();
+  render(
+    <LanguageProvider>
+      <MemoryRouter initialEntries={['/landlord/add-property']}>
+        <LandlordDashboard initialShowForm />
+      </MemoryRouter>
+    </LanguageProvider>,
+  );
+
+  expect(await screen.findByRole('heading', { name: 'Add a new property' })).toBeInTheDocument();
+  expect(screen.getByRole('progressbar', { name: 'Form completion' })).toHaveAttribute('aria-valuenow', '0');
+  expect(screen.getByRole('form', { name: 'Add property form' })).toBeInTheDocument();
+
+  fireEvent.change(screen.getByPlaceholderText('Example: House in Bole'), { target: { value: 'Bole house' } });
+  expect(screen.getByRole('progressbar', { name: 'Form completion' })).toHaveAttribute('aria-valuenow', '8');
+
+  const imagesInput = screen.getByLabelText(/Choose property images/);
+  const imageFiles = [
+    new File(['image one'], 'front.png', { type: 'image/png' }),
+    new File(['image two'], 'inside.png', { type: 'image/png' }),
+  ];
+  fireEvent.change(imagesInput, { target: { files: imageFiles } });
+
+  expect(await screen.findByRole('heading', { name: 'Property images (2/5)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Remove front.png' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Remove front.png' }));
+  expect(screen.getByRole('heading', { name: 'Property images (1/5)' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Remove front.png' })).not.toBeInTheDocument();
+});
+
+test('Add Property keeps the existing submit endpoint and FormData fields', async () => {
+  configureResponses();
+  axios.post.mockResolvedValue({ data: { message: 'Property submitted' } });
+  render(
+    <LanguageProvider>
+      <MemoryRouter initialEntries={['/landlord/add-property']}>
+        <LandlordDashboard initialShowForm />
+      </MemoryRouter>
+    </LanguageProvider>,
+  );
+
+  await screen.findByRole('heading', { name: 'Add a new property' });
+  const fieldValues = {
+    title: 'Bole House',
+    description: 'A sunny property',
+    price: '8000',
+    bedrooms: '2',
+    region: 'Oromiya',
+    zone: 'Addis Ababa',
+    wereda: 'Wereda 03',
+    city: 'Addis Ababa',
+    subCity: 'Bole',
+    kebele: '01',
+    houseNumber: '12',
+  };
+  const placeholders = {
+    title: 'Example: House in Bole',
+    description: 'Enter a property description',
+    price: 'Price',
+    bedrooms: 'Number of bedrooms',
+    region: 'Region',
+    zone: 'Zone',
+    wereda: 'Wereda',
+    city: 'City',
+    subCity: 'Sub-city',
+    kebele: 'Kebele',
+    houseNumber: 'House number',
+  };
+  Object.entries(fieldValues).forEach(([name, value]) => {
+    fireEvent.change(screen.getByPlaceholderText(placeholders[name]), { target: { value } });
+  });
+  const imageFile = new File(['image'], 'front.png', { type: 'image/png' });
+  const proofFile = new File(['proof'], 'ownership.png', { type: 'image/png' });
+  fireEvent.change(screen.getByLabelText(/Choose property images/), { target: { files: [imageFile] } });
+  fireEvent.change(screen.getByLabelText(/Choose proof of ownership/), { target: { files: [proofFile] } });
+  fireEvent.submit(screen.getByRole('form', { name: 'Add property form' }));
+
+  await waitFor(() => expect(axios.post).toHaveBeenCalledTimes(1));
+  const [url, submittedFormData] = axios.post.mock.calls[0];
+  expect(url).toContain('/api/properties');
+  Object.entries(fieldValues).forEach(([name, value]) => {
+    expect(submittedFormData.get(name)).toBe(value);
+  });
+  expect(submittedFormData.getAll('images')).toHaveLength(1);
+  expect(submittedFormData.get('document')).toBe(proofFile);
 });
 
 test('shows total and pending rental request counts when requests are closed', async () => {

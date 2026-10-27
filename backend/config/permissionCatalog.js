@@ -11,7 +11,6 @@ const PERMISSION_CATALOG = {
     'rentalRequests',
     'messages',
     'contactMessages',
-    'users',
     'notifications',
     'accountSettings',
     'changePassword',

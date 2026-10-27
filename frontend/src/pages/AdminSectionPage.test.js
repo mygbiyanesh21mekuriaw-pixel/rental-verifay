@@ -148,6 +148,34 @@ test('shows and hides the create-admin password and resets it after submission',
   expect(screen.getByTestId('current-path')).toHaveTextContent('/admin-dashboard/users-permissions?userId=created-area-admin');
 });
 
+test('opens Area Admin creation with the requested area already selected', async () => {
+  render(
+    <MemoryRouter initialEntries={['/admin-dashboard/admin-management?assignArea=North']}>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  const dialog = await screen.findByRole('dialog', { name: 'Create Area Admin Account' });
+  expect(within(dialog).getByRole('combobox', { name: 'Select an assigned area' })).toHaveValue('North');
+});
+
+test('does not offer disabled areas in the Area Admin form', async () => {
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/api/areas')
+      ? [...areas, { _id: 'disabled', name: 'Disabled Area', isActive: false }]
+      : users,
+  }));
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="adminManagement" />
+    </MemoryRouter>,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: '+ New Area Admin' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Create Area Admin Account' });
+  expect(within(dialog).queryByRole('option', { name: 'Disabled Area' })).not.toBeInTheDocument();
+});
+
 test('creates an Area Admin in a modal and refreshes the table on success', async () => {
   const createdAdmin = {
     _id: 'created-admin',
@@ -518,7 +546,130 @@ test('area admin can return from rental request details to the requests list', a
   expect(screen.getByText('Rental Property')).toBeInTheDocument();
 });
 
-test('Area Admin property cards show the latest handler snapshot and former-admin label', async () => {
+test('rental requests show summary counts, pending-first ordering, and status filtering', async () => {
+  const areaAdmin = { _id: 'area-admin-id', role: 'admin', adminType: 'area' };
+  const requests = [
+    { _id: 'approved', status: 'approved', createdAt: '2026-03-20', property: { _id: 'p1', title: 'Approved Home' }, tenant: { name: 'A Tenant' } },
+    { _id: 'pending-old', status: 'pending', createdAt: '2026-03-10', property: { _id: 'p2', title: 'Older Pending Home' }, tenant: { name: 'B Tenant' } },
+    { _id: 'rejected', status: 'rejected', createdAt: '2026-03-15', property: { _id: 'p3', title: 'Rejected Home' }, tenant: { name: 'C Tenant' } },
+    { _id: 'pending-new', status: 'pending', createdAt: '2026-03-25', property: { _id: 'p4', title: 'Newest Pending Home' }, tenant: { name: 'Target Tenant' } },
+  ];
+  useAuth.mockReturnValue({ user: areaAdmin });
+  axios.get.mockResolvedValue({ data: requests });
+
+  render(<MemoryRouter><AdminSectionPage type="rentalRequests" /></MemoryRouter>);
+
+  expect(await screen.findByRole('heading', { name: 'Newest Pending Home' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Total 4/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Pending 2/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Approved 1/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Rejected 1/ })).toBeInTheDocument();
+  const cards = screen.getAllByRole('article');
+  expect(within(cards[0]).getByRole('heading', { name: 'Newest Pending Home' })).toBeInTheDocument();
+  expect(within(cards[1]).getByRole('heading', { name: 'Older Pending Home' })).toBeInTheDocument();
+  expect(within(cards[2]).getByRole('heading', { name: 'Approved Home' })).toBeInTheDocument();
+  expect(within(cards[3]).getByRole('heading', { name: 'Rejected Home' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: /Pending 2/ }));
+  expect(screen.getByRole('heading', { name: 'Newest Pending Home' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Approved Home' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: /Rejected 1/ }));
+  expect(screen.getByRole('heading', { name: 'Rejected Home' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Approved Home' })).not.toBeInTheDocument();
+});
+
+test('rental request search, sort, and grid/list toggle work', async () => {
+  const areaAdmin = { _id: 'area-admin-id', role: 'admin', adminType: 'area' };
+  const requests = [
+    { _id: 'first', status: 'pending', createdAt: '2026-03-10', property: { _id: 'p1', title: 'Quiet Apartment' }, tenant: { name: 'Mina' } },
+    { _id: 'second', status: 'pending', createdAt: '2026-03-20', property: { _id: 'p2', title: 'Sunny Apartment' }, tenant: { name: 'Abel' } },
+  ];
+  useAuth.mockReturnValue({ user: areaAdmin });
+  axios.get.mockResolvedValue({ data: requests });
+
+  render(<MemoryRouter><AdminSectionPage type="rentalRequests" /></MemoryRouter>);
+
+  expect(await screen.findByRole('heading', { name: 'Sunny Apartment' })).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search requests' }), {
+    target: { value: 'mina' },
+  });
+  expect(screen.getByRole('heading', { name: 'Quiet Apartment' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Sunny Apartment' })).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search requests' }), {
+    target: { value: '' },
+  });
+  fireEvent.change(screen.getByLabelText('Sort'), { target: { value: 'oldest' } });
+  const cards = screen.getAllByRole('article');
+  expect(within(cards[0]).getByRole('heading', { name: 'Quiet Apartment' })).toBeInTheDocument();
+  expect(within(cards[1]).getByRole('heading', { name: 'Sunny Apartment' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'List' }));
+  expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('rental request cards reuse approve and reject actions and confirm rejection', async () => {
+  const areaAdmin = { _id: 'area-admin-id', role: 'admin', adminType: 'area' };
+  const request = {
+    _id: 'pending-request',
+    status: 'pending',
+    property: { _id: 'property-id', title: 'Pending Home' },
+    tenant: { name: 'Tenant Example' },
+  };
+  useAuth.mockReturnValue({ user: areaAdmin });
+  axios.get.mockResolvedValue({ data: [request] });
+  axios.put.mockResolvedValue({ data: { request: { status: 'approved' }, message: 'Approved.' } });
+  window.confirm = jest.fn(() => false);
+
+  render(<MemoryRouter><AdminSectionPage type="rentalRequests" /></MemoryRouter>);
+
+  await screen.findByRole('heading', { name: 'Pending Home' });
+  const card = screen.getByRole('article');
+  fireEvent.click(within(card).getByRole('button', { name: 'Reject' }));
+  expect(window.confirm).toHaveBeenCalledWith('Reject this rental request?');
+  expect(axios.put).not.toHaveBeenCalled();
+
+  window.confirm.mockReturnValue(true);
+  fireEvent.click(within(card).getByRole('button', { name: 'Approve' }));
+  await waitFor(() => expect(axios.put).toHaveBeenCalled());
+  const [endpoint, payload] = axios.put.mock.calls[0];
+  expect(endpoint).toContain('/api/rental-requests/admin-requests/pending-request/respond');
+  expect(payload).toEqual({ status: 'approved' });
+
+  window.confirm.mockReturnValue(true);
+  const refreshedCard = within(screen.getByRole('article'));
+  await waitFor(() => expect(refreshedCard.getByRole('button', { name: 'Reject' })).toBeEnabled());
+  fireEvent.click(refreshedCard.getByRole('button', { name: 'Reject' }));
+  expect(window.confirm).toHaveBeenLastCalledWith('Reject this rental request?');
+  await waitFor(() => expect(axios.put).toHaveBeenCalledTimes(2));
+  expect(axios.put.mock.calls[1][1]).toEqual({ status: 'rejected' });
+});
+
+test('rental request pagination and empty state are available', async () => {
+  const areaAdmin = { _id: 'area-admin-id', role: 'admin', adminType: 'area' };
+  const requests = Array.from({ length: 13 }, (_, index) => ({
+    _id: `request-${index}`,
+    status: 'approved',
+    createdAt: `2026-03-${String(index + 1).padStart(2, '0')}`,
+    property: { _id: `property-${index}`, title: `Rental Home ${index + 1}` },
+    tenant: { name: `Tenant ${index + 1}` },
+  }));
+  useAuth.mockReturnValue({ user: areaAdmin });
+  axios.get.mockResolvedValue({ data: requests });
+
+  const { unmount } = render(<MemoryRouter><AdminSectionPage type="rentalRequests" /></MemoryRouter>);
+
+  expect(await screen.findByRole('heading', { name: 'Rental Home 13' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Rental Home 1' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  expect(screen.getByRole('heading', { name: 'Rental Home 1' })).toBeInTheDocument();
+
+  unmount();
+  axios.get.mockResolvedValue({ data: [] });
+  render(<MemoryRouter><AdminSectionPage type="rentalRequests" /></MemoryRouter>);
+  expect(await screen.findByText('No rental requests yet.')).toBeInTheDocument();
+});
+
+test('Area Admin property cards show the latest handler summary without history noise', async () => {
   const areaAdmin = { _id: 'area-admin-id', role: 'admin', adminType: 'area' };
   useAuth.mockReturnValue({ user: areaAdmin });
   axios.get.mockImplementation((url) => Promise.resolve({
@@ -544,8 +695,103 @@ test('Area Admin property cards show the latest handler snapshot and former-admi
     </MemoryRouter>,
   );
 
-  expect(await screen.findByText(/Verified by Admin A on/)).toBeInTheDocument();
-  expect(screen.getByText(/Verified by Admin A on.*\(former admin\)/)).toBeInTheDocument();
+  expect(await screen.findByText(/Verified by Admin A ·/)).toBeInTheDocument();
+  expect(screen.queryByText(/former admin/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Handled before history tracking/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Status:/)).not.toBeInTheDocument();
+});
+
+test.each([
+  ['allProperties', 'Properties'],
+  ['pending', 'Under Review'],
+  ['verified', 'Verified'],
+  ['rejected', 'Rejected'],
+])('Area Admin %s uses the shared property layout', async (type) => {
+  useAuth.mockReturnValue({
+    user: { _id: 'area-admin-id', role: 'admin', adminType: 'area' },
+  });
+  axios.get.mockResolvedValue({
+    data: [{
+      _id: 'property-id',
+      title: 'Area Property',
+      price: 18000,
+      city: 'Addis Ababa',
+      subCity: 'Bole',
+      area: 'Addis Ababa',
+      verificationStatus: 'pending',
+      isVerified: false,
+    }],
+  });
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type={type} />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole('searchbox', { name: 'Search properties' })).toBeInTheDocument();
+  expect(screen.queryByRole('navigation', { name: 'Property status filters' })).not.toBeInTheDocument();
+});
+
+test('Area Admin Under Review actions still call the existing verify endpoint', async () => {
+  useAuth.mockReturnValue({
+    user: { _id: 'area-admin-id', role: 'admin', adminType: 'area' },
+  });
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.includes('pending-properties')
+      ? [{
+        _id: 'pending-property',
+        title: 'Pending Property',
+        verificationStatus: 'pending',
+        isVerified: false,
+      }]
+      : [],
+  }));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="pending" />
+    </MemoryRouter>,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+  await waitFor(() => {
+    expect(axios.put).toHaveBeenCalledWith(
+      expect.stringContaining('/api/admin/verify-property/pending-property'),
+      {},
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+  });
+});
+
+test('Area Admin property details keep the ownership proof out of the card', async () => {
+  useAuth.mockReturnValue({
+    user: { _id: 'area-admin-id', role: 'admin', adminType: 'area' },
+  });
+  const property = {
+    _id: 'verified-property',
+    title: 'Verified Property',
+    verificationStatus: 'approved',
+    isVerified: true,
+  };
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.endsWith('/details')
+      ? { ...property, hasVerificationDocument: false, description: 'Property details' }
+      : url.includes('status=approved') ? [property] : [],
+  }));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="verified" />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole('heading', { name: 'Verified Property' })).toBeInTheDocument();
+  expect(screen.queryByText('Proof of Ownership')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'View details' }));
+
+  expect(await screen.findByRole('heading', { name: 'Proof of Ownership' })).toBeInTheDocument();
+  expect(screen.getByText('No ownership proof provided.')).toBeInTheDocument();
 });
 
 test('Area Admin cards offer lifecycle actions without Delete', async () => {

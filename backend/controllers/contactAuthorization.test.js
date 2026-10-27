@@ -33,8 +33,9 @@ test('area admins only load contact messages assigned to their area', async () =
       user: { role: 'admin', adminType: 'area', assignedArea: 'North' },
     }, response);
 
-    assert.equal(filter.area.test('North'), true);
-    assert.equal(filter.area.test('South'), false);
+    assert.equal(filter.$or[0].areaKey, 'north');
+    assert.equal(filter.$or[1].area.test('North'), true);
+    assert.equal(filter.$or[1].area.test('South'), false);
     assert.deepEqual(response.body, []);
   } finally {
     ContactMessage.find = originalFind;
@@ -57,8 +58,9 @@ test('area admins cannot mark another area contact message as read', async () =>
     }, response);
 
     assert.equal(filter._id, '507f1f77bcf86cd799439011');
-    assert.equal(filter.area.test('North'), true);
-    assert.equal(filter.area.test('South'), false);
+    assert.equal(filter.$or[0].areaKey, 'north');
+    assert.equal(filter.$or[1].area.test('North'), true);
+    assert.equal(filter.$or[1].area.test('South'), false);
     assert.equal(response.statusCode, 404);
   } finally {
     ContactMessage.findOneAndUpdate = originalFindOneAndUpdate;

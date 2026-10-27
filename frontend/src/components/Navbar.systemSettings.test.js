@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from './Navbar';
@@ -52,6 +52,27 @@ test.each([
   } else {
     expect(screen.queryByRole('link', { name: 'System Settings' })).not.toBeInTheDocument();
   }
+});
+
+test('notification badge follows page updates and refreshes on window focus', async () => {
+  mockUser = { role: 'admin', adminType: 'area' };
+  axios.get
+    .mockResolvedValueOnce({ data: { unreadCount: 2 } })
+    .mockResolvedValueOnce({ data: { unreadCount: 4 } });
+
+  render(
+    <MemoryRouter>
+      <Navbar />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole('link', { name: 'Notifications, 2 unread' })).toBeInTheDocument();
+  window.dispatchEvent(new CustomEvent('notifications:unread-count', { detail: { unreadCount: 3 } }));
+  expect(await screen.findByRole('link', { name: 'Notifications, 3 unread' })).toBeInTheDocument();
+
+  fireEvent.focus(window);
+  await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(2));
+  expect(await screen.findByRole('link', { name: 'Notifications, 4 unread' })).toBeInTheDocument();
 });
 
 test.each([

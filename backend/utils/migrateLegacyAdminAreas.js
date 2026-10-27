@@ -2,6 +2,7 @@ const Area = require('../models/Area');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const { normalizeAdminAreaObject } = require('./adminArea');
+const { canonicalAreaKey } = require('./canonicalArea');
 
 const formatAreaName = (value) => String(value || '').trim()
   .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
@@ -49,6 +50,7 @@ const migrateLegacyAdminAreas = async () => {
         $set: {
           adminType: 'area',
           assignedArea: canonicalArea?.name || requestedArea,
+          assignedAreaKey: canonicalAreaKey(canonicalArea?.name || requestedArea),
           adminAreas: canonicalArea ? [{ city: canonicalArea.name }] : [],
         },
       },
@@ -70,7 +72,12 @@ const migrateLegacyAdminAreas = async () => {
           },
         ],
       },
-      { $set: { area: area.name } },
+      {
+        $set: {
+          area: area.name,
+          areaKey: canonicalAreaKey(area.name),
+        },
+      },
     );
   }
 };

@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Area = require('../models/Area');
 const SystemSettings = require('../models/SystemSettings');
+const SystemLog = require('../models/SystemLog');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -118,7 +119,10 @@ const register = async (req, res) => {
 
     let area = null;
     if (requestedArea) {
-      area = await Area.findOne({ normalizedName: requestedArea.toLowerCase() }).select('name').lean();
+      area = await Area.findOne({
+        normalizedName: requestedArea.toLowerCase(),
+        isActive: { $ne: false },
+      }).select('name').lean();
       if (!area) return res.status(400).json({ message: 'Select an existing area.' });
     }
 
@@ -312,10 +316,33 @@ const getMe = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const settings = await SystemSettings.findOne({ key: 'global' }).lean();
+    const [settings, recentSignInLogs, passwordChangeLogs] = await Promise.all([
+      SystemSettings.findOne({ key: 'global' }).lean(),
+      SystemLog.find({ user: user._id, action: 'USER_LOGIN', status: 'success' })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('createdAt userAgent')
+        .lean(),
+      SystemLog.find({
+        user: user._id,
+        action: { $in: ['PASSWORD_CHANGED', 'PASSWORD_RESET'] },
+        status: 'success',
+      })
+        .sort({ createdAt: -1 })
+        .limit(1)
+        .select('createdAt')
+        .lean(),
+    ]);
+    const recentSignIns = recentSignInLogs.map((entry) => ({
+      at: entry.createdAt,
+      userAgent: entry.userAgent || '',
+    }));
     res.json({
       ...serializeUser(user),
       permissions: req.user.permissions || {},
+      lastLoginAt: recentSignIns[0]?.at || null,
+      lastPasswordChangeAt: passwordChangeLogs[0]?.createdAt || null,
+      recentSignIns,
       systemPreferences: {
         defaultAppearance: settings?.defaultAppearance || 'system',
         notifications: settings?.notifications || { inAppEnabled: true, emailEnabled: true },
@@ -330,10 +357,17 @@ const getMe = async (req, res) => {
 // የተጠቃሚ መረጃ ማዘመን
 const updateProfile = async (req, res) => {
   try {
-    const { name, email, phone, profilePhoto, bankAccountName, bankAccountNumber, bankCode } = req.body;
+    const {
+      name, email, phone, profilePhoto, currentPassword,
+      bankAccountName, bankAccountNumber, bankCode,
+    } = req.body;
     const bankInformationSubmitted = bankAccountName !== undefined ||
       bankAccountNumber !== undefined ||
       bankCode !== undefined;
+    const immutableFields = ['role', 'adminType', 'adminAreas', 'area', 'assignedArea', 'isActive', 'status'];
+    if (immutableFields.some((field) => Object.prototype.hasOwnProperty.call(req.body, field))) {
+      return res.status(400).json({ message: 'Role, area, and account status cannot be changed here.' });
+    }
     const userId = req.user.id;
 
     const user = await User.findById(userId)
@@ -359,12 +393,26 @@ const updateProfile = async (req, res) => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
         return res.status(400).json({ message: 'Enter a valid email address.' });
       }
+      if (normalizedEmail !== String(user.email || '').toLowerCase()) {
+        if (!currentPassword) {
+          return res.status(400).json({ message: 'Current password is required to change your email.' });
+        }
+        if (!(await bcrypt.compare(currentPassword, user.password))) {
+          return res.status(400).json({ message: 'Current password is incorrect.' });
+        }
+      }
       const existingUser = await User.findOne({ email: normalizedEmail, _id: { $ne: userId } }).select('_id');
       if (existingUser) return res.status(409).json({ message: 'That email address is already in use.' });
       user.email = normalizedEmail;
     }
-    if (phone !== undefined) user.phone = String(phone).trim();
-    user.profilePhoto = profilePhoto || user.profilePhoto;
+    if (phone !== undefined) {
+      const normalizedPhone = String(phone).trim();
+      if (normalizedPhone && !/^(?:09\d{8}|\+2519\d{8})$/.test(normalizedPhone)) {
+        return res.status(400).json({ message: 'Use 09XXXXXXXX or +2519XXXXXXXX.' });
+      }
+      user.phone = normalizedPhone;
+    }
+    if (profilePhoto !== undefined) user.profilePhoto = String(profilePhoto || '').trim();
     await user.save();
 
     await logAudit({
@@ -419,7 +467,8 @@ const updateProfilePhoto = async (req, res) => {
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword) {
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' ||
+        !currentPassword || !newPassword) {
       return res.status(400).json({ message: 'Current password and new password are required.' });
     }
     if (String(newPassword).length < 8) {
@@ -431,6 +480,9 @@ const changePassword = async (req, res) => {
 
     const passwordMatches = await bcrypt.compare(currentPassword, user.password);
     if (!passwordMatches) return res.status(400).json({ message: 'Current password is incorrect.' });
+    if (await bcrypt.compare(newPassword, user.password)) {
+      return res.status(400).json({ message: 'New password must be different from the current password.' });
+    }
 
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();

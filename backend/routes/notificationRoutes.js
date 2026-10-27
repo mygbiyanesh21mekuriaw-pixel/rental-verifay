@@ -6,6 +6,7 @@ const {
   getAdminNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  clearReadNotifications,
   getUnreadCount,
   deleteNotification,
 } = require('../controllers/notificationController');
@@ -28,6 +29,7 @@ router.get('/', auth, requirePermission('notifications'), roleAwareHandler);
 router.get('/all', auth, adminOnly, requirePermission('notifications'), getAdminNotifications);
 router.get('/landlord', auth, landlordOnly, requirePermission('notifications'), getLandlordNotifications);
 router.get('/unread-count', auth, requirePermission('notifications'), getUnreadCount);
+router.delete('/read', auth, requirePermission('notifications'), clearReadNotifications);
 router.put('/:id/read', auth, requirePermission('notifications'), markNotificationAsRead);
 router.put('/read-all', auth, requirePermission('notifications'), markAllNotificationsAsRead);
 router.delete('/:id', auth, requirePermission('notifications'), deleteNotification);

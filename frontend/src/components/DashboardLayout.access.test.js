@@ -14,7 +14,7 @@ test('platform admins retain platform-wide sidebar destinations', () => {
   expect(paths).toContain('/admin-dashboard/places');
   expect(paths).toContain('/admin-dashboard/system-logs');
   expect(paths).toContain('/admin-dashboard/system-settings');
-  expect(paths).toContain('/admin-dashboard/all-users');
+  expect(paths.filter((path) => path === '/admin-dashboard/all-users')).toHaveLength(1);
   expect(paths).not.toContain('/admin-dashboard/contact-messages');
 });
 
@@ -33,18 +33,44 @@ test('platform_admin gets the full static menu regardless of permission data', (
   expect(paths).toContain('/admin-dashboard/places');
   expect(paths).toContain('/admin-dashboard/system-logs');
   expect(paths).toContain('/admin-dashboard/all-properties');
+  expect(paths.filter((path) => path === '/admin-dashboard/all-users')).toHaveLength(1);
 });
 
 test('area admins only see area-scoped sidebar destinations', () => {
   const paths = getMenuPaths({ role: 'admin', adminType: 'area', assignedArea: 'North' });
 
   expect(paths).toContain('/admin-dashboard/all-properties');
-  expect(paths).toContain('/admin-dashboard/all-users');
   expect(paths).toContain('/admin-dashboard/contact-messages');
+  expect(paths).not.toContain('/admin-dashboard/all-users');
   expect(paths).not.toContain('/admin-dashboard/admin-management');
   expect(paths).not.toContain('/admin-dashboard/places');
   expect(paths).not.toContain('/admin-dashboard/system-logs');
   expect(paths).not.toContain('/admin-dashboard/system-settings');
+});
+
+test('area admin Users sidebar entry stays hidden even when legacy permissions allow it', () => {
+  const user = { role: 'admin', adminType: 'area' };
+  const groups = getDashboardMenuGroups(user, (text) => text);
+  const usersItem = { label: 'Users', path: '/admin-dashboard/all-users' };
+  const duplicateMenu = [
+    ...groups,
+    { label: 'Duplicate Management', items: [{ ...usersItem }] },
+    { label: 'Another Duplicate', items: [{ ...usersItem }] },
+  ];
+
+  const enabledGroups = filterDashboardMenuGroups(duplicateMenu, {
+    ...user,
+    permissions: { users: true },
+  });
+  const enabledPaths = enabledGroups.flatMap((section) => section.items.map((menuItem) => menuItem.path));
+  expect(enabledPaths).not.toContain('/admin-dashboard/all-users');
+
+  const disabledGroups = filterDashboardMenuGroups(duplicateMenu, {
+    ...user,
+    permissions: { users: false },
+  });
+  const disabledPaths = disabledGroups.flatMap((section) => section.items.map((menuItem) => menuItem.path));
+  expect(disabledPaths).not.toContain('/admin-dashboard/all-users');
 });
 
 test('area_admin role uses the admin dashboard route and activates the Dashboard sidebar item', () => {

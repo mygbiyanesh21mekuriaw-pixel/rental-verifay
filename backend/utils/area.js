@@ -1,11 +1,8 @@
-const normalizeAreaName = (value) => String(value || '').trim();
+const { normalizeAreaName, buildCanonicalAreaQuery } = require('./canonicalArea');
 
 const buildAssignedAreaQuery = (area) => {
-  const normalizedArea = normalizeAreaName(area);
-  if (!normalizedArea) return { _id: null };
-  const escapedArea = normalizedArea.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const exactMatch = new RegExp(`^${escapedArea}$`, 'i');
-  return { area: exactMatch };
+  const query = buildCanonicalAreaQuery(area);
+  return query.$or?.length ? query : { _id: null };
 };
 
 module.exports = { normalizeAreaName, buildAssignedAreaQuery };

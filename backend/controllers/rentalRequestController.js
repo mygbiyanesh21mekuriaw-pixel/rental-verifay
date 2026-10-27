@@ -1,19 +1,34 @@
 const mongoose = require('mongoose');
 const RentRequest = require('../models/RentalRequest');
 const Property = require('../models/Property');
+const Area = require('../models/Area');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const { isApprovedProperty } = require('../utils/propertyVerification');
 const { logAudit } = require('../utils/auditLogger');
-const { normalizeAdminAreaObject, propertyMatchesAdminAreas, buildAdminAreaQuery } = require('../utils/adminArea');
+const { normalizeAdminAreaObject, propertyMatchesAdminAreas } = require('../utils/adminArea');
 const { appendAdminDecision } = require('../utils/adminHandlingHistory');
 const { getAdministrativeRole } = require('../middleware/auth');
+const { canonicalAreaKey, buildCanonicalAreaQuery } = require('../utils/canonicalArea');
 
-const getAreaAdminAreas = async (adminId) => {
-  const admin = await User.findById(adminId).select('role adminType adminAreas assignedArea isActive').lean();
+const NEW_RENTAL_DAYS = 7;
+const NEW_RENTAL_WINDOW_MS = NEW_RENTAL_DAYS * 24 * 60 * 60 * 1000;
+
+const isRecentRental = (dateValue, now = Date.now()) => {
+  const timestamp = new Date(dateValue).getTime();
+  const age = now - timestamp;
+  return Number.isFinite(timestamp) && age >= 0 && age < NEW_RENTAL_WINDOW_MS;
+};
+
+const getAreaAdminContext = async (adminId) => {
+  const admin = await User.findById(adminId)
+    .select('name role adminType adminAreas assignedArea assignedAreaKey isActive')
+    .lean();
   if (!admin || admin.isActive === false || admin.role !== 'admin' || admin.adminType !== 'area') return null;
-  if (admin.assignedArea) return [normalizeAdminAreaObject(admin.assignedArea)].filter(Boolean);
-  return (admin.adminAreas || []).map(normalizeAdminAreaObject).filter(Boolean);
+  const legacyArea = (admin.adminAreas || []).map(normalizeAdminAreaObject).find(Boolean);
+  const currentArea = admin.assignedArea || (legacyArea && Object.values(legacyArea)[0]) || '';
+  const areaKey = canonicalAreaKey(currentArea || admin.assignedAreaKey);
+  return areaKey ? { admin, areaKey } : null;
 };
 
 const addRentalHistoryHandlerStatus = async (requests) => {
@@ -56,9 +71,9 @@ const activateRentalRelationship = async (propertyId, tenantId) => {
 
 const getAdminRentalRequests = async (req, res) => {
   try {
-    const adminAreas = await getAreaAdminAreas(req.user.id);
-    if (!adminAreas || adminAreas.length === 0) return res.json([]);
-    const propertyFilter = buildAdminAreaQuery(adminAreas);
+    const adminContext = await getAreaAdminContext(req.user.id);
+    if (!adminContext) return res.json([]);
+    const propertyFilter = buildCanonicalAreaQuery(adminContext.areaKey);
 
     const properties = Object.keys(propertyFilter).length === 0
       ? await Property.find().select('_id').lean()
@@ -69,7 +84,7 @@ const getAdminRentalRequests = async (req, res) => {
     if (propertyIds.length === 0) return res.json([]);
 
     const requests = await RentRequest.find({ property: { $in: propertyIds } })
-      .populate('property', 'title location area region zone wereda city subCity kebele houseNumber images propertyImages image verificationDocument verificationDocumentAsset')
+      .populate('property', 'title location area areaKey region zone wereda city subCity kebele houseNumber images propertyImages image verificationDocument verificationDocumentAsset')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
@@ -100,23 +115,23 @@ const adminRespondToRentalRequest = async (req, res) => {
       return res.status(400).json({ message: 'Status must be approved or rejected' });
     }
 
-    const adminAreas = await getAreaAdminAreas(req.user.id);
-    if (!adminAreas || adminAreas.length === 0) {
+    const adminContext = await getAreaAdminContext(req.user.id);
+    if (!adminContext) {
       return res.status(403).json({ message: 'Area Admin permission required.' });
     }
-    const admin = await User.findById(req.user.id).select('name role adminType isActive').lean();
-    if (!admin || getAdministrativeRole(admin) !== 'area_admin' || admin.isActive === false) {
+    const { admin, areaKey } = adminContext;
+    if (getAdministrativeRole(admin) !== 'area_admin') {
       return res.status(403).json({ message: 'Area Admin permission required.' });
     }
 
     const request = await RentRequest.findById(req.params.id)
-      .populate('property', 'title location region zone wereda city subCity kebele houseNumber')
+      .populate('property', 'title location area areaKey region zone wereda city subCity kebele houseNumber availabilityStatus rentedBy')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone');
     if (!request) return res.status(404).json({ message: 'Rental request not found' });
     if (!request.property) return res.status(404).json({ message: 'Property for rental request not found' });
 
-    if (!propertyMatchesAdminAreas(request.property, adminAreas)) {
+    if (canonicalAreaKey(request.property.areaKey || request.property.area) !== areaKey) {
       return res.status(403).json({ message: 'This rental request is outside your assigned admin area' });
     }
     if (request.status !== 'pending') {
@@ -259,6 +274,8 @@ const createRentRequest = async (req, res) => {
     // አዲስ ጥያቄ ይፍጠሩ
     const rentRequest = new RentRequest({
       property: propertyId,
+      area: null,
+      areaKey: canonicalAreaKey(property.areaKey || property.area),
       tenant: tenantId,
       landlord: property.landlord,
       tenantName: fullName || tenant.name,
@@ -272,6 +289,17 @@ const createRentRequest = async (req, res) => {
       status: 'pending',
       expiresAt: new Date(+new Date() + 7 * 24 * 60 * 60 * 1000),
     });
+    const areaKey = canonicalAreaKey(property.areaKey || property.area);
+    if (areaKey) {
+      const areas = await Area.find({ isActive: { $ne: false } })
+        .select('_id name canonicalKey')
+        .lean();
+      const matches = areas.filter((area) => canonicalAreaKey(area.canonicalKey || area.name) === areaKey);
+      if (matches.length === 1) rentRequest.area = matches[0]._id;
+      else if (matches.length > 1) {
+        console.warn('Rental request area key matches multiple active areas:', { propertyId, areaKey });
+      }
+    }
 
     try {
       await rentRequest.save();
@@ -312,11 +340,25 @@ const createRentRequest = async (req, res) => {
 const getMyRentRequests = async (req, res) => {
   try {
     const requests = await RentRequest.find({ tenant: req.user.id })
-      .populate('property', 'title location price images propertyImages image availabilityStatus rentedBy rentedAt')
+      .populate('property', 'title location area areaKey price images propertyImages image availabilityStatus rentedBy rentedAt')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
 
-    res.json(requests);
+    const now = Date.now();
+    res.json(requests.map((request) => {
+      const requestData = typeof request.toObject === 'function' ? request.toObject() : request;
+      const rentalCreatedAt = requestData.property?.rentedAt || requestData.createdAt || null;
+      const rentalTimestamp = new Date(rentalCreatedAt).getTime();
+      const rentalDateIsValid = Number.isFinite(rentalTimestamp);
+      return {
+        ...requestData,
+        rentalCreatedAt,
+        is_new: isRecentRental(rentalCreatedAt, now),
+        is_new_until: rentalDateIsValid
+          ? new Date(rentalTimestamp + NEW_RENTAL_WINDOW_MS)
+          : null,
+      };
+    }));
   } catch (error) {
     console.error('Error fetching my rent requests:', error);
     res.status(500).json({ message: 'Server error' });
@@ -326,7 +368,7 @@ const getMyRentRequests = async (req, res) => {
 const getMyRentalRequestById = async (req, res) => {
   try {
     const request = await RentRequest.findOne({ _id: req.params.id, tenant: req.user.id })
-      .populate('property', 'title location price images propertyImages image description bedrooms availabilityStatus rentedBy')
+      .populate('property', 'title location area areaKey price images propertyImages image description bedrooms availabilityStatus rentedBy')
       .populate('landlord', 'name email phone');
     if (!request) return res.status(404).json({ message: 'Rental request not found' });
     res.json(request);
@@ -377,7 +419,7 @@ const getLandlordRentRequests = async (req, res) => {
     }
 
     let requestsQuery = RentRequest.find(filter)
-      .populate('property', 'title location price images propertyImages image description bedrooms')
+      .populate('property', 'title location area areaKey price images propertyImages image description bedrooms')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .sort({ createdAt: -1 });
@@ -405,6 +447,7 @@ const landlordRespondToRequest = async (req, res) => {
     }
 
     const request = await RentRequest.findById(id)
+      .populate('property', 'area areaKey title location')
       .populate('tenant', 'name email phone');
 
     if (!request) {
@@ -493,7 +536,7 @@ const getRentRequestForLandlord = async (req, res) => {
     const landlordId = req.user.id;
 
     const request = await RentRequest.findById(id)
-      .populate('property', 'title location price images propertyImages image description bedrooms landlord')
+      .populate('property', 'title location area areaKey price images propertyImages image description bedrooms landlord')
       .populate('tenant', 'name email phone')
       .populate('landlord', 'name email phone')
       .populate({
@@ -570,4 +613,6 @@ module.exports = {
   getLandlordRentStats,
   getAdminRentalRequests,
   adminRespondToRentalRequest,
+  isRecentRental,
+  NEW_RENTAL_DAYS,
 };

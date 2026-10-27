@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Property = require('../models/Property');
 const Area = require('../models/Area');
 const { matchAreaFromAddress, UNASSIGNED_AREA } = require('../utils/propertyArea');
+const { canonicalAreaKey } = require('../utils/canonicalArea');
 
 const BATCH_SIZE = 200;
 const isExecute = process.argv.includes('--execute');
@@ -20,7 +21,7 @@ const backfillPropertyArea = async (property, areas, execute = isExecute) => {
   if (!execute) return area;
   const result = await Property.updateOne(
     { _id: property._id, ...buildMissingAreaFilter() },
-    { $set: { area } },
+    { $set: { area, areaKey: canonicalAreaKey(area) } },
   );
   return result.modifiedCount > 0 ? area : null;
 };

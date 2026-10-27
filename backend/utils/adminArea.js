@@ -1,9 +1,8 @@
 const adminAreaFields = ['city', 'region', 'zone', 'wereda', 'subCity'];
-
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const { canonicalAreaKey, normalizeAreaName, buildCanonicalAreaQuery } = require('./canonicalArea');
 
 const normalizeAreaValue = (value) => {
-  return String(value || '').trim();
+  return normalizeAreaName(value);
 };
 
 const normalizeAdminAreaObject = (area) => {
@@ -30,30 +29,31 @@ const getCanonicalAreaField = (area) => {
 const propertyMatchesAdminAreas = (property, areas) => {
   if (!Array.isArray(areas) || areas.length === 0) return true;
 
+  const propertyKey = canonicalAreaKey(property?.area || property?.areaKey);
+  if (!propertyKey) return false;
   return areas.some((area) => {
     if (typeof area === 'string') {
-      return String(property?.area || '').trim().toLowerCase() === normalizeAreaValue(area).toLowerCase();
+      return propertyKey === canonicalAreaKey(area);
     }
     const field = getCanonicalAreaField(area);
     if (!field) return false;
-    const expectedArea = String(area[field]).trim().toLowerCase();
-    return String(property?.area || '').trim().toLowerCase() === expectedArea;
+    return propertyKey === canonicalAreaKey(area[field]);
   });
 };
 
 const buildAdminAreaQuery = (areas) => ({
-  $or: areas
-    .map((area) => {
-      if (typeof area === 'string') {
-        const value = normalizeAreaValue(area);
-        return value ? { area: new RegExp(`^${escapeRegex(value)}$`, 'i') } : null;
-      }
+  $or: areas.flatMap((area) => {
+    let value;
+    if (typeof area === 'string') {
+      value = area;
+    } else {
       const field = getCanonicalAreaField(area);
-      if (!field) return null;
-      const exactMatch = new RegExp(`^${escapeRegex(area[field])}$`, 'i');
-      return { area: exactMatch };
-    })
-    .filter(Boolean),
+      if (!field) return [];
+      value = area[field];
+    }
+    const query = buildCanonicalAreaQuery(value);
+    return query.$or || [];
+  }),
 });
 
 module.exports = {

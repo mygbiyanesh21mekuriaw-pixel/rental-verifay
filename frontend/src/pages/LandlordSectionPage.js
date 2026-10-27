@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { FaFileAlt, FaHome, FaMapMarkerAlt, FaPlus, FaSearch, FaTrashAlt } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
 import { getPropertyImages } from '../utils/propertyMedia';
+import './LandlordSectionPage.css';
 
 const sectionConfig = {
   myProperties: {
@@ -59,6 +61,8 @@ const LandlordSectionPage = ({ type }) => {
   const [properties, setProperties] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [propertyFilter, setPropertyFilter] = useState('All');
+  const [propertySearch, setPropertySearch] = useState('');
   const config = sectionConfig[type];
 
   const fetchProperties = useCallback(async () => {
@@ -141,8 +145,188 @@ const LandlordSectionPage = ({ type }) => {
     });
   };
 
+  const myPropertyCounts = properties.reduce((counts, property) => {
+    counts[getPropertyStatusBadge(property).label] += 1;
+    return counts;
+  }, { Verified: 0, 'Under review': 0, Rented: 0, Rejected: 0 });
+
+  const filteredMyProperties = properties.filter((property) => {
+    const matchesStatus = propertyFilter === 'All' || getPropertyStatusBadge(property).label === propertyFilter;
+    const searchValue = [
+      property.title,
+      property.location,
+      property.region,
+      property.zone,
+      property.wereda,
+      property.city,
+      property.subCity,
+      property.kebele,
+      property.houseNumber,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return matchesStatus && searchValue.includes(propertySearch.trim().toLowerCase());
+  });
+
   if (!config) {
     return <div style={styles.container}><p>Invalid section</p></div>;
+  }
+
+  if (type === 'myProperties') {
+    const filters = [
+      ['All', properties.length],
+      ['Verified', myPropertyCounts.Verified],
+      ['Under review', myPropertyCounts['Under review']],
+      ['Rented', myPropertyCounts.Rented],
+      ['Rejected', myPropertyCounts.Rejected],
+    ];
+
+    return (
+      <div className="landlord-my-properties">
+        <header className="landlord-my-properties-header">
+          <div>
+            <h1>{config.title} <span>{properties.length}</span></h1>
+            <p>Manage your property listings</p>
+          </div>
+          <Link className="landlord-my-properties-add-button" to="/landlord/add-property">
+            <FaPlus aria-hidden="true" />
+            Add House
+          </Link>
+        </header>
+
+        {successNotice && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">
+            {successNotice}
+          </div>
+        )}
+
+        {loading ? (
+          <div style={styles.loading}>Loading...</div>
+        ) : properties.length === 0 ? (
+          <div className="landlord-my-properties-empty">
+            <FaHome aria-hidden="true" />
+            <p>{config.empty}</p>
+            <Link to="/landlord/add-property" className="landlord-my-properties-add-button">Add House</Link>
+          </div>
+        ) : (
+          <>
+            <div className="landlord-my-properties-toolbar">
+              <div className="landlord-my-properties-tabs" role="tablist" aria-label="Filter properties by status">
+                {filters.map(([label, count]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    role="tab"
+                    aria-selected={propertyFilter === label}
+                    className={propertyFilter === label ? 'active' : ''}
+                    onClick={() => setPropertyFilter(label)}
+                  >
+                    {label}
+                    <span>{count}</span>
+                  </button>
+                ))}
+              </div>
+              <label className="landlord-my-properties-search">
+                <FaSearch aria-hidden="true" />
+                <input
+                  type="search"
+                  value={propertySearch}
+                  onChange={(event) => setPropertySearch(event.target.value)}
+                  placeholder="Search title or address"
+                  aria-label="Search title or address"
+                />
+              </label>
+            </div>
+
+            {filteredMyProperties.length === 0 ? (
+              <div className="landlord-my-properties-no-results" role="status">
+                No properties match your filters.
+              </div>
+            ) : (
+              <div className="landlord-my-properties-grid">
+                {filteredMyProperties.map((property) => {
+                  const statusBadge = getPropertyStatusBadge(property);
+                  const statusClass = statusBadge.label.toLowerCase().replace(/\s+/g, '-');
+                  return (
+                    <article key={property._id} className="landlord-my-property-card">
+                      <div className="landlord-my-property-image-wrap">
+                        <PropertyImage
+                          src={getPropertyImages(property)}
+                          alt={property.title}
+                          className="landlord-my-property-image"
+                          fallbackClassName="landlord-my-property-image landlord-my-property-image-placeholder"
+                          fallbackText="No photo"
+                        />
+                        <span
+                          className={`landlord-my-property-status landlord-status-${statusClass}`}
+                          role="status"
+                        >
+                          <span aria-hidden="true" />
+                          {statusBadge.label}
+                        </span>
+                      </div>
+                      <div className="landlord-my-property-content">
+                        <h2 title={property.title}>{property.title}</h2>
+                        <p className="landlord-my-property-address">
+                          <FaMapMarkerAlt aria-hidden="true" />
+                          <span>{property.location}</span>
+                        </p>
+                        <p className="landlord-my-property-price">
+                          ETB {property.price.toLocaleString()} <span>/ month</span>
+                        </p>
+                        {type === 'rented' && property.rentedBy?.name && (
+                          <p className="landlord-my-property-tenant">Tenant: {property.rentedBy.name}</p>
+                        )}
+                        <div className="landlord-my-property-proof">
+                          <FaFileAlt aria-hidden="true" />
+                          <span className="landlord-my-property-proof-title">Proof of ownership</span>
+                          {property.hasVerificationDocument ? (
+                            <>
+                              <PropertyOwnershipProof
+                                propertyId={property._id}
+                                hasProof={property.hasVerificationDocument}
+                                title={property.title}
+                                showLabel={false}
+                                className="landlord-my-property-proof-loader"
+                                imageClassName="landlord-my-property-proof-image"
+                                fallbackClassName="landlord-my-property-proof-error"
+                              />
+                              <Link to={`/property/${property._id}`} className="landlord-my-property-proof-view">
+                                View
+                              </Link>
+                            </>
+                          ) : (
+                            <span className="landlord-my-property-proof-missing">Not uploaded</span>
+                          )}
+                        </div>
+                        <div className="landlord-my-property-actions">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdate(property)}
+                            className="landlord-my-property-update"
+                            title="Edit property"
+                          >
+                            Update
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(property._id)}
+                            className="landlord-my-property-delete"
+                            aria-label="Delete"
+                            title="Delete property"
+                          >
+                            <FaTrashAlt aria-hidden="true" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
   }
 
   return (

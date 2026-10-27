@@ -18,6 +18,11 @@ test('platform admins receive a superset of all catalog permissions', () => {
   }
 });
 
+test('Area Admins cannot be assigned Users management permission', () => {
+  assert.equal(PERMISSION_CATALOG.area_admin.includes('users'), false);
+  assert.equal(getDefaultUserPermissions('area_admin').users, undefined);
+});
+
 test('individual permission rows override defaults except for always-on keys', () => {
   const permissions = mergeUserPermissions('tenant', [
     { permissionKey: 'favorites', enabled: false },
@@ -36,4 +41,3 @@ test('platform-admin permission overrides are ignored', () => {
   ]);
   assert.equal(permissions.messages, true);
 });
-

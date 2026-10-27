@@ -15,11 +15,19 @@ test('GET /api/permissions/me requires authentication', () => {
   assert.equal(route.stack[0].handle, auth);
 });
 
-test('user permission, approval, and area-admin routes require Platform Admin', () => {
+test('all user-management routes require Platform Admin', () => {
   for (const [path, method] of [
+    ['/users', 'get'],
+    ['/users/:id', 'delete'],
+    ['/users/:id/active', 'patch'],
+    ['/users/:id/role', 'put'],
     ['/users/:id/permissions', 'get'],
     ['/users/:id/permissions', 'put'],
     ['/users/:id/approve', 'post'],
+    ['/users/admin', 'post'],
+    ['/users/admin/:id', 'put'],
+    ['/users/admin/:id', 'delete'],
+    ['/users/admin/:id/active', 'patch'],
     ['/area-admins', 'post'],
   ]) {
     const route = routeByPath(adminRoutes, path, method);
@@ -41,9 +49,9 @@ test('GET /api/permissions/me defaults to all role permissions when the user has
   getMyPermissions({ user: { role: 'admin', adminType: 'area', permissions: {} } }, response);
 });
 
-test('pending users query rejects Area Admins before the users controller', () => {
+test('user listing rejects Area Admins regardless of query parameters', () => {
   const route = routeByPath(adminRoutes, '/users', 'get');
-  const roleGuard = route.stack[1].handle;
+  assert.equal(route.stack[1].handle, platformAdminOnly);
   const response = {
     statusCode: null,
     body: null,
@@ -58,9 +66,13 @@ test('pending users query rejects Area Admins before the users controller', () =
   };
   let nextCalled = false;
 
-  roleGuard({ query: { status: 'pending' }, user: { role: 'admin', adminType: 'area' } }, response, () => {
-    nextCalled = true;
-  });
+  route.stack[1].handle(
+    { query: { status: 'pending' }, user: { role: 'admin', adminType: 'area' } },
+    response,
+    () => {
+      nextCalled = true;
+    },
+  );
 
   assert.equal(response.statusCode, 403);
   assert.equal(nextCalled, false);

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -11,11 +11,13 @@ import {
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import BackToDashboard from '../components/BackToDashboard';
+import AreaPropertyList from '../components/AreaPropertyList';
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
 import { getPropertyImages } from '../utils/propertyMedia';
 import { apiUrl } from '../utils/apiUrl';
 import { useLanguage } from '../context/LanguageContext';
+import AdminPaymentPeriods from './AdminPaymentPeriods';
 import './adminDashboard.css';
 
 const sectionConfig = {
@@ -32,12 +34,32 @@ const sectionConfig = {
   verified: { title: 'Verified Properties', status: 'approved' },
 };
 
+const RENTAL_REQUEST_PAGE_SIZE = 12;
+
+const getRentalRequestStatus = (request) => {
+  const status = String(request?.status || 'pending').trim().toLowerCase();
+  if (status === 'approved' || status === 'confirmed') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  return status === 'pending' ? 'pending' : 'other';
+};
+
 const displayVerificationStatus = (property) => {
   if (property.isVerified && property.verificationStatus === 'approved') return 'Verified';
   if (!property.isVerified && property.verificationStatus === 'rejected') return 'Rejected';
   if (!property.isVerified && property.verificationStatus === 'pending') return 'Under Review';
   return property.verificationStatus || 'Unknown';
 };
+
+const getPropertyStatusClass = (property) => {
+  if (property.isVerified && property.verificationStatus === 'approved') return 'is-verified';
+  if (!property.isVerified && property.verificationStatus === 'rejected') return 'is-rejected';
+  return 'is-under-review';
+};
+
+const getPropertyShortLocation = (property) => [
+  property.city,
+  property.zone,
+].filter(Boolean).join(', ') || property.location || '';
 
 const getAdminAreaValue = (adminAreas) => {
   const firstArea = Array.isArray(adminAreas) ? adminAreas[0] : null;
@@ -51,6 +73,95 @@ const getDisplayUserRole = (user) => {
   return user.adminType === 'area' || (!user.adminType && user.adminAreas?.length > 0)
     ? 'area_admin'
     : 'platform_admin';
+};
+
+const AdminPropertyDetailsModal = ({
+  selectedProperty,
+  propertyDetails,
+  loading,
+  error,
+  onClose,
+  t,
+  formatDate,
+}) => {
+  if (!selectedProperty) return null;
+  const property = propertyDetails || selectedProperty;
+
+  return (
+    <div className="admin-property-modal-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="admin-property-details-modal" role="dialog" aria-modal="true" aria-labelledby="admin-property-details-title">
+        <div className="admin-property-details-header">
+          <div>
+            <h2 id="admin-property-details-title">{propertyDetails?.title || selectedProperty.title}</h2>
+            <span className={`admin-property-status-badge ${getPropertyStatusClass(property)}`}>{t(displayVerificationStatus(property))}</span>
+          </div>
+          <button type="button" className="admin-property-modal-close" onClick={onClose} aria-label={t('Close details')} autoFocus>×</button>
+        </div>
+        {loading ? (
+          <p role="status">{t('Loading property details...')}</p>
+        ) : error ? (
+          <p role="alert" className="admin-property-details-error">{error}</p>
+        ) : propertyDetails && (
+          <div className="admin-property-details-body">
+            <section>
+              <h3>{t('Description')}</h3>
+              <p>{propertyDetails.description || t('No description provided')}</p>
+            </section>
+            <section>
+              <h3>{t('Full address')}</h3>
+              <p>{[
+                propertyDetails.location,
+                propertyDetails.houseNumber,
+                propertyDetails.kebele,
+                propertyDetails.subCity,
+                propertyDetails.city,
+                propertyDetails.wereda,
+                propertyDetails.zone,
+                propertyDetails.region,
+                propertyDetails.area,
+              ].filter(Boolean).join(', ') || t('Location unavailable')}</p>
+            </section>
+            <section>
+              <h3>{t('Landlord')}</h3>
+              <p>{propertyDetails.landlord?.name || t('Unknown Owner')}</p>
+            </section>
+            <section>
+              <h3>{t('Proof of Ownership')}</h3>
+              {propertyDetails.hasVerificationDocument ? (
+                <PropertyOwnershipProof
+                  propertyId={propertyDetails._id}
+                  hasProof
+                  title={propertyDetails.title}
+                  className="admin-property-proof"
+                  imageClassName="admin-property-proof-image"
+                  fallbackClassName="admin-property-proof-error"
+                  showLabel={false}
+                />
+              ) : <p>{t('No ownership proof provided.')}</p>}
+            </section>
+            <section className="admin-property-history">
+              <h3>{t('History')}</h3>
+              {propertyDetails.history?.length ? (
+                <ol>
+                  {propertyDetails.history.map((entry, index) => (
+                    <li key={`${entry.byId || entry.byName}-${entry.at}-${index}`}>
+                      <strong>{t(entry.action === 'verified' ? 'Verified' : entry.action === 'returned' ? 'Returned' : 'Rejected')}</strong>
+                      <span>{entry.byName && entry.byName !== 'Unknown (before history tracking)' ? entry.byName : t('Handled before history tracking')}</span>
+                      <time>{entry.at ? formatDate(entry.at, { dateStyle: 'medium', timeStyle: 'short' }) : t('Date unavailable')}</time>
+                      {entry.note && <p>{entry.note}</p>}
+                    </li>
+                  ))}
+                </ol>
+              ) : ['approved', 'rejected'].includes(propertyDetails.verificationStatus)
+                || ['verified', 'rejected', 'returned'].includes(propertyDetails.decision) ? (
+                <p>{t('Handled before history tracking')}</p>
+              ) : <p>{t('No history recorded yet.')}</p>}
+            </section>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 };
 
 const AdminSectionPage = ({ type }) => {
@@ -73,6 +184,31 @@ const AdminSectionPage = ({ type }) => {
   const [userStatusFilter, setUserStatusFilter] = useState('all');
   const [userSearch, setUserSearch] = useState('');
   const [userPage, setUserPage] = useState(1);
+  const [propertySearch, setPropertySearch] = useState('');
+  const [propertyStatus, setPropertyStatus] = useState('all');
+  const [propertyArea, setPropertyArea] = useState('all');
+  const [propertyMinPrice, setPropertyMinPrice] = useState('');
+  const [propertyMaxPrice, setPropertyMaxPrice] = useState('');
+  const [propertySort, setPropertySort] = useState('newest');
+  const [propertyPage, setPropertyPage] = useState(1);
+  const [propertyPagination, setPropertyPagination] = useState({
+    page: 1,
+    limit: 12,
+    total: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
+  const [propertyTotals, setPropertyTotals] = useState({ total: 0, verified: 0, underReview: 0, rejected: 0 });
+  const [propertyAreas, setPropertyAreas] = useState([]);
+  const [propertyView, setPropertyView] = useState(() => (
+    localStorage.getItem('admin-properties-view') === 'list' ? 'list' : 'grid'
+  ));
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [propertyDetails, setPropertyDetails] = useState(null);
+  const [propertyDetailsLoading, setPropertyDetailsLoading] = useState(false);
+  const [propertyDetailsError, setPropertyDetailsError] = useState('');
+  const propertyFetchSequence = useRef(0);
   const [adminForm, setAdminForm] = useState({
     name: '',
     email: '',
@@ -80,7 +216,7 @@ const AdminSectionPage = ({ type }) => {
     phone: '',
     password: '',
     adminType: 'area',
-    area: '',
+    area: new URLSearchParams(location.search).get('assignArea') || '',
   });
   const [adminFormError, setAdminFormError] = useState('');
   const [adminFormMessage, setAdminFormMessage] = useState('');
@@ -95,7 +231,9 @@ const AdminSectionPage = ({ type }) => {
   const [resetTemporaryPassword, setResetTemporaryPassword] = useState('');
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [editingAdminId, setEditingAdminId] = useState(null);
-  const [adminFormOpen, setAdminFormOpen] = useState(false);
+  const [adminFormOpen, setAdminFormOpen] = useState(() => (
+    type === 'adminManagement' && new URLSearchParams(location.search).has('assignArea')
+  ));
   const [adminSearch, setAdminSearch] = useState('');
   const [adminStatusFilter, setAdminStatusFilter] = useState('all');
   const [adminPage, setAdminPage] = useState(1);
@@ -115,8 +253,12 @@ const AdminSectionPage = ({ type }) => {
   const [promotionArea, setPromotionArea] = useState('');
   const [selectedRentalRequest, setSelectedRentalRequest] = useState(null);
   const [rentalRequestFeedback, setRentalRequestFeedback] = useState('');
-  const isPlatformAdmin = currentUser?.role === 'admin'
-    && (!currentUser.adminType || currentUser.adminType === 'platform');
+  const [rentalRequestFilter, setRentalRequestFilter] = useState('all');
+  const [rentalRequestSearch, setRentalRequestSearch] = useState('');
+  const [rentalRequestSort, setRentalRequestSort] = useState('newest');
+  const [rentalRequestView, setRentalRequestView] = useState('grid');
+  const [rentalRequestPage, setRentalRequestPage] = useState(1);
+  const isPlatformAdmin = getDisplayUserRole(currentUser) === 'platform_admin';
   const showPlatformAdminBackLink = isPlatformAdmin
     && ['allUsers', 'paymentPeriod', 'adminManagement'].includes(type);
   const showAreaAdminBackLink = currentUser?.role === 'admin'
@@ -126,6 +268,48 @@ const AdminSectionPage = ({ type }) => {
     && currentUser?.adminType === 'area'
     && (type === 'pending' || type === 'reviewProperties' || type === 'awaitingVerification');
   const canManageRentalRequests = currentUser?.role === 'admin' && currentUser?.adminType === 'area';
+  const rentalRequestCounts = useMemo(() => items.reduce((counts, request) => {
+    counts.total += 1;
+    const status = getRentalRequestStatus(request);
+    if (Object.prototype.hasOwnProperty.call(counts, status)) counts[status] += 1;
+    return counts;
+  }, { total: 0, pending: 0, approved: 0, rejected: 0 }), [items]);
+  const filteredRentalRequests = useMemo(() => {
+    const query = rentalRequestSearch.trim().toLocaleLowerCase();
+    return items
+      .filter((request) => {
+        const status = getRentalRequestStatus(request);
+        const searchable = [
+          request.property?.title,
+          request.tenant?.name,
+          request.tenantName,
+        ].join(' ').toLocaleLowerCase();
+        return (rentalRequestFilter === 'all' || status === rentalRequestFilter)
+          && (!query || searchable.includes(query));
+      })
+      .sort((left, right) => {
+        const statusDifference = Number(getRentalRequestStatus(left) !== 'pending')
+          - Number(getRentalRequestStatus(right) !== 'pending');
+        if (statusDifference !== 0) return statusDifference;
+        const dateDifference = new Date(left.createdAt || 0).getTime()
+          - new Date(right.createdAt || 0).getTime();
+        return rentalRequestSort === 'oldest' ? dateDifference : -dateDifference;
+      });
+  }, [items, rentalRequestFilter, rentalRequestSearch, rentalRequestSort]);
+  const rentalRequestPageCount = Math.max(
+    1,
+    Math.ceil(filteredRentalRequests.length / RENTAL_REQUEST_PAGE_SIZE),
+  );
+  const visibleRentalRequests = filteredRentalRequests.slice(
+    (rentalRequestPage - 1) * RENTAL_REQUEST_PAGE_SIZE,
+    rentalRequestPage * RENTAL_REQUEST_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (rentalRequestPage > rentalRequestPageCount) {
+      setRentalRequestPage(rentalRequestPageCount);
+    }
+  }, [rentalRequestPage, rentalRequestPageCount]);
 
   useEffect(() => () => {
     if (adminNoticeTimeout.current) {
@@ -190,28 +374,70 @@ const AdminSectionPage = ({ type }) => {
   }, [fetchAreas, isAdminManagementPage, isPlatformAdmin, isUserListPage]);
 
   const fetchItems = useCallback(async () => {
+    if (type === 'paymentPeriod') return;
+    const requestId = type === 'allProperties' ? ++propertyFetchSequence.current : null;
     setLoading(true);
     setLoadError('');
     try {
       const token = localStorage.getItem('token');
-      let endpoint = config.endpoint
-        ? type === 'rentalRequests'
-          ? `${process.env.REACT_APP_API_URL}/api/${config.endpoint}`
-          : `${process.env.REACT_APP_API_URL}/api/admin/${config.endpoint}`
-        : `${process.env.REACT_APP_API_URL}/api/admin/properties?status=${config.status}`;
+      let endpoint;
+      if (type === 'allProperties') {
+        const params = new URLSearchParams({
+          status: propertyStatus,
+          page: String(propertyPage),
+          limit: '12',
+          sort: propertySort,
+        });
+        if (propertySearch.trim()) params.set('q', propertySearch.trim());
+        if (propertyArea !== 'all') params.set('area', propertyArea);
+        if (propertyMinPrice !== '') params.set('minPrice', propertyMinPrice);
+        if (propertyMaxPrice !== '') params.set('maxPrice', propertyMaxPrice);
+        endpoint = `${process.env.REACT_APP_API_URL}/api/admin/properties?${params}`;
+      } else {
+        endpoint = config.endpoint
+          ? type === 'rentalRequests'
+            ? `${process.env.REACT_APP_API_URL}/api/${config.endpoint}`
+            : `${process.env.REACT_APP_API_URL}/api/admin/${config.endpoint}`
+          : `${process.env.REACT_APP_API_URL}/api/admin/properties?status=${config.status}`;
+      }
 
       const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (requestId !== null && requestId !== propertyFetchSequence.current) return;
       const records = Array.isArray(response.data)
         ? response.data
         : Array.isArray(response.data?.properties) ? response.data.properties : [];
+      if (type === 'allProperties' && !Array.isArray(response.data)) {
+        setPropertyPagination(response.data.pagination || {
+          page: 1,
+          limit: 12,
+          total: 0,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false,
+        });
+        setPropertyTotals(response.data.totals || { total: 0, verified: 0, underReview: 0, rejected: 0 });
+        setPropertyAreas(response.data.areas || []);
+      }
       setItems(isAdminManagementPage
         ? records.filter(user =>user && user._id != null && user.role === 'admin' && user.adminType === 'area')
         : records.filter(property =>property && property._id != null));
     } catch (error) {
-      console.error('Error fetching admin section:', error);
-      setItems([]);
+        if (requestId !== null && requestId !== propertyFetchSequence.current) return;
+        console.error('Error fetching admin section:', error);
+        setItems([]);
+        if (type === 'allProperties') {
+          setPropertyTotals({ total: 0, verified: 0, underReview: 0, rejected: 0 });
+          setPropertyPagination({
+            page: 1,
+            limit: 12,
+            total: 0,
+            totalPages: 1,
+            hasNextPage: false,
+            hasPrevPage: false,
+          });
+        }
       const responseStatus = error.response?.status;
       const responseMessage = error.response?.data?.message;
       const defaultMessage = type === 'rentalRequests'
@@ -221,13 +447,66 @@ const AdminSectionPage = ({ type }) => {
         ? `${responseMessage || defaultMessage} (HTTP ${responseStatus})`
         : responseMessage || defaultMessage);
     } finally {
-      setLoading(false);
+      if (requestId === null || requestId === propertyFetchSequence.current) setLoading(false);
     }
-  }, [config, type, isAdminManagementPage]);
+  }, [
+    config,
+    isAdminManagementPage,
+    propertyArea,
+    propertyMaxPrice,
+    propertyMinPrice,
+    propertyPage,
+    propertySearch,
+    propertySort,
+    propertyStatus,
+    type,
+  ]);
 
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
+
+  useEffect(() => {
+    localStorage.setItem('admin-properties-view', propertyView);
+  }, [propertyView]);
+
+  const openPropertyDetails = async (property) => {
+    setSelectedProperty(property);
+    setPropertyDetails(null);
+    setPropertyDetailsError('');
+    setPropertyDetailsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        apiUrl(`/api/admin/properties/${encodeURIComponent(property._id)}/details`),
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setPropertyDetails(response.data);
+    } catch (error) {
+      setPropertyDetailsError(error.response?.data?.message || t('Unable to load property details.'));
+    } finally {
+      setPropertyDetailsLoading(false);
+    }
+  };
+
+  const closePropertyDetails = () => {
+    setSelectedProperty(null);
+    setPropertyDetails(null);
+    setPropertyDetailsError('');
+  };
+
+  useEffect(() => {
+    if (!selectedProperty) return undefined;
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setSelectedProperty(null);
+        setPropertyDetails(null);
+        setPropertyDetailsError('');
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [selectedProperty]);
 
   const filteredAreaAdmins = isAdminManagementPage
     ? items.filter((admin) => {
@@ -259,6 +538,20 @@ const AdminSectionPage = ({ type }) => {
     if (counts[user.displayRole] !== undefined) counts[user.displayRole] += 1;
     return counts;
   }, { all: 0, landlord: 0, tenant: 0, area_admin: 0, platform_admin: 0 });
+  const userRoleSummaryItems = [
+    ['all', 'Total users'],
+    ['landlord', 'Landlords'],
+    ['tenant', 'Tenants'],
+    ['area_admin', 'Area Admins'],
+    ['platform_admin', 'Platform Admins'],
+  ];
+  const userRoleTabItems = [
+    ['all', 'All'],
+    ['landlord', 'Landlords'],
+    ['tenant', 'Tenants'],
+    ['area_admin', 'Area Admins'],
+    ['platform_admin', 'Platform Admins'],
+  ];
   const filteredUsers = normalizedUsers.filter((user) => {
     const matchesRole = userRoleTab === 'all' || user.displayRole === userRoleTab;
     const matchesStatus = userStatusFilter === 'all'
@@ -803,7 +1096,7 @@ const AdminSectionPage = ({ type }) => {
                   )}
                   <select name="area" autoComplete="off" value={adminForm.area} onChange={handleAdminFormChange} required className="admin-card-detail" aria-label={t('Select an assigned area')}>
                     <option value="" disabled>{areas.length ? t('Select an assigned area') : t('No places registered yet')}</option>
-                    {areas.map((area) => {
+                    {areas.filter((area) => area.isActive !== false).map((area) => {
                       const areaAdmin = getAreaAdminFor(area.name, editingAdminId);
                       return (
                         <option key={area._id} value={area.name} disabled={Boolean(areaAdmin)}>
@@ -834,27 +1127,7 @@ const AdminSectionPage = ({ type }) => {
 
       {type === 'paymentPeriod' && isPlatformAdmin && (
         <section className="admin-detail-section admin-dedicated-content admin-payment-period-panel">
-          <h2 className="admin-card-title">Payment Period Overview</h2>
-          {loading ? (
-            <div className="admin-loading-small">Loading payment periods...</div>
-          ) : items.length === 0 ? (
-            <div className="admin-empty-text">No payment period data found.</div>
-          ) : (
-            <div className="admin-grid">
-              {items.map((payment) => (
-                <div key={payment._id} className="admin-card">
-                  <h4 className="admin-card-title"> {payment.paymentPeriod}</h4>
-                  <p className="admin-card-detail">Tenant: {payment.tenant?.name || 'Unknown'}</p>
-                  <p className="admin-card-detail">Property: {payment.property?.title || 'Unknown property'}</p>
-                  <p className="admin-card-detail">Area: {payment.property?.city || payment.property?.region || 'Unknown area'}</p>
-                  <p className="admin-card-detail">Amount: ETB {Number(payment.amount || 0).toLocaleString()}</p>
-                  <p className="admin-card-detail"> {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString() : 'Date unavailable'}</p>
-                  <p className="admin-card-detail">Status: {payment.status || 'Unknown'}</p>
-                  <p className="admin-card-detail">Reference: {payment.paymentReference || 'N/A'}</p>
-                </div>
-              ))}
-            </div>
-          )}
+          <AdminPaymentPeriods />
         </section>
       )}
 
@@ -1134,32 +1407,210 @@ const AdminSectionPage = ({ type }) => {
       )}
 
       {type === 'rentalRequests' && (
-        <section className={`admin-detail-section admin-dedicated-content${isUserListPage ? ' admin-user-list-panel' : ''}`}>
+        <section className="admin-detail-section admin-dedicated-content admin-rental-request-page">
+          <div className="admin-rental-summary-grid" role="group" aria-label={t('Rental request summary')}>
+            {[
+              ['all', 'Total'],
+              ['pending', 'Pending'],
+              ['approved', 'Approved'],
+              ['rejected', 'Rejected'],
+            ].map(([status, label]) => (
+              <button
+                type="button"
+                key={status}
+                className={`admin-rental-summary-card is-${status}${rentalRequestFilter === status ? ' is-selected' : ''}`}
+                onClick={() => {
+                  setRentalRequestFilter(status);
+                  setRentalRequestPage(1);
+                }}
+                aria-pressed={rentalRequestFilter === status}
+              >
+                <span>{t(label)}</span>
+                <strong>{status === 'all' ? rentalRequestCounts.total : rentalRequestCounts[status]}</strong>
+              </button>
+            ))}
+          </div>
+          <div className="admin-rental-toolbar">
+            <div className="admin-rental-filter-tabs" role="tablist" aria-label={t('Filter rental requests')}>
+              {[
+                ['all', 'All'],
+                ['pending', 'Pending'],
+                ['approved', 'Approved'],
+                ['rejected', 'Rejected'],
+              ].map(([status, label]) => (
+                <button
+                  type="button"
+                  role="tab"
+                  key={status}
+                  aria-selected={rentalRequestFilter === status}
+                  onClick={() => {
+                    setRentalRequestFilter(status);
+                    setRentalRequestPage(1);
+                  }}
+                >
+                  {t(label)}
+                  <span>{status === 'all' ? rentalRequestCounts.total : rentalRequestCounts[status]}</span>
+                </button>
+              ))}
+            </div>
+            <div className="admin-rental-controls">
+              <label className="admin-rental-search">
+                <span>{t('Search requests')}</span>
+                <input
+                  type="search"
+                  value={rentalRequestSearch}
+                  onChange={(event) => {
+                    setRentalRequestSearch(event.target.value);
+                    setRentalRequestPage(1);
+                  }}
+                  placeholder={t('Property or tenant name')}
+                />
+              </label>
+              <label className="admin-rental-sort">
+                <span>{t('Sort')}</span>
+                <select
+                  value={rentalRequestSort}
+                  onChange={(event) => {
+                    setRentalRequestSort(event.target.value);
+                    setRentalRequestPage(1);
+                  }}
+                >
+                  <option value="newest">{t('Newest')}</option>
+                  <option value="oldest">{t('Oldest')}</option>
+                </select>
+              </label>
+              <div className="admin-rental-view-toggle" role="group" aria-label={t('Rental request view')}>
+                <button
+                  type="button"
+                  aria-pressed={rentalRequestView === 'grid'}
+                  onClick={() => setRentalRequestView('grid')}
+                >{t('Grid')}</button>
+                <button
+                  type="button"
+                  aria-pressed={rentalRequestView === 'list'}
+                  onClick={() => setRentalRequestView('list')}
+                >{t('List')}</button>
+              </div>
+            </div>
+            <p className="admin-rental-result-count">
+              {t('{count} requests', { count: filteredRentalRequests.length })}
+            </p>
+          </div>
           {loading ? (
-            <div className="admin-loading-small">Loading rental requests...</div>
-          ) : loadError ? (
-            <div className="admin-empty-text">{loadError}</div>
-          ) : items.length === 0 ? (
-            <div className="admin-empty-text">No rental requests found.</div>
-          ) : (
-            <div className="admin-grid">
-              {items.map((request) => (
-                <div key={request._id} className="admin-card">
-                  <h4 className="admin-card-title"> {request.property?.title || 'Property'}</h4>
-                  <p className="admin-card-detail">Tenant: {request.tenant?.name || request.tenantName || 'Unknown tenant'}</p>
-                  <p className="admin-card-detail">Area: {request.property?.city || request.property?.region || 'Unknown area'}</p>
-                  <p className="admin-card-detail">Status: {request.status || 'pending'}</p>
-                  {request.property?._id && (
-                    <button
-                      type="button"
-                      className="admin-card-link"
-                      onClick={() =>openRentalRequestDetails(request)}
-                    >View Details
-                    </button>
-                  )}
+            <div className={`admin-rental-request-grid${rentalRequestView === 'list' ? ' is-list' : ''}`} role="status" aria-label={t('Loading rental requests')}>
+              {Array.from({ length: 8 }, (_, index) => (
+                <div className="admin-rental-skeleton" key={index} aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
                 </div>
               ))}
             </div>
+          ) : loadError ? (
+            <div className="admin-rental-empty" role="alert">{loadError}</div>
+          ) : filteredRentalRequests.length === 0 ? (
+            <div className="admin-rental-empty">
+              <span className="admin-rental-empty-icon" aria-hidden="true">⌕</span>
+              <strong>{t(items.length ? 'No matching rental requests' : 'No rental requests yet.')}</strong>
+              <p>{t(items.length
+                ? 'Try another search or status filter.'
+                : 'New rental requests for your area will appear here.')}</p>
+            </div>
+          ) : (
+            <div className={`admin-rental-request-grid${rentalRequestView === 'list' ? ' is-list' : ''}`}>
+              {visibleRentalRequests.map((request) => {
+                const status = getRentalRequestStatus(request);
+                const tenantName = request.tenant?.name || request.tenantName || t('Unknown tenant');
+                const property = request.property || {};
+                const area = property.area || property.city || property.subCity
+                  || property.subcity || property.region || property.zone || t('Unknown area');
+                return (
+                  <article key={request._id} className="admin-rental-request-card">
+                    <PropertyImage
+                      src={getPropertyImages(property)}
+                      alt={property.title || t('Property')}
+                      className="admin-rental-request-image"
+                      fallbackClassName="admin-rental-request-image admin-rental-request-image-placeholder"
+                      fallbackText={t('No property image available')}
+                    />
+                    <span className={`admin-rental-status-badge is-${status}`}>{t(
+                      status === 'approved'
+                        ? 'Approved'
+                        : status === 'rejected'
+                          ? 'Rejected'
+                          : status === 'pending'
+                            ? 'Pending'
+                            : request.status || 'Other',
+                    )}</span>
+                    <div className="admin-rental-request-content">
+                      <h3 title={property.title || t('Property')}>{property.title || t('Property')}</h3>
+                      <p className="admin-rental-request-price">
+                        ETB {Number(property.price || 0).toLocaleString()} <span>{t('/ month')}</span>
+                      </p>
+                      <div className="admin-rental-tenant">
+                        <span className="admin-rental-tenant-avatar" aria-hidden="true">
+                          {tenantName.trim().charAt(0).toLocaleUpperCase() || '?'}
+                        </span>
+                        <span>{tenantName}</span>
+                      </div>
+                      <div className="admin-rental-request-meta">
+                        <span>{area}</span>
+                        <span>{request.createdAt
+                          ? formatDate(request.createdAt, { dateStyle: 'medium' })
+                          : t('Date unavailable')}</span>
+                      </div>
+                    </div>
+                    <div className="admin-rental-request-actions">
+                      {status === 'pending' && canManageRentalRequests && (
+                        <>
+                          <button
+                            type="button"
+                            className="admin-rental-action-approve"
+                            disabled={actionLoading === request._id}
+                            onClick={() => handleRentalRequestAction(request._id, 'approved')}
+                          >{t(actionLoading === request._id ? 'Working...' : 'Approve')}</button>
+                          <button
+                            type="button"
+                            className="admin-rental-action-reject"
+                            disabled={actionLoading === request._id}
+                            onClick={() => {
+                              if (window.confirm(t('Reject this rental request?'))) {
+                                handleRentalRequestAction(request._id, 'rejected');
+                              }
+                            }}
+                          >{t('Reject')}</button>
+                        </>
+                      )}
+                      {property._id && (
+                        <button
+                          type="button"
+                          className="admin-rental-view-details"
+                          onClick={() => openRentalRequestDetails(request)}
+                        >{t('View Details')}</button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+          {!loading && !loadError && rentalRequestPageCount > 1 && (
+            <nav className="admin-rental-pagination" aria-label={t('Rental request pagination')}>
+              <button
+                type="button"
+                disabled={rentalRequestPage <= 1}
+                onClick={() => setRentalRequestPage((page) => Math.max(1, page - 1))}
+              >{t('Previous')}</button>
+              <span>{t('Page {current} of {total}', {
+                current: rentalRequestPage,
+                total: rentalRequestPageCount,
+              })}</span>
+              <button
+                type="button"
+                disabled={rentalRequestPage >= rentalRequestPageCount}
+                onClick={() => setRentalRequestPage((page) => Math.min(rentalRequestPageCount, page + 1))}
+              >{t('Next')}</button>
+            </nav>
           )}
         </section>
       )}
@@ -1254,13 +1705,7 @@ const AdminSectionPage = ({ type }) => {
             </p>
           )}
           <div className="admin-user-summary" aria-label={t('User role summary')}>
-            {[
-              ['all', 'Total users'],
-              ['landlord', 'Landlords'],
-              ['tenant', 'Tenants'],
-              ['area_admin', 'Area Admins'],
-              ['platform_admin', 'Platform Admins'],
-            ].map(([role, label]) => (
+            {userRoleSummaryItems.map(([role, label]) => (
               <button
                 type="button"
                 className={`admin-user-summary-card${userRoleTab === role ? ' is-selected' : ''}`}
@@ -1278,13 +1723,7 @@ const AdminSectionPage = ({ type }) => {
           </div>
           <div className="admin-user-controls">
             <div className="admin-user-role-tabs" role="tablist" aria-label={t('Filter users by role')}>
-              {[
-                ['all', 'All'],
-                ['landlord', 'Landlords'],
-                ['tenant', 'Tenants'],
-                ['area_admin', 'Area Admins'],
-                ['platform_admin', 'Platform Admins'],
-              ].map(([role, label]) => (
+              {userRoleTabItems.map(([role, label]) => (
                 <button
                   type="button"
                   role="tab"
@@ -1355,10 +1794,8 @@ const AdminSectionPage = ({ type }) => {
                     {visibleUsers.map((user) => {
                       const userMenuKey = `user-${user._id}`;
                       const isCurrentUser = String(user._id) === String(currentUser?._id || currentUser?.id);
-                      const isPlatformAdminAccount = user.displayRole === 'platform_admin';
                       const canChangeUserStatus = !isCurrentUser
-                        && !isPlatformAdminAccount
-                        && (isPlatformAdmin || ['tenant', 'landlord'].includes(user.role));
+                        && ['tenant', 'landlord'].includes(user.role);
                       const canPromote = isPlatformAdmin
                         && !isCurrentUser
                         && ['tenant', 'landlord'].includes(user.role);
@@ -1521,7 +1958,258 @@ const AdminSectionPage = ({ type }) => {
 
       {type !== 'paymentPeriod' && !isAdminManagementPage && !isUserListPage && type !== 'rentalRequests' && (
         <section className={`admin-detail-section admin-dedicated-content${type === 'allProperties' && isPlatformAdmin ? ' admin-platform-properties-panel' : ''}`}>
-          {loading ? (
+          {isAreaAdminPropertySection && ['allProperties', 'pending', 'verified', 'rejected'].includes(type) ? (
+            <>
+              <AreaPropertyList
+                properties={items}
+                loading={loading}
+                error={loadError}
+                canManageVerification={canManageVerification}
+                actionLoading={actionLoading}
+                onAction={handlePropertyAction}
+                onViewDetails={openPropertyDetails}
+                remoteFilters={type === 'allProperties'}
+                search={propertySearch}
+                onSearchChange={(value) => {
+                  setPropertySearch(value);
+                  setPropertyPage(1);
+                }}
+                sort={propertySort}
+                onSortChange={(value) => {
+                  setPropertySort(value);
+                  setPropertyPage(1);
+                }}
+                minPrice={propertyMinPrice}
+                onMinPriceChange={(value) => {
+                  setPropertyMinPrice(value);
+                  setPropertyPage(1);
+                }}
+                maxPrice={propertyMaxPrice}
+                onMaxPriceChange={(value) => {
+                  setPropertyMaxPrice(value);
+                  setPropertyPage(1);
+                }}
+                serverPagination={propertyPagination}
+                onPageChange={setPropertyPage}
+              />
+              <AdminPropertyDetailsModal
+                selectedProperty={selectedProperty}
+                propertyDetails={propertyDetails}
+                loading={propertyDetailsLoading}
+                error={propertyDetailsError}
+                onClose={closePropertyDetails}
+                t={t}
+                formatDate={formatDate}
+              />
+            </>
+          ) : type === 'allProperties' ? (
+            <div className="admin-properties-redesign">
+              <div className="admin-property-summary-grid">
+                {[
+                  ['all', 'Total', propertyTotals.total],
+                  ['approved', 'Verified', propertyTotals.verified],
+                  ['pending', 'Under review', propertyTotals.underReview],
+                  ['rejected', 'Rejected', propertyTotals.rejected],
+                ].map(([status, label, value]) => (
+                  <button
+                    key={status}
+                    type="button"
+                    className={`admin-property-summary-card${propertyStatus === status ? ' is-selected' : ''}`}
+                    aria-pressed={propertyStatus === status}
+                    onClick={() => {
+                      setPropertyStatus(status);
+                      setPropertyPage(1);
+                    }}
+                  >
+                    <span>{t(label)}</span>
+                    <strong>{value ?? 0}</strong>
+                  </button>
+                ))}
+              </div>
+
+              <div className="admin-property-toolbar">
+                <div className="admin-property-filters">
+                  <label>
+                    <span>{t('Search properties')}</span>
+                    <input
+                      type="search"
+                      value={propertySearch}
+                      placeholder={t('Search title, landlord, or address')}
+                      onChange={(event) => {
+                        setPropertySearch(event.target.value);
+                        setPropertyPage(1);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    <span>{t('Status')}</span>
+                    <select value={propertyStatus} onChange={(event) => { setPropertyStatus(event.target.value); setPropertyPage(1); }}>
+                      <option value="all">{t('All statuses')}</option>
+                      <option value="approved">{t('Verified')}</option>
+                      <option value="pending">{t('Under review')}</option>
+                      <option value="rejected">{t('Rejected')}</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>{t('Area')}</span>
+                    <select value={propertyArea} onChange={(event) => { setPropertyArea(event.target.value); setPropertyPage(1); }}>
+                      <option value="all">{t('All areas')}</option>
+                      {propertyAreas.map((area) => <option key={area} value={area}>{area}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span>{t('Minimum price')}</span>
+                    <input type="number" min="0" value={propertyMinPrice} onChange={(event) => { setPropertyMinPrice(event.target.value); setPropertyPage(1); }} />
+                  </label>
+                  <label>
+                    <span>{t('Maximum price')}</span>
+                    <input type="number" min="0" value={propertyMaxPrice} onChange={(event) => { setPropertyMaxPrice(event.target.value); setPropertyPage(1); }} />
+                  </label>
+                  <label>
+                    <span>{t('Sort')}</span>
+                    <select value={propertySort} onChange={(event) => { setPropertySort(event.target.value); setPropertyPage(1); }}>
+                      <option value="newest">{t('Newest')}</option>
+                      <option value="price-asc">{t('Price: low to high')}</option>
+                      <option value="price-desc">{t('Price: high to low')}</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="admin-property-toolbar-footer">
+                  <span className="admin-property-result-count">{propertyPagination.total} {t('results')}</span>
+                  <button
+                    type="button"
+                    className="admin-property-clear-filters"
+                    onClick={() => {
+                      setPropertySearch('');
+                      setPropertyStatus('all');
+                      setPropertyArea('all');
+                      setPropertyMinPrice('');
+                      setPropertyMaxPrice('');
+                      setPropertySort('newest');
+                      setPropertyPage(1);
+                    }}
+                  >{t('Clear filters')}</button>
+                  <div className="admin-property-view-toggle" role="group" aria-label={t('Property view')}>
+                    <button type="button" aria-pressed={propertyView === 'grid'} onClick={() => setPropertyView('grid')}>{t('Grid')}</button>
+                    <button type="button" aria-pressed={propertyView === 'list'} onClick={() => setPropertyView('list')}>{t('List')}</button>
+                  </div>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="admin-property-state" role="status">{t('Loading properties...')}</div>
+              ) : loadError ? (
+                <div className="admin-property-state" role="alert">{loadError}</div>
+              ) : items.length === 0 ? (
+                <div className="admin-property-state">{t('No properties match your filters.')}</div>
+              ) : propertyView === 'grid' ? (
+                <div className="admin-property-card-grid">
+                  {items.map((property) => (
+                    <article key={property._id} className="admin-property-card">
+                      <div className="admin-property-card-media">
+                        <PropertyImage
+                          src={getPropertyImages(property)}
+                          alt={property.title}
+                          className="admin-property-card-image"
+                          fallbackClassName="admin-property-card-image admin-property-image-placeholder"
+                          fallbackText={t('No property image available')}
+                        />
+                        <span className={`admin-property-status-badge ${getPropertyStatusClass(property)}`}>
+                          {t(displayVerificationStatus(property))}
+                        </span>
+                      </div>
+                      <div className="admin-property-card-content">
+                        <h3 className="admin-property-card-title" title={property.title}>{property.title}</h3>
+                        <p className="admin-property-location">
+                          {[getPropertyShortLocation(property), property.area].filter(Boolean).join(' · ') || t('Location unavailable')}
+                        </p>
+                        <p className="admin-property-price">
+                          ETB {Number(property.price || 0).toLocaleString()} <span>{t('/ month')}</span>
+                        </p>
+                        <div className="admin-property-card-meta">
+                          <span>{t('Bedrooms: {count}').replace('{count}', String(property.bedrooms ?? '—'))}</span>
+                          <span>{property.landlord?.name || t('Unknown Owner')}</span>
+                          <span>{t('Submitted: {date}').replace('{date}', property.createdAt ? formatDate(property.createdAt, { dateStyle: 'medium' }) : t('Date unavailable'))}</span>
+                        </div>
+                      </div>
+                      <button type="button" className="admin-property-view-details" onClick={() => openPropertyDetails(property)}>
+                        {t('View details')}
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="admin-property-list">
+                  <div className="admin-property-table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>{t('Property')}</th>
+                          <th>{t('Area')}</th>
+                          <th>{t('Price')}</th>
+                          <th>{t('Status')}</th>
+                          <th>{t('Landlord')}</th>
+                          <th>{t('Submitted')}</th>
+                          <th>{t('Actions')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((property) => (
+                          <tr key={property._id}>
+                            <td>
+                              <div className="admin-property-list-title">
+                                <PropertyImage src={getPropertyImages(property)} alt={property.title} className="admin-property-list-image" fallbackClassName="admin-property-list-image admin-property-image-placeholder" fallbackText={t('No image')} />
+                                <strong>{property.title}</strong>
+                              </div>
+                            </td>
+                            <td>{[getPropertyShortLocation(property), property.area].filter(Boolean).join(' · ') || t('Location unavailable')}</td>
+                            <td className="admin-property-list-price">ETB {Number(property.price || 0).toLocaleString()} {t('/ month')}</td>
+                            <td><span className={`admin-property-status-badge ${getPropertyStatusClass(property)}`}>{t(displayVerificationStatus(property))}</span></td>
+                            <td>{property.landlord?.name || t('Unknown Owner')}</td>
+                            <td>{property.createdAt ? formatDate(property.createdAt, { dateStyle: 'medium' }) : t('Date unavailable')}</td>
+                            <td><button type="button" className="admin-property-view-details" onClick={() => openPropertyDetails(property)}>{t('View details')}</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="admin-property-list-mobile">
+                    {items.map((property) => (
+                      <article key={property._id} className="admin-property-mobile-row">
+                        <div className="admin-property-list-title">
+                          <PropertyImage src={getPropertyImages(property)} alt={property.title} className="admin-property-list-image" fallbackClassName="admin-property-list-image admin-property-image-placeholder" fallbackText={t('No image')} />
+                          <strong>{property.title}</strong>
+                        </div>
+                        <span className={`admin-property-status-badge ${getPropertyStatusClass(property)}`}>{t(displayVerificationStatus(property))}</span>
+                        <span>{[getPropertyShortLocation(property), property.area].filter(Boolean).join(' · ') || t('Location unavailable')}</span>
+                        <strong>ETB {Number(property.price || 0).toLocaleString()} {t('/ month')}</strong>
+                        <span>{property.landlord?.name || t('Unknown Owner')}</span>
+                        <button type="button" className="admin-property-view-details" onClick={() => openPropertyDetails(property)}>{t('View details')}</button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!loading && !loadError && propertyPagination.totalPages > 1 && (
+                <nav className="admin-pagination" aria-label={t('Property pagination')}>
+                  <button type="button" className="admin-btn" disabled={!propertyPagination.hasPrevPage} onClick={() => setPropertyPage((page) => Math.max(1, page - 1))}>{t('Previous')}</button>
+                  <span>{t('Page {current} of {total}').replace('{current}', String(propertyPagination.page)).replace('{total}', String(propertyPagination.totalPages))}</span>
+                  <button type="button" className="admin-btn" disabled={!propertyPagination.hasNextPage} onClick={() => setPropertyPage((page) => page + 1)}>{t('Next')}</button>
+                </nav>
+              )}
+
+              <AdminPropertyDetailsModal
+                selectedProperty={selectedProperty}
+                propertyDetails={propertyDetails}
+                loading={propertyDetailsLoading}
+                error={propertyDetailsError}
+                onClose={closePropertyDetails}
+                t={t}
+                formatDate={formatDate}
+              />
+            </div>
+          ) : loading ? (
             <div className="admin-loading-small">Loading...</div>
           ) : loadError ? (
             <div className="admin-empty-text">{loadError}</div>
@@ -1689,7 +2377,7 @@ const AdminSectionPage = ({ type }) => {
               className="admin-card-detail"
             >
               <option value="" disabled>{t('Select an assigned area')}</option>
-              {areas.map((area) => {
+              {areas.filter((area) => area.isActive !== false).map((area) => {
                 const areaAdmin = getAreaAdminFor(area.name);
                 return (
                   <option key={area._id} value={area.name} disabled={Boolean(areaAdmin)}>

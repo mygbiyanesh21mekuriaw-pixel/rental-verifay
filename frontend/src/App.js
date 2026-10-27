@@ -87,6 +87,9 @@ const RouteMain = ({ children }) => {
 };
 
 const getUserRole = (user) => user?.effectiveRole || user?.role;
+const getAdminType = (user) => user?.adminType || (
+  (user?.adminAreas || []).length > 0 ? 'area' : 'platform'
+);
 
 const isPlatformAdmin = (user) => (
   getUserRole(user) === 'platform_admin' ||
@@ -177,7 +180,6 @@ export const getRoutePermission = (user, pathname) => {
       ['/admin-dashboard/notifications', 'notifications'],
       ['/admin-dashboard/all-properties', 'allProperties'],
       ['/admin-dashboard/review-properties', 'pendingProperties'],
-      ['/admin-dashboard/all-users', 'users'],
     ]
     : user?.role === 'landlord'
       ? [
@@ -242,7 +244,7 @@ const PrivateRoute = ({ children, allowedRoles, allowedAdminTypes }) => {
     return <Navigate to={dashboardPaths[userRole] || '/'} replace />;
   }
 
-  if (!isPlatformAdmin(user) && getRouteRole(user) === 'admin' && allowedAdminTypes && !allowedAdminTypes.includes(user.adminType || 'platform')) {
+  if (getRouteRole(user) === 'admin' && allowedAdminTypes && !allowedAdminTypes.includes(getAdminType(user))) {
     return <Navigate to={dashboardPaths[userRole] || '/'} replace />;
   }
 
@@ -607,7 +609,7 @@ function AppContent() {
             <Route path="/admin-dashboard/properties-awaiting-verification" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['area']}><AdminSectionPage type="awaitingVerification" /></PrivateRoute>} />
             <Route path="/admin-dashboard/review-properties" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="reviewProperties" /></PrivateRoute>} />
             <Route path="/admin-dashboard/all-properties" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="allProperties" /></PrivateRoute>} />
-            <Route path="/admin-dashboard/all-users" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform', 'area']}><AdminSectionPage type="allUsers" /></PrivateRoute>} />
+            <Route path="/admin-dashboard/all-users" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="allUsers" /></PrivateRoute>} />
             <Route path="/admin-dashboard/admin-management" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="adminManagement" /></PrivateRoute>} />
             <Route path="/admin-dashboard/places" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminPlaces /></PrivateRoute>} />
             <Route path="/admin-dashboard/payment-period" element={<PrivateRoute allowedRoles={['admin']} allowedAdminTypes={['platform']}><AdminSectionPage type="paymentPeriod" /></PrivateRoute>} />

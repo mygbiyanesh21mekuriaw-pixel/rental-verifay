@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Area = require('../models/Area');
 const { getAdministrativeRole } = require('../middleware/auth');
 const sendEmail = require('../utils/email');
+const { canonicalAreaKey, buildCanonicalAreaPattern } = require('../utils/canonicalArea');
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,8 +20,9 @@ const getPlatformAdminEmail = async () => {
 };
 
 const getAreaAdminEmails = async (areaName) => {
-  const escapedArea = String(areaName || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const exactArea = new RegExp(`^${escapedArea}$`, 'i');
+  const areaKey = canonicalAreaKey(areaName);
+  const exactArea = buildCanonicalAreaPattern(areaName);
+  if (!areaKey || !exactArea) return [];
   const admins = await User.find({
     role: 'admin',
     isActive: { $ne: false },
@@ -28,6 +30,7 @@ const getAreaAdminEmails = async (areaName) => {
       { $or: [{ adminType: 'area' }, { adminType: { $exists: false }, adminAreas: { $ne: [] } }] },
       {
         $or: [
+          { assignedAreaKey: areaKey },
           { assignedArea: exactArea },
           { 'adminAreas.region': exactArea },
           { 'adminAreas.zone': exactArea },
@@ -65,9 +68,12 @@ const submitContactMessage = async (req, res) => {
     if (name.length > 120 || email.length > 254 || subject.length > 180 || message.length > 5000) {
       return res.status(400).json({ message: 'One or more fields exceed the maximum length.' });
     }
-    const area = await Area.findOne({ normalizedName: areaName.toLowerCase() }).select('name').lean();
+    const areaKey = canonicalAreaKey(areaName);
+    const areas = await Area.find({ isActive: { $ne: false } }).select('name canonicalKey').lean();
+    const matchingAreas = areas.filter((area) => canonicalAreaKey(area.canonicalKey || area.name) === areaKey);
+    const area = matchingAreas.length === 1 ? matchingAreas[0] : null;
     if (!area) return res.status(400).json({ message: 'Select an existing area.' });
-    const contactMessage = await ContactMessage.create({ name, email, subject, message, area: area.name });
+    const contactMessage = await ContactMessage.create({ name, email, subject, message, area: area.name, areaKey });
     try {
       const areaAdminEmails = await getAreaAdminEmails(area.name);
       if (areaAdminEmails.length && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
@@ -97,8 +103,11 @@ const getAreaAdminContactMessages = async (req, res) => {
     if (getAdministrativeRole(req.user) !== 'area_admin' || !req.user.assignedArea) {
       return res.json([]);
     }
-    const escapedArea = req.user.assignedArea.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const filter = { area: new RegExp(`^${escapedArea}$`, 'i') };
+    const areaKey = canonicalAreaKey(req.user.assignedArea);
+    const areaPattern = buildCanonicalAreaPattern(req.user.assignedArea);
+    const filter = areaKey
+      ? { $or: [{ areaKey }, ...(areaPattern ? [{ area: areaPattern }] : [])] }
+      : { _id: null };
     const messages = await ContactMessage.find(filter).sort({ createdAt: -1 }).lean();
     res.json(messages);
   } catch (error) {
@@ -113,8 +122,11 @@ const markAreaAdminContactMessageRead = async (req, res) => {
       return res.status(403).json({ message: 'Area Admin permission required.' });
     }
     const filter = { _id: req.params.id };
-    const escapedArea = req.user.assignedArea.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    filter.area = new RegExp(`^${escapedArea}$`, 'i');
+    const areaKey = canonicalAreaKey(req.user.assignedArea);
+    const areaPattern = buildCanonicalAreaPattern(req.user.assignedArea);
+    filter.$or = areaKey
+      ? [{ areaKey }, ...(areaPattern ? [{ area: areaPattern }] : [])]
+      : [{ _id: null }];
     const contactMessage = await ContactMessage.findOneAndUpdate(
       filter,
       { $set: { read: true } },

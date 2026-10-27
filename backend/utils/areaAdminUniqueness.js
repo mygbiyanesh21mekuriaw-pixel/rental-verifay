@@ -1,8 +1,9 @@
 const User = require('../models/User');
 const { getAdministrativeRole } = require('../middleware/auth');
 const { getAdminAreaNames } = require('./areaAdminHandover');
+const { canonicalAreaKey } = require('./canonicalArea');
 
-const normalizeAreaName = (areaName) => String(areaName || '').trim().toLocaleLowerCase('en');
+const normalizeAreaName = canonicalAreaKey;
 
 const getAreaAdminConflict = async (areaName, excludeAdminId = null) => {
   const normalizedAreaName = normalizeAreaName(areaName);

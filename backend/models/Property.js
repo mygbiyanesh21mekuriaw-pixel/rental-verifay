@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { canonicalAreaKey, normalizeAreaName } = require('../utils/canonicalArea');
 
 const AdminHandlingHistorySchema = new mongoose.Schema({
   action: {
@@ -53,6 +54,12 @@ const PropertySchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
+  },
+  areaKey: {
+    type: String,
+    default: '',
+    trim: true,
+    index: true,
   },
   region: {
     type: String,
@@ -190,6 +197,13 @@ const PropertySchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+});
+
+PropertySchema.pre('validate', function normalizePropertyArea() {
+  if (this.area) {
+    this.area = normalizeAreaName(this.area);
+    this.areaKey = canonicalAreaKey(this.area);
+  }
 });
 
 module.exports = mongoose.model('Property', PropertySchema);

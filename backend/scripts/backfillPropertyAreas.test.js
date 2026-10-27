@@ -46,7 +46,7 @@ test('area migration writes derived assignments only when the property area is s
       region: 'Amhara',
       city: 'Dessie',
     }, [{ name: 'Dessie', addressMapping: { region: 'Amhara', city: 'Dessie' } }], true), 'Dessie');
-    assert.deepEqual(update.values, { $set: { area: 'Dessie' } });
+    assert.deepEqual(update.values, { $set: { area: 'Dessie', areaKey: 'dessie' } });
     assert.deepEqual(update.filter.$or, buildMissingAreaFilter().$or);
   } finally {
     Property.updateOne = originalUpdateOne;
@@ -63,7 +63,7 @@ test('area migration can mark unmapped existing properties unassigned', async ()
 
   try {
     assert.equal(await backfillPropertyArea({ _id: 'unmapped-property', city: 'Adama' }, [], true), UNASSIGNED_AREA);
-    assert.deepEqual(update.values, { $set: { area: UNASSIGNED_AREA } });
+    assert.deepEqual(update.values, { $set: { area: UNASSIGNED_AREA, areaKey: 'unassignedarea' } });
   } finally {
     Property.updateOne = originalUpdateOne;
   }

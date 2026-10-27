@@ -1,6 +1,13 @@
 import React from 'react';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import PropertyOwnershipProof from './PropertyOwnershipProof';
+import { LanguageProvider } from '../context/LanguageContext';
+
+const renderProof = (props) => render(
+  <LanguageProvider>
+    <PropertyOwnershipProof {...props} />
+  </LanguageProvider>,
+);
 
 describe('PropertyOwnershipProof', () => {
   const originalFetch = global.fetch;
@@ -28,13 +35,7 @@ describe('PropertyOwnershipProof', () => {
       headers: { get: () => 'image/png' },
     });
 
-    render(
-      <PropertyOwnershipProof
-        propertyId="property-123"
-        hasProof
-        title="Riverside home"
-      />,
-    );
+    renderProof({ propertyId: 'property-123', hasProof: true, title: 'Riverside home' });
 
     expect(await screen.findByRole('img', {
       name: 'Proof of ownership for Riverside home',
@@ -50,9 +51,7 @@ describe('PropertyOwnershipProof', () => {
   test('does not request or reveal a proof when the API denies access', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 404 });
 
-    render(
-      <PropertyOwnershipProof propertyId="property-123" hasProof title="Private home" />,
-    );
+    renderProof({ propertyId: 'property-123', hasProof: true, title: 'Private home' });
 
     expect(await screen.findByText(/unavailable or requires secure migration/i)).toBeInTheDocument();
     expect(URL.createObjectURL).not.toHaveBeenCalled();
@@ -61,9 +60,7 @@ describe('PropertyOwnershipProof', () => {
   test('does not fetch proof bytes when no authorized proof is available', async () => {
     global.fetch = jest.fn();
 
-    const { container } = render(
-      <PropertyOwnershipProof propertyId="property-123" title="Private home" />,
-    );
+    const { container } = renderProof({ propertyId: 'property-123', title: 'Private home' });
 
     await waitFor(() => expect(global.fetch).not.toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();

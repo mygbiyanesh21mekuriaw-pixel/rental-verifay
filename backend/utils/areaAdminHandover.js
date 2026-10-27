@@ -46,7 +46,13 @@ const clearUnfinishedAreaAdminAssignments = async (admin) => {
       updateOptions,
     ),
     ContactMessage.updateMany(
-      { area: { $in: areaNames }, read: false, ...assignmentFilter },
+      {
+        $and: [
+          buildAdminAreaQuery(areaNames),
+          assignmentFilter,
+        ],
+        read: false,
+      },
       unsetAssignment,
       updateOptions,
     ),
