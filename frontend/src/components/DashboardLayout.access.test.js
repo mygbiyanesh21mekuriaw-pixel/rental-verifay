@@ -38,9 +38,17 @@ test('platform_admin gets the full static menu regardless of permission data', (
 
 test('area admins only see area-scoped sidebar destinations', () => {
   const paths = getMenuPaths({ role: 'admin', adminType: 'area', assignedArea: 'North' });
+  const groups = getDashboardMenuGroups({ role: 'admin', adminType: 'area' }, (text) => text);
+  const managementGroups = groups.filter((section) => section.label === 'Management');
 
   expect(paths).toContain('/admin-dashboard/all-properties');
   expect(paths).toContain('/admin-dashboard/contact-messages');
+  expect(paths).toContain('/admin-dashboard/messages');
+  expect(managementGroups).toHaveLength(1);
+  expect(managementGroups[0].items.map((menuItem) => menuItem.path)).toEqual([
+    '/admin-dashboard/contact-messages',
+    '/admin-dashboard/messages',
+  ]);
   expect(paths).not.toContain('/admin-dashboard/all-users');
   expect(paths).not.toContain('/admin-dashboard/admin-management');
   expect(paths).not.toContain('/admin-dashboard/places');

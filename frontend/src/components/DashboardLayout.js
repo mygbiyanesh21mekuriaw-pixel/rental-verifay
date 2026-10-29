@@ -61,6 +61,7 @@ const featureKeyForPath = (path) => ({
   '/landlord/account-settings': 'accountSettings',
   '/landlord/profile': 'accountSettings',
   '/landlord/messages': 'messages',
+  '/landlord/contact-admin': 'messages',
   '/landlord/notifications': 'notifications',
   '/landlord/reviews': 'reviews',
   '/tenant/verified-properties': 'verifiedProperties',
@@ -70,6 +71,7 @@ const featureKeyForPath = (path) => ({
   '/tenant/rented-property': 'rentedProperty',
   '/tenant/account-settings': 'accountSettings',
   '/tenant/messages': 'messages',
+  '/tenant/contact-admin': 'messages',
   '/tenant/notifications': 'notifications',
   '/tenant/rent-payment': 'rentPayments',
   '/tenant/recently-viewed': 'recentlyViewed',
@@ -104,6 +106,9 @@ export const getDashboardMenuGroups = (user, t) => {
         item('Rented Properties', '/landlord/rented-properties', FaHardHat),
         item('Rent Payments', '/landlord/rent-payments', FaMoneyBill),
       ]),
+      group('Management', [
+        item('Messages', '/landlord/contact-admin', FaEnvelope),
+      ]),
       group('Account', [
         item('Bank Information', '/landlord/bank-information', FaCreditCard),
         item('Account Settings', '/landlord/account-settings', FaCog),
@@ -122,6 +127,9 @@ export const getDashboardMenuGroups = (user, t) => {
       group('Rentals', [
         item('Rental Requests', '/tenant/rental-requests', FaFileAlt),
         item('Rented Property', '/tenant/rented-property', FaBuilding),
+      ]),
+      group('Management', [
+        item('Messages', '/tenant/contact-admin', FaEnvelope),
       ]),
       group('Account', [
         item('Account Settings', '/tenant/account-settings', FaCog),
@@ -167,12 +175,10 @@ export const getDashboardMenuGroups = (user, t) => {
       ]),
       group('Management', [
         item('Contact Messages', '/admin-dashboard/contact-messages', FaEnvelope),
+        item('Messages', '/admin-dashboard/messages', FaEnvelope),
       ]),
       group('Rentals', [
         item('Rental Requests', '/admin-dashboard/rental-requests', FaClipboardList),
-      ]),
-      group('Management', [
-        item('Messages', '/admin-dashboard/messages', FaEnvelope),
       ]),
       group('Account', [
         item('Account Settings', '/admin-dashboard/profile', FaUser),
