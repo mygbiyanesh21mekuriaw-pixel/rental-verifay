@@ -284,70 +284,75 @@ const LandlordSectionPage = ({ type }) => {
     setMenuOpenId(propertyId);
   };
 
-  const renderVerifiedMenu = (property, includesUpdate = false) => (
-    <>
-      <button
-        type="button"
-        className="landlord-verified-menu-trigger"
-        id={`landlord-verified-trigger-${property._id}`}
-        aria-label={`${t('More actions')} ${property.title}`}
-        aria-expanded={menuOpenId === property._id}
-        aria-controls={`landlord-verified-menu-${property._id}`}
-        onClick={(event) => toggleVerifiedMenu(event, property._id, includesUpdate)}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') setMenuOpenId(null);
-          if (event.key === 'ArrowDown' && menuOpenId !== property._id) {
-            toggleVerifiedMenu(event, property._id, includesUpdate);
-          }
-        }}
-      >
-        ⋮
-      </button>
-      {menuOpenId === property._id && createPortal(
-        <div
-          id={`landlord-verified-menu-${property._id}`}
-          className="landlord-verified-menu"
-          role="menu"
-          aria-label={t('Property actions')}
-          style={{ top: menuPosition.top, right: menuPosition.right }}
+  const renderVerifiedMenu = (property, includesUpdate = false, showDelete = false) => {
+    const canShowDelete = showDelete && String(property?.verificationStatus ?? property?.status ?? '').toLowerCase() === 'rejected';
+    return (
+      <>
+        <button
+          type="button"
+          className="landlord-verified-menu-trigger"
+          id={`landlord-verified-trigger-${property._id}`}
+          aria-label={`${t('More actions')} ${property.title}`}
+          aria-expanded={menuOpenId === property._id}
+          aria-controls={`landlord-verified-menu-${property._id}`}
+          onClick={(event) => toggleVerifiedMenu(event, property._id, includesUpdate || canShowDelete)}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setMenuOpenId(null);
-              document.getElementById(`landlord-verified-trigger-${property._id}`)?.focus();
+            if (event.key === 'Escape') setMenuOpenId(null);
+            if (event.key === 'ArrowDown' && menuOpenId !== property._id) {
+              toggleVerifiedMenu(event, property._id, includesUpdate || canShowDelete);
             }
           }}
         >
-          {includesUpdate && (
-            <button
-              type="button"
-              className="landlord-verified-menu-item landlord-verified-menu-item-update"
-              role="menuitem"
-              autoFocus
-              onClick={() => {
+          ⋮
+        </button>
+        {menuOpenId === property._id && createPortal(
+          <div
+            id={`landlord-verified-menu-${property._id}`}
+            className="landlord-verified-menu"
+            role="menu"
+            aria-label={t('Property actions')}
+            style={{ top: menuPosition.top, right: menuPosition.right }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
                 setMenuOpenId(null);
-                handleUpdate(property);
-              }}
-            >
-              {t('Update')}
-            </button>
-          )}
-          <button
-            type="button"
-            className="landlord-verified-menu-item"
-            role="menuitem"
-            autoFocus={!includesUpdate}
-            onClick={() => {
-              setMenuOpenId(null);
-              handleDelete(property._id);
+                document.getElementById(`landlord-verified-trigger-${property._id}`)?.focus();
+              }
             }}
           >
-            {t('Delete')}
-          </button>
-        </div>,
-        document.body,
-      )}
-    </>
-  );
+            {includesUpdate && (
+              <button
+                type="button"
+                className="landlord-verified-menu-item landlord-verified-menu-item-update"
+                role="menuitem"
+                autoFocus
+                onClick={() => {
+                  setMenuOpenId(null);
+                  handleUpdate(property);
+                }}
+              >
+                {t('Update')}
+              </button>
+            )}
+            {canShowDelete && (
+              <button
+                type="button"
+                className="landlord-verified-menu-item"
+                role="menuitem"
+                autoFocus={!includesUpdate}
+                onClick={() => {
+                  setMenuOpenId(null);
+                  handleDelete(property._id);
+                }}
+              >
+                {t('Delete')}
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
+      </>
+    );
+  };
 
   const myPropertyCounts = properties.reduce((counts, property) => {
     counts[getPropertyStatusBadge(property).label] += 1;
@@ -691,7 +696,7 @@ const LandlordSectionPage = ({ type }) => {
                             {t('Rent Payments')}
                           </button>
                           <div className="landlord-verified-menu-wrap">
-                            {renderVerifiedMenu(property, true)}
+                            {renderVerifiedMenu(property, true, false)}
                           </div>
                         </div>
                       </div>
@@ -787,9 +792,7 @@ const LandlordSectionPage = ({ type }) => {
                           {t('Update')}
                         </button>
 
-                        <div className="landlord-verified-menu-wrap">
-                          {renderVerifiedMenu(property)}
-                        </div>
+                        <div className="landlord-verified-menu-wrap" />
                       </div>
                     </div>
                   </article>
@@ -1093,16 +1096,18 @@ const LandlordSectionPage = ({ type }) => {
                           >
                             Update
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(property._id)}
-                            className="landlord-my-property-delete"
-                            aria-label="Delete"
-                            title="Delete property"
-                          >
-                            <FaTrashAlt aria-hidden="true" />
-                            <span>Delete</span>
-                          </button>
+                          {String(property?.verificationStatus ?? property?.status ?? '').toLowerCase() === 'rejected' && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(property._id)}
+                              className="landlord-my-property-delete"
+                              aria-label="Delete"
+                              title="Delete property"
+                            >
+                              <FaTrashAlt aria-hidden="true" />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </article>
