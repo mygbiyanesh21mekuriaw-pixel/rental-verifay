@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { FaFileAlt, FaHome, FaMapMarkerAlt, FaPlus, FaSearch, FaTrashAlt } from 'react-icons/fa';
+import { FaFileAlt, FaHome, FaMapMarkerAlt, FaSearch, FaTrashAlt } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
 import { getPropertyImages } from '../utils/propertyMedia';
@@ -52,8 +54,54 @@ const getPropertyStatusBadge = (property) => {
   return { label: 'Rejected', style: styles.rejectedBadge };
 };
 
+const getRejectedHistoryEntry = (property) => (
+  [...(property.history || [])].reverse().find((entry) => entry.action === 'rejected')
+);
+
+const getRejectedReason = (property) => {
+  const historyNote = getRejectedHistoryEntry(property)?.note;
+  const reason = property.rejectionReason || property.rejectionNote || property.rejectionNotes || historyNote;
+  return typeof reason === 'string' ? reason.trim() : '';
+};
+
+const getRejectedDate = (property) => (
+  property.rejectedAt || property.handledAt || getRejectedHistoryEntry(property)?.at
+);
+
+const getDisplayLocation = (property, t) => {
+  const parts = [property.subCity || property.subcity, property.city || property.location]
+    .filter((part) => typeof part === 'string')
+    .map((part) => part.trim())
+    .filter((part) => part && !['undefined', 'null', 'n/a', 'na', '-'].includes(part.toLowerCase()));
+  const uniqueParts = parts.filter((part, index) => (
+    parts.findIndex((candidate) => candidate.toLowerCase() === part.toLowerCase()) === index
+  ));
+  return uniqueParts.join(', ') || t('Location unavailable');
+};
+
+const getRentedTenantName = (property) => {
+  const tenant = property.rentedBy;
+  if (tenant && typeof tenant === 'object' && typeof tenant.name === 'string' && tenant.name.trim()) {
+    return tenant.name.trim();
+  }
+  return [property.tenantName, property.renterName].find(
+    (name) => typeof name === 'string' && name.trim(),
+  )?.trim() || '';
+};
+
+const getLatestPaymentStatus = (property) => {
+  const status = property.latestPayment?.status || property.paymentStatus;
+  if (typeof status !== 'string') return '';
+  const normalizedStatus = status.trim().toLowerCase();
+  if (normalizedStatus === 'paid') return 'Paid';
+  if (normalizedStatus === 'due' || normalizedStatus === 'pending') return 'Due';
+  if (normalizedStatus === 'overdue') return 'Overdue';
+  return '';
+};
+
 const LandlordSectionPage = ({ type }) => {
   const { user } = useAuth();
+  const { t, formatDate } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const successMessage = location.state?.successMessage;
@@ -63,7 +111,76 @@ const LandlordSectionPage = ({ type }) => {
   const [loading, setLoading] = useState(true);
   const [propertyFilter, setPropertyFilter] = useState('All');
   const [propertySearch, setPropertySearch] = useState('');
+  const [verifiedView, setVerifiedView] = useState(() => {
+    try {
+      return window.localStorage.getItem('landlord-verified-properties-view') === 'list' ? 'list' : 'grid';
+    } catch (error) {
+      return 'grid';
+    }
+  });
+  const [underReviewView, setUnderReviewView] = useState(() => {
+    try {
+      return window.localStorage.getItem('landlord-under-review-properties-view') === 'list' ? 'list' : 'grid';
+    } catch (error) {
+      return 'grid';
+    }
+  });
+  const [rejectedView, setRejectedView] = useState(() => {
+    try {
+      return window.localStorage.getItem('landlord-rejected-properties-view') === 'list' ? 'list' : 'grid';
+    } catch (error) {
+      return 'grid';
+    }
+  });
+  const [rentedView, setRentedView] = useState(() => {
+    try {
+      return window.localStorage.getItem('landlord-rented-properties-view') === 'list' ? 'list' : 'grid';
+    } catch (error) {
+      return 'grid';
+    }
+  });
+  const [verifiedSearch, setVerifiedSearch] = useState('');
+  const [verifiedSort, setVerifiedSort] = useState('newest');
+  const [verifiedPage, setVerifiedPage] = useState(1);
+  const [rejectedSearch, setRejectedSearch] = useState('');
+  const [rejectedSort, setRejectedSort] = useState('newest');
+  const [rejectedPage, setRejectedPage] = useState(1);
+  const [rentedSearch, setRentedSearch] = useState('');
+  const [rentedSort, setRentedSort] = useState('newest');
+  const [rentedPage, setRentedPage] = useState(1);
+  const [menuOpenId, setMenuOpenId] = useState(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const config = sectionConfig[type];
+
+  useEffect(() => {
+    try {
+      if (type === 'verified') {
+        window.localStorage.setItem('landlord-verified-properties-view', verifiedView);
+      } else if (type === 'underReview') {
+        window.localStorage.setItem('landlord-under-review-properties-view', underReviewView);
+      } else if (type === 'rejected') {
+        window.localStorage.setItem('landlord-rejected-properties-view', rejectedView);
+      } else if (type === 'rented') {
+        window.localStorage.setItem('landlord-rented-properties-view', rentedView);
+      }
+    } catch (error) {
+      console.warn('Unable to remember the preferred landlord property view:', error);
+    }
+  }, [rejectedView, rentedView, type, underReviewView, verifiedView]);
+
+  useEffect(() => {
+    if (type !== 'verified' && type !== 'underReview' && type !== 'rejected' && type !== 'rented') return undefined;
+    const handlePointerDown = (event) => {
+      if (menuOpenId
+        && !event.target.closest('.landlord-verified-menu-wrap')
+        && !event.target.closest('.landlord-verified-menu')) {
+        setMenuOpenId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [menuOpenId, type]);
 
   const fetchProperties = useCallback(async () => {
     setLoading(true);
@@ -139,11 +256,98 @@ const LandlordSectionPage = ({ type }) => {
     });
   };
 
+  const handleRentPayments = (property) => {
+    navigate(`/landlord/rent-payments?propertyId=${property._id}`, {
+      state: { from: `${location.pathname}${location.search}` },
+    });
+  };
+
   const handleUpdate = (property) => {
     navigate(`/landlord/edit-property/${property._id}`, {
       state: { from: `${location.pathname}${location.search}` },
     });
   };
+
+  const toggleVerifiedMenu = (event, propertyId, includesUpdate = false) => {
+    if (menuOpenId === propertyId) {
+      setMenuOpenId(null);
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const estimatedMenuHeight = includesUpdate ? 84 : 48;
+    const opensAbove = window.innerHeight - bounds.bottom < estimatedMenuHeight + 8;
+    setMenuPosition({
+      top: Math.max(8, opensAbove ? bounds.top - estimatedMenuHeight - 6 : bounds.bottom + 6),
+      right: Math.max(8, window.innerWidth - bounds.right),
+    });
+    setMenuOpenId(propertyId);
+  };
+
+  const renderVerifiedMenu = (property, includesUpdate = false) => (
+    <>
+      <button
+        type="button"
+        className="landlord-verified-menu-trigger"
+        id={`landlord-verified-trigger-${property._id}`}
+        aria-label={`${t('More actions')} ${property.title}`}
+        aria-expanded={menuOpenId === property._id}
+        aria-controls={`landlord-verified-menu-${property._id}`}
+        onClick={(event) => toggleVerifiedMenu(event, property._id, includesUpdate)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setMenuOpenId(null);
+          if (event.key === 'ArrowDown' && menuOpenId !== property._id) {
+            toggleVerifiedMenu(event, property._id, includesUpdate);
+          }
+        }}
+      >
+        ⋮
+      </button>
+      {menuOpenId === property._id && createPortal(
+        <div
+          id={`landlord-verified-menu-${property._id}`}
+          className="landlord-verified-menu"
+          role="menu"
+          aria-label={t('Property actions')}
+          style={{ top: menuPosition.top, right: menuPosition.right }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setMenuOpenId(null);
+              document.getElementById(`landlord-verified-trigger-${property._id}`)?.focus();
+            }
+          }}
+        >
+          {includesUpdate && (
+            <button
+              type="button"
+              className="landlord-verified-menu-item landlord-verified-menu-item-update"
+              role="menuitem"
+              autoFocus
+              onClick={() => {
+                setMenuOpenId(null);
+                handleUpdate(property);
+              }}
+            >
+              {t('Update')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="landlord-verified-menu-item"
+            role="menuitem"
+            autoFocus={!includesUpdate}
+            onClick={() => {
+              setMenuOpenId(null);
+              handleDelete(property._id);
+            }}
+          >
+            {t('Delete')}
+          </button>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
 
   const myPropertyCounts = properties.reduce((counts, property) => {
     counts[getPropertyStatusBadge(property).label] += 1;
@@ -166,8 +370,595 @@ const LandlordSectionPage = ({ type }) => {
     return matchesStatus && searchValue.includes(propertySearch.trim().toLowerCase());
   });
 
+  const verifiedFilteredProperties = useMemo(() => {
+    const query = verifiedSearch.trim().toLowerCase();
+    return [...properties]
+      .filter((property) => {
+        if (!query) return true;
+        const searchable = [
+          property.title,
+          property.location,
+          property.city,
+          property.subCity,
+          property.subcity,
+          property.region,
+          property.zone,
+          property.wereda,
+        ].filter(Boolean).join(' ').toLowerCase();
+        return searchable.includes(query);
+      })
+      .sort((left, right) => {
+        if (verifiedSort === 'price-asc') return Number(left.price || 0) - Number(right.price || 0);
+        if (verifiedSort === 'price-desc') return Number(right.price || 0) - Number(left.price || 0);
+        const leftTime = new Date(left.createdAt || 0).getTime();
+        const rightTime = new Date(right.createdAt || 0).getTime();
+        return rightTime - leftTime;
+      });
+  }, [properties, verifiedSearch, verifiedSort]);
+
+  const verifiedPageCount = Math.max(1, Math.ceil(verifiedFilteredProperties.length / 12));
+  const verifiedVisibleProperties = verifiedFilteredProperties.slice((verifiedPage - 1) * 12, verifiedPage * 12);
+
+  const rejectedFilteredProperties = useMemo(() => {
+    const query = rejectedSearch.trim().toLowerCase();
+    return [...properties]
+      .filter((property) => {
+        if (!query) return true;
+        return [
+          property.title,
+          property.location,
+          property.city,
+          property.subCity,
+          property.subcity,
+          property.region,
+          property.zone,
+          property.wereda,
+        ].filter(Boolean).join(' ').toLowerCase().includes(query);
+      })
+      .sort((left, right) => {
+        if (rejectedSort === 'price-asc') return Number(left.price || 0) - Number(right.price || 0);
+        if (rejectedSort === 'price-desc') return Number(right.price || 0) - Number(left.price || 0);
+        const leftTime = new Date(left.createdAt || 0).getTime();
+        const rightTime = new Date(right.createdAt || 0).getTime();
+        return rightTime - leftTime;
+      });
+  }, [properties, rejectedSearch, rejectedSort]);
+
+  const rejectedPageCount = Math.max(1, Math.ceil(rejectedFilteredProperties.length / 12));
+  const rejectedVisibleProperties = rejectedFilteredProperties.slice((rejectedPage - 1) * 12, rejectedPage * 12);
+
+  const rentedFilteredProperties = useMemo(() => {
+    const query = rentedSearch.trim().toLowerCase();
+    return [...properties]
+      .filter((property) => {
+        if (!query) return true;
+        const searchable = [
+          property.title,
+          property.location,
+          property.city,
+          property.subCity,
+          property.subcity,
+          property.region,
+          property.zone,
+          property.wereda,
+          property.kebele,
+          property.houseNumber,
+          getRentedTenantName(property),
+        ].filter(Boolean).join(' ').toLowerCase();
+        return searchable.includes(query);
+      })
+      .sort((left, right) => {
+        if (rentedSort === 'price-asc') return Number(left.price || 0) - Number(right.price || 0);
+        if (rentedSort === 'price-desc') return Number(right.price || 0) - Number(left.price || 0);
+        const leftTime = new Date(left.rentedAt || left.createdAt || 0).getTime();
+        const rightTime = new Date(right.rentedAt || right.createdAt || 0).getTime();
+        return rightTime - leftTime;
+      });
+  }, [properties, rentedSearch, rentedSort]);
+
+  const rentedPageCount = Math.max(1, Math.ceil(rentedFilteredProperties.length / 12));
+  const rentedVisibleProperties = rentedFilteredProperties.slice((rentedPage - 1) * 12, rentedPage * 12);
+
+  useEffect(() => {
+    if (verifiedPage > verifiedPageCount) {
+      setVerifiedPage(verifiedPageCount);
+    }
+  }, [verifiedPage, verifiedPageCount]);
+
+  useEffect(() => {
+    if (rejectedPage > rejectedPageCount) {
+      setRejectedPage(rejectedPageCount);
+    }
+  }, [rejectedPage, rejectedPageCount]);
+
+  useEffect(() => {
+    if (rentedPage > rentedPageCount) {
+      setRentedPage(rentedPageCount);
+    }
+  }, [rentedPage, rentedPageCount]);
+
   if (!config) {
     return <div style={styles.container}><p>Invalid section</p></div>;
+  }
+
+  if (type === 'verified' || type === 'underReview' || type === 'rejected' || type === 'rented') {
+    const isUnderReview = type === 'underReview';
+    const isRejected = type === 'rejected';
+    const isRented = type === 'rented';
+    const currentView = isRented ? rentedView : isRejected ? rejectedView : isUnderReview ? underReviewView : verifiedView;
+    const setCurrentView = isRented ? setRentedView : isRejected ? setRejectedView : isUnderReview ? setUnderReviewView : setVerifiedView;
+    const currentSearch = isRented ? rentedSearch : isRejected ? rejectedSearch : verifiedSearch;
+    const setCurrentSearch = isRented ? setRentedSearch : isRejected ? setRejectedSearch : setVerifiedSearch;
+    const currentSort = isRented ? rentedSort : isRejected ? rejectedSort : verifiedSort;
+    const setCurrentSort = isRented ? setRentedSort : isRejected ? setRejectedSort : setVerifiedSort;
+    const currentPage = isRented ? rentedPage : isRejected ? rejectedPage : verifiedPage;
+    const setCurrentPage = isRented ? setRentedPage : isRejected ? setRejectedPage : setVerifiedPage;
+    const currentPageCount = isRented ? rentedPageCount : isRejected ? rejectedPageCount : verifiedPageCount;
+    const filteredPageProperties = isRented ? rentedFilteredProperties : isRejected ? rejectedFilteredProperties : verifiedFilteredProperties;
+    const visiblePageProperties = isRented ? rentedVisibleProperties : isRejected ? rejectedVisibleProperties : verifiedVisibleProperties;
+    const formattedCount = filteredPageProperties.length;
+
+    return (
+      <div className={`landlord-verified-page${isRejected ? ' landlord-rejected-page' : ''}${isRented ? ' landlord-rented-page' : ''}`}>
+        <header className="landlord-verified-header">
+          <div className="landlord-verified-header-row">
+            <h1>
+              {config.title}
+              <span>{formattedCount}</span>
+            </h1>
+          </div>
+
+          <div className="landlord-verified-toolbar">
+            <label className="landlord-verified-search" htmlFor="landlord-verified-search">
+              <FaSearch aria-hidden="true" />
+              <input
+                id="landlord-verified-search"
+                type="search"
+                value={currentSearch}
+                onChange={(event) => {
+                  setCurrentSearch(event.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder={t(isRented ? 'Search title, address, or tenant' : 'Search title or address')}
+                aria-label={t(isRented ? 'Search title, address, or tenant' : 'Search title or address')}
+              />
+            </label>
+
+            <label className="landlord-verified-sort" htmlFor="landlord-verified-sort">
+              <span>{t('Sort')}</span>
+              <select
+                id="landlord-verified-sort"
+                value={currentSort}
+                onChange={(event) => {
+                  setCurrentSort(event.target.value);
+                  setCurrentPage(1);
+                }}
+                aria-label={t('Sort')}
+              >
+                <option value="newest">{t('Newest')}</option>
+                <option value="price-asc">{t('Price: low to high')}</option>
+                <option value="price-desc">{t('Price: high to low')}</option>
+              </select>
+            </label>
+
+            <div className="landlord-verified-view-toggle" role="group" aria-label={t('Property view')}>
+              <button
+                type="button"
+                aria-pressed={currentView === 'grid'}
+                onClick={() => setCurrentView('grid')}
+                className={currentView === 'grid' ? 'active' : ''}
+              >
+                {t('Grid')}
+              </button>
+              <button
+                type="button"
+                aria-pressed={currentView === 'list'}
+                onClick={() => setCurrentView('list')}
+                className={currentView === 'list' ? 'active' : ''}
+              >
+                {t('List')}
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {successNotice && (
+          <div className="landlord-verified-success" role="status">
+            {successNotice}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="landlord-verified-skeleton-grid" role="status" aria-label={t('Loading properties...')}>
+            {Array.from({ length: 6 }, (_, index) => (
+              <div className="landlord-verified-skeleton-card" key={index} aria-hidden="true">
+                <span className="landlord-verified-skeleton-image" />
+                <span className="landlord-verified-skeleton-line short" />
+                <span className="landlord-verified-skeleton-line" />
+                <span className="landlord-verified-skeleton-line" />
+              </div>
+            ))}
+          </div>
+        ) : filteredPageProperties.length === 0 ? (
+          <div className="landlord-verified-empty" role="status">
+            <FaHome aria-hidden="true" />
+            <p>
+              {currentSearch
+                ? t('No properties match your filters.')
+                : isRented
+                  ? t('No rented properties yet')
+                  : isUnderReview
+                  ? t('No properties under review')
+                  : isRejected ? t('No rejected properties') : config.empty}
+            </p>
+            {isUnderReview && !currentSearch && (
+              <Link to="/landlord/add-property" className="landlord-my-properties-add-button">
+                {t('Add House')}
+              </Link>
+            )}
+          </div>
+        ) : currentView === 'grid' ? (
+          <>
+            <div
+              className={`landlord-verified-grid${isRented ? ' landlord-rented-grid' : ''}`}
+              data-testid={isRented ? 'landlord-rented-grid' : undefined}
+            >
+              {visiblePageProperties.map((property) => {
+                if (isRented) {
+                  const tenantName = getRentedTenantName(property);
+                  const paymentStatus = getLatestPaymentStatus(property);
+                  const propertyReviews = reviews.filter((review) => (
+                    String(review.property?._id || review.property) === String(property._id)
+                  ));
+
+                  return (
+                    <article key={property._id} className="landlord-verified-card landlord-rented-card">
+                      <div className="landlord-verified-image-wrap">
+                        <PropertyImage
+                          src={getPropertyImages(property)}
+                          alt={property.title}
+                          className="landlord-verified-image"
+                          fallbackClassName="landlord-verified-image landlord-verified-image-placeholder"
+                          fallbackText={t('No photo')}
+                        />
+                        <span className="landlord-verified-badge landlord-rented-badge" role="status">
+                          {t('Rented')}
+                        </span>
+                      </div>
+                      <div className="landlord-verified-content">
+                        <h2 title={property.title}>{property.title}</h2>
+                        <p className="landlord-verified-location">
+                          <FaMapMarkerAlt aria-hidden="true" />
+                          <span>{getDisplayLocation(property, t)}</span>
+                        </p>
+                        <p className="landlord-verified-price">
+                          ETB {Number(property.price || 0).toLocaleString()}
+                          <span>{t('/ month')}</span>
+                        </p>
+                        {property.bedrooms !== undefined && property.bedrooms !== null && (
+                          <div className="landlord-verified-meta">
+                            <span>{t('Bedrooms: {count}', { count: property.bedrooms })}</span>
+                          </div>
+                        )}
+                        <section className="landlord-rented-tenant" aria-label={t('Tenant information')}>
+                          <span className="landlord-rented-tenant-label">{t('Tenant')}</span>
+                          <strong>{tenantName || t('Unknown tenant')}</strong>
+                          {property.rentedAt && (
+                            <span>{t('Rented since {date}', {
+                              date: formatDate(property.rentedAt, { dateStyle: 'medium' }),
+                            })}</span>
+                          )}
+                          {paymentStatus && (
+                            <span className={`landlord-rented-payment-status landlord-rented-payment-${paymentStatus.toLowerCase()}`}>
+                              {t(paymentStatus)}
+                            </span>
+                          )}
+                        </section>
+                        {propertyReviews.length > 0 && (
+                          <details className="landlord-rented-reviews">
+                            <summary>{t('Tenant reviews ({count})', { count: propertyReviews.length })}</summary>
+                            {propertyReviews.map((review) => (
+                              <article key={review._id} className="landlord-rented-review">
+                                <div>
+                                  <strong>{review.tenant?.name || t('Tenant')}</strong>
+                                  <span aria-label={t('{count} out of 5 stars', { count: review.rating })}>
+                                    {'★'.repeat(Math.max(0, Math.min(5, Number(review.rating) || 0)))}
+                                  </span>
+                                </div>
+                                <p>{review.comment}</p>
+                                {review.createdAt && (
+                                  <time dateTime={review.createdAt}>
+                                    {formatDate(review.createdAt, { dateStyle: 'medium' })}
+                                  </time>
+                                )}
+                              </article>
+                            ))}
+                          </details>
+                        )}
+                        <div className="landlord-rented-actions">
+                          <button
+                            type="button"
+                            className="landlord-rented-action-message"
+                            onClick={() => handleMessage(property)}
+                          >
+                            {t('Message')}
+                          </button>
+                          <button
+                            type="button"
+                            className="landlord-rented-action-payments"
+                            onClick={() => handleRentPayments(property)}
+                          >
+                            {t('Rent Payments')}
+                          </button>
+                          <div className="landlord-verified-menu-wrap">
+                            {renderVerifiedMenu(property, true)}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                }
+
+                const locationText = isRejected
+                  ? getDisplayLocation(property, t)
+                  : [property.subCity || property.subcity, property.city || property.location]
+                    .filter(Boolean)
+                    .join(', ') || property.location || t('Location unavailable');
+                const rejectedReason = isRejected ? getRejectedReason(property) : '';
+                const rejectedDate = isRejected ? getRejectedDate(property) : null;
+
+                return (
+                  <article key={property._id} className="landlord-verified-card">
+                    <div className="landlord-verified-image-wrap">
+                      <PropertyImage
+                        src={getPropertyImages(property)}
+                        alt={property.title}
+                        className="landlord-verified-image"
+                        fallbackClassName="landlord-verified-image landlord-verified-image-placeholder"
+                        fallbackText={t('No photo')}
+                      />
+                      <span
+                        className={`landlord-verified-badge${isUnderReview ? ' landlord-under-review-badge' : ''}${isRejected ? ' landlord-rejected-badge' : ''}`}
+                        role="status"
+                      >
+                        {t(isRejected ? 'Rejected' : isUnderReview ? 'Under review' : 'Verified')}
+                      </span>
+                    </div>
+
+                    <div className="landlord-verified-content">
+                      <h2 title={property.title}>{property.title}</h2>
+
+                      <p className="landlord-verified-location">
+                        <FaMapMarkerAlt aria-hidden="true" />
+                        <span>{locationText}</span>
+                      </p>
+
+                      <p className="landlord-verified-price">
+                        ETB {Number(property.price || 0).toLocaleString()}
+                        <span>{t('/ month')}</span>
+                      </p>
+
+                      <div className="landlord-verified-meta">
+                        {property.bedrooms !== undefined && property.bedrooms !== null && (
+                          <span>{t('Bedrooms: {count}', { count: property.bedrooms })}</span>
+                        )}
+                        {property.createdAt && !isRejected && (
+                          <span>
+                            {t(isUnderReview ? 'Submitted {date}' : 'Submitted: {date}', {
+                              date: formatDate(property.createdAt, { dateStyle: 'medium' }),
+                            })}
+                          </span>
+                        )}
+                        {isRejected && rejectedDate && (
+                          <span>
+                            {t('Rejected {date}', { date: formatDate(rejectedDate, { dateStyle: 'medium' }) })}
+                          </span>
+                        )}
+                        {isRejected && property.rejectedByName && (
+                          <span>{t('Rejected by {name}', { name: property.rejectedByName })}</span>
+                        )}
+                        {isUnderReview && (
+                          <span className="landlord-verified-review-status">
+                            {t('Waiting for review')}
+                            {property.area && <>{' · '}{property.area}</>}
+                          </span>
+                        )}
+                      </div>
+
+                      {isRejected && rejectedReason && (
+                        <div className="landlord-rejected-reason">
+                          <strong>{t('Reason for rejection')}</strong>
+                          <p>{rejectedReason}</p>
+                          <Link
+                            to={`/property/${property._id}`}
+                            state={{ from: `${location.pathname}${location.search}` }}
+                          >
+                            {t('Read more')}
+                          </Link>
+                        </div>
+                      )}
+
+                      <div className="landlord-verified-actions">
+                        <button
+                          type="button"
+                          className="landlord-verified-update"
+                          onClick={() => handleUpdate(property)}
+                        >
+                          {t('Update')}
+                        </button>
+
+                        <div className="landlord-verified-menu-wrap">
+                          {renderVerifiedMenu(property)}
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            {currentPageCount > 1 && (
+              <nav className="landlord-verified-pagination" aria-label={t('Property pagination')}>
+                <button
+                  type="button"
+                  className="landlord-verified-page-button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+                >
+                  {t('Previous')}
+                </button>
+                <span>{t('Page {current} of {total}', { current: currentPage, total: currentPageCount })}</span>
+                <button
+                  type="button"
+                  className="landlord-verified-page-button"
+                  disabled={currentPage >= currentPageCount}
+                  onClick={() => setCurrentPage((current) => Math.min(currentPageCount, current + 1))}
+                >
+                  {t('Next')}
+                </button>
+              </nav>
+            )}
+          </>
+        ) : (
+          <div className={`landlord-verified-table-wrap${isRented ? ' landlord-rented-table-wrap' : ''}`}>
+            <table
+              className={`landlord-verified-table${isRented ? ' landlord-rented-table' : ''}`}
+              aria-label={t(isRented ? 'Rented Properties' : isRejected ? 'Rejected Properties' : isUnderReview ? 'Properties Under Review' : 'Verified Properties')}
+            >
+              <thead>
+                <tr>
+                  <th>{t('Property')}</th>
+                  <th>{t('Location')}</th>
+                  <th>{t('Price')}</th>
+                  {isRented ? (
+                    <>
+                      <th>{t('Tenant')}</th>
+                      <th>{t('Payment status')}</th>
+                    </>
+                  ) : <th>{t(isRejected ? 'Rejected on' : 'Submitted')}</th>}
+                  {isRejected && <th>{t('Rejection reason')}</th>}
+                  <th>{t('Actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visiblePageProperties.map((property) => {
+                  const tenantName = getRentedTenantName(property);
+                  const paymentStatus = getLatestPaymentStatus(property);
+                  return (
+                  <tr key={property._id}>
+                    <td data-label={t('Property')}>
+                      <div className="landlord-verified-table-title">
+                        <PropertyImage
+                          src={getPropertyImages(property)}
+                          alt={property.title}
+                          className="landlord-verified-table-thumb"
+                          fallbackClassName="landlord-verified-table-thumb landlord-verified-image-placeholder"
+                          fallbackText={t('No image')}
+                        />
+                        <span>{property.title}</span>
+                      </div>
+                    </td>
+                    <td data-label={t('Location')}>
+                      {isRented || isRejected
+                        ? getDisplayLocation(property, t)
+                        : [property.subCity || property.subcity, property.city || property.location]
+                          .filter(Boolean).join(', ') || property.location || t('Location unavailable')}
+                    </td>
+                    <td data-label={t('Price')} className="landlord-verified-table-price">
+                      ETB {Number(property.price || 0).toLocaleString()} {t('/ month')}
+                    </td>
+                    {isRented ? (
+                      <>
+                        <td data-label={t('Tenant')}>{tenantName || t('Unknown tenant')}</td>
+                        <td data-label={t('Payment status')}>
+                          {paymentStatus
+                            ? <span className={`landlord-rented-payment-status landlord-rented-payment-${paymentStatus.toLowerCase()}`}>{t(paymentStatus)}</span>
+                            : '—'}
+                        </td>
+                      </>
+                    ) : (
+                      <td data-label={t(isRejected ? 'Rejected on' : 'Submitted')}>
+                        {isRejected
+                          ? (
+                            <>
+                              {getRejectedDate(property) && formatDate(getRejectedDate(property), { dateStyle: 'medium' })}
+                              {property.rejectedByName && (
+                                <small className="landlord-rejected-by">{t('Rejected by {name}', { name: property.rejectedByName })}</small>
+                              )}
+                            </>
+                          )
+                          : property.createdAt && formatDate(property.createdAt, { dateStyle: 'medium' })}
+                      </td>
+                    )}
+                    {isRejected && (
+                      <td data-label={t('Rejection reason')}>
+                        {getRejectedReason(property) && (
+                          <div className="landlord-rejected-table-reason">
+                            <strong>{t('Reason for rejection')}</strong>
+                            <span>{getRejectedReason(property)}</span>
+                            <Link
+                              to={`/property/${property._id}`}
+                              state={{ from: `${location.pathname}${location.search}` }}
+                            >
+                              {t('Read more')}
+                            </Link>
+                          </div>
+                        )}
+                      </td>
+                    )}
+                    <td data-label={t('Actions')}>
+                      <div className="landlord-verified-table-actions">
+                        {isRented ? (
+                          <>
+                            <button type="button" className="landlord-rented-table-action" onClick={() => handleMessage(property)}>
+                              {t('Message')}
+                            </button>
+                            <button type="button" className="landlord-rented-table-action" onClick={() => handleRentPayments(property)}>
+                              {t('Rent Payments')}
+                            </button>
+                            <div className="landlord-verified-menu-wrap">{renderVerifiedMenu(property, true)}</div>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="landlord-verified-update landlord-verified-update-small" onClick={() => handleUpdate(property)}>
+                              {t('Update')}
+                            </button>
+                            <div className="landlord-verified-menu-wrap">{renderVerifiedMenu(property)}</div>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {currentPageCount > 1 && currentView === 'list' && (
+          <nav className="landlord-verified-pagination" aria-label={t('Property pagination')}>
+            <button
+              type="button"
+              className="landlord-verified-page-button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+            >
+              {t('Previous')}
+            </button>
+            <span>{t('Page {current} of {total}', { current: currentPage, total: currentPageCount })}</span>
+            <button
+              type="button"
+              className="landlord-verified-page-button"
+              disabled={currentPage >= currentPageCount}
+              onClick={() => setCurrentPage((current) => Math.min(currentPageCount, current + 1))}
+            >
+              {t('Next')}
+            </button>
+          </nav>
+        )}
+      </div>
+    );
   }
 
   if (type === 'myProperties') {
@@ -186,10 +977,6 @@ const LandlordSectionPage = ({ type }) => {
             <h1>{config.title} <span>{properties.length}</span></h1>
             <p>Manage your property listings</p>
           </div>
-          <Link className="landlord-my-properties-add-button" to="/landlord/add-property">
-            <FaPlus aria-hidden="true" />
-            Add House
-          </Link>
         </header>
 
         {successNotice && (
@@ -204,7 +991,7 @@ const LandlordSectionPage = ({ type }) => {
           <div className="landlord-my-properties-empty">
             <FaHome aria-hidden="true" />
             <p>{config.empty}</p>
-            <Link to="/landlord/add-property" className="landlord-my-properties-add-button">Add House</Link>
+            <Link to="/landlord/add-property" className="landlord-my-properties-add-button">Add your first house</Link>
           </div>
         ) : (
           <>

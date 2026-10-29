@@ -1016,6 +1016,32 @@
   font-weight: 500;
 }
 
+.property-rejection-reason {
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #7f1d1d;
+}
+
+.property-rejection-reason h2 {
+  margin: 0 0 6px;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.property-rejection-reason p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.property-rejection-reason small {
+  display: block;
+  margin-top: 8px;
+  color: #9f1239;
+}
+
 .property-feature-chips {
   display: flex;
   flex-wrap: wrap;

@@ -1,4 +1,4 @@
-const dotenv = require('dotenv');
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -9,9 +9,6 @@ const reportInvalidUsernames = require('./utils/reportInvalidUsernames');
 const migrateLegacyAdminAreas = require('./utils/migrateLegacyAdminAreas');
 const { ensureSingleAreaAdminIndex } = require('./utils/areaAdminUniqueness');
 const { startPayoutReconciliation } = require('./services/payoutReconciliation');
-
-// የአካባቢ ተለዋዋጮችን ጫን
-dotenv.config({ path: path.join(__dirname, '.env') });
 
 const getDevelopmentJwtSecret = () => {
   const secretPath = path.join(__dirname, '.jwt-secret');

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import PropertyImage from './PropertyImage';
+import RejectionReasonModal from './RejectionReasonModal';
 import { getPropertyImages } from '../utils/propertyMedia';
 
 const PAGE_SIZE = 12;
@@ -75,6 +76,9 @@ const AreaPropertyList = ({
   const [localMinPrice, setLocalMinPrice] = useState('');
   const [localMaxPrice, setLocalMaxPrice] = useState('');
   const [localPage, setLocalPage] = useState(1);
+  const [rejectionProperty, setRejectionProperty] = useState(null);
+  const [rejectionFeedback, setRejectionFeedback] = useState('');
+  const rejectionTriggerRef = React.useRef(null);
 
   const search = remoteFilters ? remoteSearch : localSearch;
   const sort = remoteFilters ? remoteSort : localSort;
@@ -179,7 +183,11 @@ const AreaPropertyList = ({
             type="button"
             className="admin-btn admin-btn-reject"
             disabled={actionLoading === property._id}
-            onClick={() => onAction(property._id, 'reject')}
+            onClick={(event) => {
+              rejectionTriggerRef.current = event.currentTarget;
+              setRejectionFeedback('');
+              setRejectionProperty(property);
+            }}
           >
             {t(actionLoading === property._id ? 'Working...' : 'Reject')}
           </button>
@@ -194,6 +202,13 @@ const AreaPropertyList = ({
       </button>
     </div>
   );
+
+  const submitRejection = async (reason) => {
+    const result = await onAction(rejectionProperty._id, 'reject', reason);
+    if (result?.success === false) return result;
+    setRejectionFeedback(t('Property rejected successfully.'));
+    return { success: true };
+  };
 
   const renderStatus = (property) => {
     const status = statusDetails[getStatus(property)];
@@ -244,6 +259,11 @@ const AreaPropertyList = ({
 
   return (
     <div className="area-property-list">
+      {rejectionFeedback && (
+        <p className="admin-success-banner" role="status" aria-live="polite">
+          {rejectionFeedback}
+        </p>
+      )}
       <div className="admin-property-toolbar area-property-toolbar">
         <div className="admin-property-filters area-property-filters">
           <label>
@@ -391,6 +411,14 @@ const AreaPropertyList = ({
             {t('Next')}
           </button>
         </nav>
+      )}
+      {rejectionProperty && (
+        <RejectionReasonModal
+          onClose={() => setRejectionProperty(null)}
+          onSubmit={submitRejection}
+          returnFocusRef={rejectionTriggerRef}
+          loading={actionLoading === rejectionProperty._id}
+        />
       )}
     </div>
   );

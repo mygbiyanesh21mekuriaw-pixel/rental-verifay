@@ -3,12 +3,13 @@ const assert = require('node:assert/strict');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const Area = require('../models/Area');
+const SystemSettings = require('../models/SystemSettings');
 const VerificationRequest = require('../models/VerificationRequest');
 const Notification = require('../models/Notification');
 const SystemLog = require('../models/SystemLog');
 const propertyRoutes = require('../routes/propertyRoutes');
 const { areaAdminOnly } = require('../middleware/auth');
-const { getPropertyHistory, updateProperty } = require('./propertyController');
+const { getPropertyById, getPropertyHistory, updateProperty } = require('./propertyController');
 const { verifyProperty, rejectProperty } = require('./adminController');
 
 const adminId = '507f1f77bcf86cd799439011';
@@ -52,6 +53,7 @@ test('property verification decisions append actor snapshots without replacing e
     notificationCreate: Notification.create,
     systemLogCreate: SystemLog.create,
   };
+  let landlordNotification;
   const admin = {
     _id: adminId,
     name: 'Admin A',
@@ -74,7 +76,9 @@ test('property verification decisions append actor snapshots without replacing e
   User.findById = () => createSelectLeanQuery(admin);
   Property.findById = async () => property;
   VerificationRequest.findOneAndUpdate = async () => {};
-  Notification.create = async () => {};
+  Notification.create = async (notification) => {
+    landlordNotification = notification;
+  };
   SystemLog.create = async () => {};
 
   try {
@@ -85,10 +89,29 @@ test('property verification decisions append actor snapshots without replacing e
     assert.equal(property.decision, 'verified');
 
     admin.name = 'Renamed Admin A';
+    const invalidReasonResponse = createResponse();
+    await rejectProperty({
+      params: { id: propertyId },
+      body: { reason: '   ' },
+      user: { id: adminId, role: 'admin' },
+    }, invalidReasonResponse);
+    assert.equal(invalidReasonResponse.statusCode, 400);
+    assert.match(invalidReasonResponse.body.message, /10 and 500/);
+    assert.equal(property.history.length, 1);
+
+    const oversizedReasonResponse = createResponse();
+    await rejectProperty({
+      params: { id: propertyId },
+      body: { reason: 'x'.repeat(501) },
+      user: { id: adminId, role: 'admin' },
+    }, oversizedReasonResponse);
+    assert.equal(oversizedReasonResponse.statusCode, 400);
+    assert.equal(property.history.length, 1);
+
     const rejectResponse = createResponse();
     await rejectProperty({
       params: { id: propertyId },
-      body: { comment: 'Needs a correction' },
+      body: { reason: '  Needs a correction  ' },
       user: { id: adminId, role: 'admin' },
     }, rejectResponse);
 
@@ -99,10 +122,156 @@ test('property verification decisions append actor snapshots without replacing e
     assert.equal(property.history[1].byName, 'Renamed Admin A');
     assert.equal(property.history[1].action, 'rejected');
     assert.equal(property.history[1].note, 'Needs a correction');
+    assert.equal(property.rejectionReason, 'Needs a correction');
+    assert.ok(property.rejectedAt instanceof Date);
+    assert.equal(property.history[1].byName, 'Renamed Admin A');
+    assert.match(landlordNotification.message, /Needs a correction/);
+    assert.equal(landlordNotification.instructions, 'Needs a correction');
   } finally {
     User.findById = originals.userFindById;
     Property.findById = originals.propertyFindById;
     VerificationRequest.findOneAndUpdate = originals.verificationUpdate;
+    Notification.create = originals.notificationCreate;
+    SystemLog.create = originals.systemLogCreate;
+  }
+});
+
+test('landlords can read rejection details only for their own property', async () => {
+  const originals = {
+    settingsFindOne: SystemSettings.findOne,
+    propertyFindById: Property.findById,
+  };
+  const property = {
+    _id: propertyId,
+    title: 'Rejected property',
+    landlord: '507f1f77bcf86cd799439014',
+    verificationStatus: 'rejected',
+    rejectionReason: 'Needs a clearer address',
+    rejectedAt: new Date('2026-03-01T10:00:00.000Z'),
+    history: [{
+      action: 'rejected',
+      byName: 'Area Admin',
+      note: 'Needs a clearer address',
+      at: new Date('2026-03-01T10:00:00.000Z'),
+    }],
+    toObject() {
+      return { ...this };
+    },
+  };
+  SystemSettings.findOne = () => ({
+    select: () => ({ lean: async () => ({ properties: { requireAdminReview: true } }) }),
+  });
+  Property.findById = () => ({
+    populate: async () => property,
+  });
+
+  try {
+    const ownerResponse = createResponse();
+    await getPropertyById({
+      params: { id: propertyId },
+      user: { id: property.landlord, role: 'landlord' },
+    }, ownerResponse);
+    assert.equal(ownerResponse.body.rejectionReason, 'Needs a clearer address');
+    assert.equal(ownerResponse.body.rejectedByName, 'Area Admin');
+
+    const otherLandlordResponse = createResponse();
+    await getPropertyById({
+      params: { id: propertyId },
+      user: { id: '507f1f77bcf86cd799439099', role: 'landlord' },
+    }, otherLandlordResponse);
+    assert.equal(otherLandlordResponse.statusCode, 404);
+    assert.equal(otherLandlordResponse.body.rejectionReason, undefined);
+
+    property.verificationStatus = 'approved';
+    property.isVerified = true;
+    property.rejectionNote = 'Private historical note';
+    const publicResponse = createResponse();
+    await getPropertyById({
+      params: { id: propertyId },
+      user: { id: '507f1f77bcf86cd799439099', role: 'landlord' },
+    }, publicResponse);
+    assert.equal(publicResponse.body.rejectionReason, undefined);
+    assert.equal(publicResponse.body.rejectionNote, undefined);
+    assert.equal(publicResponse.body.rejectionNotes, undefined);
+  } finally {
+    SystemSettings.findOne = originals.settingsFindOne;
+    Property.findById = originals.propertyFindById;
+  }
+});
+
+test('resubmitting a rejected property clears active rejection fields and preserves its history', async () => {
+  const originals = {
+    areaFind: Area.find,
+    propertyFindById: Property.findById,
+    notificationCreate: Notification.create,
+    systemLogCreate: SystemLog.create,
+  };
+  const property = {
+    _id: propertyId,
+    title: 'Rejected property',
+    description: 'Existing description',
+    price: 18000,
+    bedrooms: 2,
+    landlord: '507f1f77bcf86cd799439014',
+    region: 'Amhara',
+    zone: 'South Wollo',
+    wereda: 'Dessie',
+    city: 'Dessie',
+    subCity: 'Dessie',
+    kebele: '01',
+    houseNumber: '10',
+    area: 'Dessie',
+    verificationStatus: 'rejected',
+    decision: 'rejected',
+    isVerified: false,
+    rejectionReason: 'Needs a clearer address',
+    rejectedAt: new Date('2026-03-01T10:00:00.000Z'),
+    history: [{
+      action: 'rejected',
+      byName: 'Area Admin',
+      note: 'Needs a clearer address',
+      at: new Date('2026-03-01T10:00:00.000Z'),
+    }],
+    async save() {},
+    toObject() {
+      return { ...this };
+    },
+  };
+  Area.find = () => ({ select: () => ({ lean: async () => [] }) });
+  Property.findById = async () => property;
+  Notification.create = async () => {};
+  SystemLog.create = async () => {};
+
+  try {
+    const response = createResponse();
+    await updateProperty({
+      params: { id: propertyId },
+      user: { id: property.landlord, role: 'landlord' },
+      body: {
+        title: 'Updated property',
+        description: 'Updated description',
+        price: 19000,
+        bedrooms: 3,
+        region: 'Amhara',
+        zone: 'South Wollo',
+        wereda: 'Dessie',
+        city: 'Dessie',
+        subCity: 'Dessie',
+        kebele: '01',
+        houseNumber: '10',
+      },
+    }, response);
+
+    assert.equal(property.verificationStatus, 'pending');
+    assert.equal(property.rejectionReason, '');
+    assert.equal(property.rejectedAt, null);
+    assert.equal(property.history.length, 1);
+    assert.equal(property.history[0].note, 'Needs a clearer address');
+    assert.equal(response.body.property.rejectionReason, '');
+    assert.equal(response.body.property.rejectedByName, '');
+  } finally {
+    Area.find = originals.areaFind;
+    Property.findById = originals.propertyFindById;
     Notification.create = originals.notificationCreate;
     SystemLog.create = originals.systemLogCreate;
   }

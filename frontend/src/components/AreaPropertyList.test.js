@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import AreaPropertyList from './AreaPropertyList';
 
 jest.mock('../context/LanguageContext', () => ({
@@ -106,6 +106,53 @@ test('shows verification actions only when enabled and calls the existing handle
 
   fireEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]);
   expect(onAction).toHaveBeenCalledWith('property-b', 'verify');
+});
+
+test('requires a trimmed rejection reason and submits it through the existing action handler', async () => {
+  const onAction = jest.fn().mockResolvedValue({ success: true });
+  renderList({ properties: [properties[1]], canManageVerification: true, onAction });
+
+  const rejectButton = screen.getByRole('button', { name: 'Reject' });
+  fireEvent.click(rejectButton);
+  const dialog = screen.getByRole('dialog', { name: 'Reject property' });
+  const submitButton = within(dialog).getByRole('button', { name: 'Reject' });
+  const textarea = within(dialog).getByRole('textbox', { name: 'Reason for rejection (required)' });
+
+  expect(submitButton).toBeDisabled();
+  fireEvent.change(textarea, { target: { value: 'too short' } });
+  expect(submitButton).toBeDisabled();
+  fireEvent.change(textarea, { target: { value: 'x'.repeat(501) } });
+  expect(submitButton).toBeDisabled();
+  fireEvent.change(textarea, { target: { value: '  Needs a clearer address  ' } });
+  expect(submitButton).toBeEnabled();
+  await act(async () => {
+    fireEvent.click(submitButton);
+  });
+
+  await waitFor(() => {
+    expect(onAction).toHaveBeenCalledWith('property-b', 'reject', 'Needs a clearer address');
+  });
+  expect(await screen.findByRole('status')).toHaveTextContent('Property rejected successfully.');
+  expect(rejectButton).toHaveFocus();
+});
+
+test('shows the server rejection error and quick-pick text remains editable', async () => {
+  const onAction = jest.fn().mockResolvedValue({ success: false, message: 'Server rejected the request.' });
+  renderList({ properties: [properties[1]], canManageVerification: true, onAction });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+  const dialog = screen.getByRole('dialog', { name: 'Reject property' });
+  const textarea = within(dialog).getByRole('textbox', { name: 'Reason for rejection (required)' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Incorrect address' }));
+  expect(textarea).toHaveValue('Incorrect address');
+  fireEvent.change(textarea, { target: { value: 'Incorrect address - the kebele is missing.' } });
+  await act(async () => {
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Reject' }));
+  });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Server rejected the request.');
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(screen.queryByRole('dialog', { name: 'Reject property' })).not.toBeInTheDocument();
 });
 
 test('paginates local results by twelve', () => {

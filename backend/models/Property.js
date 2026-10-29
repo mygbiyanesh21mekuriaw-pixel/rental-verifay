@@ -141,6 +141,15 @@ const PropertySchema = new mongoose.Schema({
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending',
   },
+  rejectionReason: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  rejectedAt: {
+    type: Date,
+    default: null,
+  },
   handledBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

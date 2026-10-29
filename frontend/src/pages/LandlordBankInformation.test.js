@@ -13,6 +13,14 @@ jest.mock('../context/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('../context/LanguageContext', () => ({
+  useLanguage: () => ({
+    t: (text, values = {}) => text.replace(/\{(\w+)\}/g, (match, key) => (
+      Object.prototype.hasOwnProperty.call(values, key) ? String(values[key]) : match
+    )),
+  }),
+}));
+
 const banks = [
   { code: 'CBE', name: 'Commercial Bank of Ethiopia (CBE)' },
   { code: 'AWASH', name: 'Awash Bank' },
@@ -65,20 +73,21 @@ const expectTransactionsTableColumns = async () => {
   expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
     'Date',
     'Period',
-    'Description',
     'Tenant',
     'Property',
     'Amount',
-    'Credit/Debit',
-    'Landlord Credit',
+    'Type',
+    'Status',
     'Reference',
   ]);
   within(table).getAllByRole('row').slice(1).forEach((row) => {
-    expect(within(row).getAllByRole('cell')).toHaveLength(9);
+    expect(within(row).getAllByRole('cell')).toHaveLength(8);
   });
   expect(within(table).queryByText('External Transfer')).not.toBeInTheDocument();
   expect(within(table).queryByText(/NOT EXECUTED|PENDING|EXECUTED|Sandbox only|Chapa submission:|Chapa verification:/))
     .not.toBeInTheDocument();
+  const referenceDetails = within(table).queryByText('View reference details');
+  if (referenceDetails) fireEvent.click(referenceDetails);
 };
 
 beforeEach(() => {
@@ -146,8 +155,9 @@ test('shows saved landlord account details with a masked number', async () => {
   expect(await screen.findByText('Commercial Bank of Ethiopia (CBE) (CBE)')).toBeInTheDocument();
   expect(screen.getByText('Dejen Mulat')).toBeInTheDocument();
   expect(screen.getByText('*********6789')).toBeInTheDocument();
-  expect(screen.getByText('Internal Available Balance')).toBeInTheDocument();
-  expect(screen.getByText('Manage your saved bank details and view rent credits.')).toBeInTheDocument();
+  expect(screen.getByText('Available balance')).toBeInTheDocument();
+  expect(screen.getByText('Internal balance')).toBeInTheDocument();
+  expect(screen.getByText('No transactions yet')).toBeInTheDocument();
   expect(document.querySelector('.bank-account-details p')).toBeNull();
   expect(screen.getByText('ETB 2,000')).toBeInTheDocument();
   expect(screen.queryByLabelText('Account Number')).not.toBeInTheDocument();
@@ -262,7 +272,7 @@ test('requires a new account number when the saved encrypted number cannot be re
   expect(accountNumberInput).toHaveAttribute('placeholder', 'Enter account number');
 });
 
-test('keeps the active bank status without helper copy', async () => {
+test('shows active bank status in the account card without a separate active banner', async () => {
   axios.get.mockImplementation((url) => (
     Promise.resolve({
       data: {
@@ -273,9 +283,9 @@ test('keeps the active bank status without helper copy', async () => {
   ));
   render(<LandlordBankInformation />);
 
-  expect(await screen.findByText('Your bank account is active')).toBeInTheDocument();
+  expect(await screen.findByText('Active')).toBeInTheDocument();
   expect(document.querySelector('.bank-account-status')).toHaveTextContent('Active');
-  expect(document.querySelector('.bank-account-active-banner p')).toBeNull();
+  expect(document.querySelector('.bank-account-active-banner')).toBeNull();
   expect(screen.queryByText(
     'Verified rent payments are credited to your internal balance, not transferred to this bank account.'
   )).not.toBeInTheDocument();
@@ -293,17 +303,94 @@ test('shows persistent internal balance and credited rent transaction history', 
 
   expect(await screen.findAllByText('ETB 2,000')).toHaveLength(2);
   expect(screen.getByRole('heading', { name: 'Account Transactions' })).toBeInTheDocument();
-  expect(screen.getByText('Rent payment credit')).toBeInTheDocument();
-  expect(screen.getByText('2026-10')).toBeInTheDocument();
+  await expectTransactionsTableColumns();
+  expect(within(screen.getByRole('table')).getByText('2026-10')).toBeInTheDocument();
   expect(screen.getByText('Tenant Example')).toBeInTheDocument();
   expect(screen.getByText('Rental Home')).toBeInTheDocument();
   expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
   expect(screen.getByText('Rent payment: RP-payment-1')).toBeInTheDocument();
   expect(screen.getByText('Chapa payment: CHAPA-transaction-1')).toBeInTheDocument();
-  expect(screen.getByText('CREDITED')).toBeInTheDocument();
-  await expectTransactionsTableColumns();
+  expect(within(screen.getByRole('table')).getByText('CREDITED')).toBeInTheDocument();
+  expect(within(screen.getByRole('table')).getAllByText('Credit')).toHaveLength(1);
   expect(screen.queryByText('Payout reference: PO-test-123')).not.toBeInTheDocument();
   expect(screen.queryByText('Chapa transfer reference: PO-test-123')).not.toBeInTheDocument();
+});
+
+test('filters loaded transactions by search, period, type, and status and paginates results', async () => {
+  const transactions = Array.from({ length: 12 }, (_value, index) => ({
+    ...rentCredit,
+    id: `credit-${index + 1}`,
+    tenant: index === 11 ? 'Filtered Tenant' : `Tenant ${index + 1}`,
+    property: `Property ${index + 1}`,
+    paymentPeriod: index === 11 ? '2026-09' : '2026-10',
+    direction: index === 11 ? 'DEBIT' : 'CREDIT',
+    status: index === 11 ? 'PENDING' : 'CREDITED',
+    paymentReference: `REF-${index + 1}`,
+    providerTransactionReference: undefined,
+    payoutReference: undefined,
+  }));
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({ data: { transactions } });
+    }
+    return Promise.resolve({ data: { success: true, account } });
+  });
+  render(<LandlordBankInformation />);
+
+  const table = await screen.findByRole('table');
+  expect(within(table).getAllByRole('row')).toHaveLength(11);
+  expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  expect(within(table).getAllByRole('row')).toHaveLength(3);
+  const rowsPerPage = screen.getByLabelText('Rows per page');
+  expect(Array.from(rowsPerPage.options).map((option) => option.value)).toEqual(['10', '25', '50']);
+  fireEvent.change(rowsPerPage, { target: { value: '25' } });
+  expect(within(table).getAllByRole('row')).toHaveLength(13);
+  expect(screen.getByText('Page 1 of 1')).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText('Search transactions'), { target: { value: 'REF-12' } });
+  fireEvent.change(screen.getByLabelText('Period'), { target: { value: '2026-09' } });
+  fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'debit' } });
+  fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'PENDING' } });
+  expect(within(table).getAllByRole('row')).toHaveLength(2);
+  expect(within(table).getByText('Filtered Tenant')).toBeInTheDocument();
+  expect(screen.getByText('Showing 1–1 of 1')).toBeInTheDocument();
+});
+
+test('copies one shortened reference and reveals the full reference set on demand', async () => {
+  const fullReference = 'RP-reference-with-a-long-sensitive-value';
+  const writeText = jest.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  });
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/banks')) return Promise.resolve({ data: { success: true, banks } });
+    if (url.endsWith('/my-account/transactions')) {
+      return Promise.resolve({
+        data: {
+          transactions: [{
+            ...rentCredit,
+            paymentReference: fullReference,
+          }],
+        },
+      });
+    }
+    return Promise.resolve({ data: { success: true, account } });
+  });
+  render(<LandlordBankInformation />);
+
+  const table = await screen.findByRole('table');
+  expect(within(table).getByText('RP-refere…e-value')).toBeInTheDocument();
+  expect(within(table).queryByText(`Rent payment: ${fullReference}`)).not.toBeInTheDocument();
+  fireEvent.click(within(table).getByRole('button', { name: 'Copy reference RP-refere…e-value' }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(fullReference));
+  expect(await screen.findByText('Reference copied.')).toBeInTheDocument();
+  fireEvent.click(within(table).getByText('View reference details'));
+  expect(within(table).getByText(`Rent payment: ${fullReference}`)).toBeInTheDocument();
+  expect(within(table).getByText('Chapa payment: CHAPA-transaction-1')).toBeInTheDocument();
+  expect(within(table).getByText('Payout: PO-test-123')).toBeInTheDocument();
 });
 
 test('hides external transfer status and retry controls while retaining transaction data', async () => {
@@ -331,7 +418,7 @@ test('hides external transfer status and retry controls while retaining transact
   render(<LandlordBankInformation />);
 
   await expectTransactionsTableColumns();
-  expect(screen.getByText('CREDITED')).toBeInTheDocument();
+  expect(within(screen.getByRole('table')).getByText('CREDITED')).toBeInTheDocument();
   expect(screen.getByText('Rent payment: RP-payment-1')).toBeInTheDocument();
   expect(screen.getByText('Payout: PO-test-123')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Retry verification' })).not.toBeInTheDocument();

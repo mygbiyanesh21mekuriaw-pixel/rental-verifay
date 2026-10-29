@@ -1365,6 +1365,34 @@
   order: 5;
 }
 
+.landlord-rejection-reason {
+  order: 0;
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #7f1d1d;
+}
+
+.landlord-rejection-reason h2 {
+  margin: 0 0 6px;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.landlord-rejection-reason p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.landlord-rejection-reason small {
+  display: block;
+  margin-top: 8px;
+  color: #9f1239;
+}
+
 .landlord-property-edit-form .landlord-property-edit-images {
   order: 6;
 }

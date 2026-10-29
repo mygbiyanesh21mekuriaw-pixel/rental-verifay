@@ -802,7 +802,6 @@ const verifyProperty = async (req, res) => {
 // ንብረት ማረጋገጥ እምቢ ማለት (Reject)
 const rejectProperty = async (req, res) => {
   try {
-    const { comment } = req.body;
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({ message: 'Invalid property ID' });
     }
@@ -822,9 +821,17 @@ const rejectProperty = async (req, res) => {
       return res.status(403).json({ message: 'This property is outside your assigned admin area' });
     }
 
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+    if (reason.length < 10 || reason.length > 500) {
+      return res.status(400).json({ message: 'Rejection reason must be between 10 and 500 characters.' });
+    }
+
+    const rejectedAt = new Date();
     property.isVerified = false;
     property.verificationStatus = 'rejected';
-    appendAdminDecision(property, admin, 'rejected', comment || 'Documentation insufficient');
+    property.rejectionReason = reason;
+    property.rejectedAt = rejectedAt;
+    appendAdminDecision(property, admin, 'rejected', reason, rejectedAt);
     await property.save();
 
     // የማረጋገጫ ጥያቄውን አዘምን
@@ -833,8 +840,8 @@ const rejectProperty = async (req, res) => {
       {
         status: 'rejected',
         reviewedBy: req.user.id,
-        reviewedAt: new Date(),
-        adminComment: comment || 'Documentation insufficient',
+        reviewedAt: rejectedAt,
+        adminComment: reason,
       }
     );
 
@@ -842,15 +849,15 @@ const rejectProperty = async (req, res) => {
       property.landlord,
       property._id,
       property.title,
-      `Your property "${property.title}" was rejected.`,
+      `Your property "${property.title}" was rejected. Reason: ${reason}`,
       'rejected',
-      comment || 'Please review the verification requirements and resubmit the property.'
+      reason
     );
 
     await logAudit({
       req, action: 'PROPERTY_REJECTED', module: 'properties',
       targetType: 'property', targetId: property._id, targetLabel: property.title,
-      details: { comment: comment || 'Documentation insufficient.' },
+      details: { reason },
       description: `Area Admin ${admin.name} rejected property "${property.title}".`,
     });
 

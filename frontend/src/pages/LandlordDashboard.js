@@ -223,6 +223,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
   const [unavailablePermissions, setUnavailablePermissions] = useState({});
   const [documentFile, setDocumentFile] = useState(null);
   const [existingProofOfOwnership, setExistingProofOfOwnership] = useState(false);
+  const [rejectionDetails, setRejectionDetails] = useState(null);
   const formFieldCount = Object.keys(formData).length + 2;
   const filledFormFieldCount = Object.values(formData).filter(
     (value) => String(value).trim().length > 0
@@ -231,6 +232,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
 
   useEffect(() => {
     setShowForm(initialShowForm || isEditMode);
+    setRejectionDetails(null);
     if (initialShowForm) {
       setActiveSection('addProperty');
     }
@@ -247,6 +249,11 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
         });
 
         const property = response.data;
+        setRejectionDetails({
+          reason: typeof property.rejectionReason === 'string' ? property.rejectionReason.trim() : '',
+          date: property.rejectedAt || null,
+          adminName: property.rejectedByName || '',
+        });
         setExistingPropertyImages(getPropertyImages(property));
         setFormData({
           title: property.title || '',
@@ -820,6 +827,21 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
               }`}
             >
               <div className={isEditMode ? 'landlord-property-edit-layout' : 'landlord-add-property-layout'}>
+                {isEditMode && rejectionDetails?.reason && (
+                  <section className="landlord-rejection-reason" aria-labelledby="landlord-rejection-reason-title">
+                    <h2 id="landlord-rejection-reason-title">{t('Reason for rejection')}</h2>
+                    <p>{rejectionDetails.reason}</p>
+                    {(rejectionDetails.date || rejectionDetails.adminName) && (
+                      <small>
+                        {rejectionDetails.date && t('Rejected {date}', {
+                          date: formatDate(rejectionDetails.date, { dateStyle: 'medium' }),
+                        })}
+                        {rejectionDetails.date && rejectionDetails.adminName ? ' · ' : ''}
+                        {rejectionDetails.adminName && t('Rejected by {name}', { name: rejectionDetails.adminName })}
+                      </small>
+                    )}
+                  </section>
+                )}
                 <div className={isEditMode ? 'landlord-property-edit-main' : 'landlord-add-property-main'}>
                   <section className={isEditMode ? 'landlord-property-edit-basic' : 'landlord-add-property-card'}>
                     {!isEditMode && <h2>Basic information</h2>}

@@ -50,9 +50,37 @@ const canViewVerificationDocument = (user, property) => {
 const propertyResponse = (property, user) => {
   const result = typeof property.toObject === 'function' ? property.toObject() : { ...property };
   const canViewProof = canViewVerificationDocument(user, property);
+  const landlordId = property.landlord?._id || property.landlord;
+  const userId = user?.id || user?._id;
+  const isOwnerLandlord = getAdministrativeRole(user) === 'landlord'
+    && String(landlordId) === String(userId);
+  const rejectedHistory = (property.history || []).filter((entry) => entry.action === 'rejected');
+  const latestRejection = rejectedHistory[rejectedHistory.length - 1];
+  const isCurrentlyRejected = property.verificationStatus
+    ? property.verificationStatus === 'rejected'
+    : property.decision === 'rejected';
   result.hasVerificationDocument = Boolean(
     canViewProof && (property.verificationDocument || property.verificationDocumentAsset?.publicId),
   );
+  delete result.rejectionReason;
+  delete result.rejectionNote;
+  delete result.rejectionNotes;
+  delete result.rejectedAt;
+  delete result.rejectedByName;
+  if (isOwnerLandlord) {
+    result.rejectionReason = isCurrentlyRejected
+      ? [
+        property.rejectionReason,
+        property.rejectionNote,
+        property.rejectionNotes,
+        latestRejection?.note,
+      ].find((reason) => typeof reason === 'string' && reason.trim())?.trim() || ''
+      : '';
+    result.rejectedAt = isCurrentlyRejected ? property.rejectedAt || latestRejection?.at || null : null;
+    result.rejectedByName = isCurrentlyRejected
+      ? latestRejection?.byName || property.handledByName || ''
+      : '';
+  }
   delete result.verificationDocument;
   delete result.verificationDocumentAsset;
   delete result.handledBy;
@@ -796,6 +824,8 @@ const updateProperty = async (req, res) => {
     // ካዘመነ በኋላ እንደገና መረጋገጥ አለበት
     property.isVerified = false;
     property.verificationStatus = 'pending';
+    property.rejectionReason = '';
+    property.rejectedAt = null;
 
     await property.save();
 

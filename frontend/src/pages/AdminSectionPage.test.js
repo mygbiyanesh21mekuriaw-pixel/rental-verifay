@@ -764,6 +764,45 @@ test('Area Admin Under Review actions still call the existing verify endpoint', 
   });
 });
 
+test('Area Admin rejection submits the trimmed reason and refreshes the properties list', async () => {
+  useAuth.mockReturnValue({
+    user: { _id: 'area-admin-id', role: 'admin', adminType: 'area' },
+  });
+  axios.get.mockImplementation((url) => Promise.resolve({
+    data: url.includes('pending-properties')
+      ? [{
+        _id: 'pending-property',
+        title: 'Pending Property',
+        verificationStatus: 'pending',
+        isVerified: false,
+      }]
+      : [],
+  }));
+
+  render(
+    <MemoryRouter>
+      <AdminSectionPage type="pending" />
+    </MemoryRouter>,
+  );
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Reject' }));
+  const dialog = screen.getByRole('dialog', { name: 'Reject property' });
+  fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason for rejection (required)' }), {
+    target: { value: '  Ownership document is unclear  ' },
+  });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Reject' }));
+
+  await waitFor(() => {
+    expect(axios.put).toHaveBeenCalledWith(
+      expect.stringContaining('/api/admin/reject-property/pending-property'),
+      { reason: 'Ownership document is unclear' },
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+  });
+  expect(await screen.findByText('Property rejected successfully.')).toBeInTheDocument();
+  await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(2));
+});
+
 test('Area Admin property details keep the ownership proof out of the card', async () => {
   useAuth.mockReturnValue({
     user: { _id: 'area-admin-id', role: 'admin', adminType: 'area' },

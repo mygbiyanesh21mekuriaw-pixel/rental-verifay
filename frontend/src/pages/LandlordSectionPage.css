@@ -486,3 +486,895 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.landlord-rented-grid {
+  grid-auto-rows: 1fr;
+}
+
+.landlord-rented-card .landlord-verified-content h2 {
+  min-height: 2.7em;
+}
+
+.landlord-rented-badge {
+  background: #6d28d9;
+}
+
+.landlord-rented-tenant {
+  display: flex;
+  min-height: 86px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 11px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.landlord-rented-tenant-label {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.landlord-rented-tenant strong {
+  color: #172033;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.landlord-rented-payment-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.landlord-rented-payment-paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.landlord-rented-payment-due {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.landlord-rented-payment-overdue {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.landlord-rented-reviews {
+  color: #475569;
+  font-size: 11px;
+}
+
+.landlord-rented-reviews summary {
+  width: fit-content;
+  color: #1d4ed8;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.landlord-rented-review {
+  margin-top: 7px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.landlord-rented-review > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.landlord-rented-review > div span {
+  color: #ca8a04;
+  white-space: nowrap;
+}
+
+.landlord-rented-review p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 5px 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.landlord-rented-review time {
+  color: #64748b;
+  font-size: 10px;
+}
+
+.landlord-rented-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #eef2f7;
+}
+
+.landlord-rented-actions > button,
+.landlord-rented-table-action {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 36px;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+}
+
+.landlord-rented-action-message {
+  border-color: #2563eb !important;
+  background: #2563eb;
+}
+
+.landlord-rented-action-message:hover {
+  background: #1d4ed8;
+}
+
+.landlord-rented-action-payments {
+  border-color: #b45309 !important;
+  background: #b45309;
+}
+
+.landlord-rented-action-payments:hover {
+  background: #92400e;
+}
+
+.landlord-verified-menu-item-update {
+  color: #1d4ed8;
+}
+
+.landlord-verified-menu-item-update:hover,
+.landlord-verified-menu-item-update:focus-visible {
+  background: #eff6ff;
+}
+
+.landlord-rented-table .landlord-rented-table-action {
+  min-height: 32px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.landlord-rented-table .landlord-verified-table-actions {
+  min-width: 240px;
+}
+
+@media (max-width: 640px) {
+  .landlord-rented-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .landlord-rented-table,
+  .landlord-rented-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .landlord-rented-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  .landlord-rented-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.06);
+  }
+
+  .landlord-rented-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(90px, 0.42fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  .landlord-rented-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .landlord-rented-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .landlord-rented-table .landlord-verified-table-actions {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+.landlord-verified-page {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.landlord-verified-header {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.landlord-verified-header-row h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #172033;
+  font-size: 23px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.landlord-verified-header-row h1 > span {
+  display: inline-flex;
+  min-width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #e8f1ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.landlord-verified-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.landlord-verified-search {
+  display: flex;
+  width: min(100%, 370px);
+  min-width: 180px;
+  height: 40px;
+  align-items: center;
+  gap: 9px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid #d5dce7;
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+}
+
+.landlord-verified-search:focus-within,
+.landlord-verified-sort select:focus-visible {
+  border-color: #2563eb;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.landlord-verified-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+}
+
+.landlord-verified-sort {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.landlord-verified-sort select {
+  height: 40px;
+  padding: 0 30px 0 10px;
+  border: 1px solid #d5dce7;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 13px;
+}
+
+.landlord-verified-view-toggle {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 3px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.landlord-verified-view-toggle button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.landlord-verified-view-toggle button.active,
+.landlord-verified-view-toggle button[aria-pressed="true"] {
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.landlord-verified-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  align-items: stretch;
+  gap: 16px;
+}
+
+.landlord-verified-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.landlord-verified-card:hover {
+  z-index: 1;
+  transform: translateY(-2px);
+  box-shadow: 0 9px 22px rgba(15, 23, 42, 0.11);
+}
+
+.landlord-verified-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 13px 13px 0 0;
+  background: #f1f5f9;
+}
+
+.landlord-verified-image,
+.landlord-verified-image-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.landlord-verified-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.landlord-verified-badge {
+  position: absolute;
+  top: 11px;
+  left: 11px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  background: #15803d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+}
+
+.landlord-under-review-badge {
+  background: #b45309;
+}
+
+.landlord-rejected-badge {
+  background: #b91c1c;
+}
+
+.landlord-verified-content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px;
+}
+
+.landlord-verified-content h2 {
+  display: -webkit-box;
+  min-height: 2.7em;
+  overflow: hidden;
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.landlord-verified-location {
+  display: flex;
+  min-height: 2.8em;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.landlord-verified-location svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.landlord-verified-location span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.landlord-verified-price {
+  margin: 0;
+  color: #1d4ed8;
+  font-size: 21px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.landlord-verified-price span {
+  margin-left: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.landlord-verified-meta {
+  display: flex;
+  min-height: 34px;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 5px 12px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.landlord-verified-review-status {
+  display: -webkit-box;
+  overflow: hidden;
+  width: 100%;
+  color: #92400e;
+  font-weight: 650;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.landlord-rejected-reason {
+  padding: 9px 10px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #7f1d1d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.landlord-rejected-reason strong,
+.landlord-rejected-table-reason strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.landlord-rejected-by {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+}
+
+.landlord-rejected-reason p,
+.landlord-rejected-table-reason span {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.landlord-rejected-reason a,
+.landlord-rejected-table-reason a {
+  display: inline-block;
+  margin-top: 4px;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.landlord-rejected-table-reason {
+  max-width: 220px;
+  color: #7f1d1d;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.landlord-verified-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #eef2f7;
+}
+
+.landlord-verified-update {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 38px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid #2563eb;
+  border-radius: 9px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.landlord-verified-update:hover {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+}
+
+.landlord-verified-update-small {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+}
+
+.landlord-verified-menu-wrap {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.landlord-verified-menu-trigger {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.landlord-verified-menu-trigger:hover,
+.landlord-verified-menu-trigger[aria-expanded="true"] {
+  background: #f8fafc;
+  color: #172033;
+}
+
+.landlord-verified-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 132px;
+  padding: 5px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+}
+
+.landlord-verified-menu-item {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.landlord-verified-menu-item:hover,
+.landlord-verified-menu-item:focus-visible {
+  outline: 0;
+  background: #fef2f2;
+}
+
+.landlord-verified-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.landlord-verified-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #334155;
+  font-size: 13px;
+}
+
+.landlord-verified-table th,
+.landlord-verified-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.landlord-verified-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.landlord-verified-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.landlord-verified-table-title,
+.landlord-verified-table-actions {
+  display: flex;
+  min-width: 150px;
+  align-items: center;
+  gap: 9px;
+}
+
+.landlord-verified-table-title > span {
+  display: -webkit-box;
+  overflow: hidden;
+  font-weight: 700;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.landlord-verified-table-thumb {
+  width: 52px;
+  height: 40px;
+  flex: 0 0 52px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.landlord-verified-table-price {
+  color: #1d4ed8;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.landlord-verified-table-actions {
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.landlord-verified-table-actions .landlord-verified-menu-trigger {
+  width: 34px;
+  height: 34px;
+}
+
+.landlord-verified-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.landlord-verified-page-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #d5dce7;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.landlord-verified-page-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.landlord-verified-empty {
+  display: flex;
+  min-height: 210px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  color: #64748b;
+  text-align: center;
+}
+
+.landlord-verified-empty > svg {
+  color: #2563eb;
+  font-size: 32px;
+}
+
+.landlord-verified-empty p {
+  margin: 0;
+}
+
+.landlord-verified-success {
+  padding: 11px 14px;
+  border: 1px solid #a7f3d0;
+  border-radius: 9px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.landlord-verified-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 16px;
+}
+
+.landlord-verified-skeleton-card {
+  display: flex;
+  min-height: 310px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.landlord-verified-skeleton-image,
+.landlord-verified-skeleton-line {
+  display: block;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: landlord-verified-shimmer 1.3s ease-in-out infinite;
+}
+
+.landlord-verified-skeleton-image {
+  height: 145px;
+}
+
+.landlord-verified-skeleton-line {
+  height: 12px;
+}
+
+.landlord-verified-skeleton-line.short {
+  width: 65%;
+}
+
+@keyframes landlord-verified-shimmer {
+  to { background-position: -200% 0; }
+}
+
+@media (max-width: 640px) {
+  .landlord-verified-page {
+    gap: 14px;
+  }
+
+  .landlord-verified-header-row h1 {
+    font-size: 20px;
+  }
+
+  .landlord-verified-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .landlord-verified-search {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .landlord-verified-sort {
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  .landlord-verified-sort select {
+    flex: 1;
+  }
+
+  .landlord-verified-view-toggle {
+    margin-left: 0;
+  }
+
+  .landlord-verified-grid,
+  .landlord-verified-skeleton-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .landlord-verified-table th,
+  .landlord-verified-table td {
+    padding: 9px 8px;
+  }
+}

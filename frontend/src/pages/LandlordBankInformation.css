@@ -1,0 +1,551 @@
+.landlord-bank-information {
+  min-width: 0;
+  gap: 16px;
+}
+
+.landlord-bank-information-heading {
+  margin: 0 0 2px;
+}
+
+.landlord-bank-information-heading h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.bank-account-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr);
+  align-items: stretch;
+  gap: 16px;
+  min-width: 0;
+}
+
+.bank-account-summary-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.bank-account-balance-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 180px;
+  background: linear-gradient(140deg, #f8fafc, #eef2ff);
+}
+
+.bank-account-balance-card h2,
+.bank-account-panel > h2 {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.bank-account-balance-amount {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(30px, 3vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.bank-account-balance-caption {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.bank-account-balance-skeleton,
+.bank-account-skeleton span,
+.bank-account-transactions-skeleton span {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: bank-account-skeleton-pulse 1.4s ease infinite;
+}
+
+.bank-account-balance-skeleton {
+  width: min(80%, 250px);
+  height: 42px;
+}
+
+.bank-account-skeleton {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.bank-account-skeleton span {
+  width: 75%;
+  height: 14px;
+}
+
+.bank-account-skeleton span:first-child {
+  width: 45%;
+  height: 22px;
+}
+
+.bank-account-summary-loading {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 180px;
+}
+
+.bank-account-panel {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.bank-account-panel .bank-account-details {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.bank-account-panel .bank-account-details dl > div {
+  grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1.5fr);
+  gap: 10px;
+  padding: 9px 0;
+}
+
+.bank-account-panel .bank-account-details dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bank-account-status-row dd {
+  display: flex;
+  align-items: center;
+}
+
+.bank-account-status {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.bank-account-status-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.bank-account-status-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.bank-account-status-other {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.bank-account-panel .bank-account-active-banner {
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+}
+
+.bank-account-update-button {
+  width: 100%;
+  min-height: 44px;
+}
+
+.bank-account-transactions {
+  min-width: 0;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.bank-account-transactions-heading h2 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.bank-account-transactions-heading p {
+  margin: 5px 0 16px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.bank-account-transaction-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.bank-account-transaction-controls label,
+.bank-account-pagination label {
+  min-width: 0;
+}
+
+.bank-account-transaction-controls input,
+.bank-account-transaction-controls select,
+.bank-account-pagination select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+}
+
+.bank-account-transaction-controls input:focus-visible,
+.bank-account-transaction-controls select:focus-visible,
+.bank-account-pagination select:focus-visible,
+.bank-account-pagination button:focus-visible,
+.bank-account-copy-button:focus-visible,
+.bank-account-reference-details-button:focus-visible {
+  outline: 3px solid rgba(79, 70, 229, 0.3);
+  outline-offset: 2px;
+}
+
+.bank-account-result-count {
+  margin: 12px 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.bank-account-transactions-wrap {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.bank-account-transactions-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+  color: #334155;
+  font-size: 12px;
+  text-align: left;
+}
+
+.bank-account-transactions-table th,
+.bank-account-transactions-table td {
+  padding: 10px 9px;
+  border-bottom: 1px solid #e8edf3;
+  white-space: nowrap;
+}
+
+.bank-account-transactions-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bank-account-transactions-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.bank-account-transactions-table .bank-account-amount-cell {
+  color: #0f172a;
+  font-weight: 800;
+  text-align: right;
+}
+
+.bank-account-transactions-table .bank-account-ledger-status {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.bank-account-ledger-status-credit,
+.bank-account-ledger-status-credited {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.bank-account-ledger-status-debit,
+.bank-account-ledger-status-failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.bank-account-ledger-status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.bank-account-ledger-status-neutral {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.bank-account-reference-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.bank-account-copy-button {
+  padding: 4px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.bank-account-reference-details-button {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #4338ca;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.bank-account-reference-details {
+  position: absolute;
+  z-index: 2;
+  top: 100%;
+  right: 0;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  margin: 6px 0 0;
+  padding: 10px 12px 10px 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  white-space: normal;
+}
+
+.bank-account-reference-details li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.bank-account-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.bank-account-pagination label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.bank-account-pagination select {
+  width: auto;
+  min-width: 76px;
+}
+
+.bank-account-pagination nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.bank-account-pagination button {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.bank-account-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.bank-account-copy-feedback {
+  margin: 8px 0;
+  color: #166534;
+  font-size: 13px;
+}
+
+.bank-account-copy-feedback.is-error {
+  color: #b91c1c;
+}
+
+.bank-account-transactions-skeleton {
+  display: grid;
+  gap: 10px;
+}
+
+.bank-account-transactions-skeleton span {
+  height: 38px;
+}
+
+@keyframes bank-account-skeleton-pulse {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .bank-account-transaction-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .bank-account-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bank-account-summary-loading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bank-account-balance-card {
+    min-height: 150px;
+  }
+
+  .bank-account-transactions {
+    padding: 14px;
+  }
+
+  .bank-account-transactions-wrap {
+    overflow: visible;
+    border: 0;
+  }
+
+  .bank-account-transactions-table {
+    display: block;
+    min-width: 0;
+  }
+
+  .bank-account-transactions-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  .bank-account-transactions-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .bank-account-transactions-table tbody tr {
+    display: grid;
+    gap: 0;
+    padding: 6px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+  }
+
+  .bank-account-transactions-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(90px, 0.7fr) minmax(0, 1.3fr);
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .bank-account-transactions-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .bank-account-transactions-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .bank-account-transactions-table .bank-account-amount-cell {
+    text-align: left;
+  }
+
+  .bank-account-reference-cell {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .bank-account-reference-details {
+    position: static;
+    width: auto;
+    max-width: none;
+  }
+
+  .bank-account-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .bank-account-pagination nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .bank-account-summary-card {
+    padding: 16px;
+  }
+
+  .bank-account-transaction-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bank-account-transactions-table tbody td {
+    grid-template-columns: minmax(75px, 0.65fr) minmax(0, 1.35fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bank-account-balance-skeleton,
+  .bank-account-skeleton span,
+  .bank-account-transactions-skeleton span {
+    animation: none;
+  }
+}

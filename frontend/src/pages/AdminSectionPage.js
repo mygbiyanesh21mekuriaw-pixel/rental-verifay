@@ -14,6 +14,7 @@ import BackToDashboard from '../components/BackToDashboard';
 import AreaPropertyList from '../components/AreaPropertyList';
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
+import RejectionReasonModal from '../components/RejectionReasonModal';
 import { getPropertyImages } from '../utils/propertyMedia';
 import { apiUrl } from '../utils/apiUrl';
 import { useLanguage } from '../context/LanguageContext';
@@ -179,6 +180,11 @@ const AdminSectionPage = ({ type }) => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+  const [rejectionProperty, setRejectionProperty] = useState(null);
+  const [propertyActionFeedback, setPropertyActionFeedback] = useState(() => (
+    location.state?.message ? t(location.state.message) : ''
+  ));
+  const rejectionTriggerRef = useRef(null);
   const [userActionFeedback, setUserActionFeedback] = useState(null);
   const [userRoleTab, setUserRoleTab] = useState('all');
   const [userStatusFilter, setUserStatusFilter] = useState('all');
@@ -673,21 +679,35 @@ const AdminSectionPage = ({ type }) => {
     };
   }, [adminFormOpen]);
 
-  const handlePropertyAction = async (propertyId, action) => {
+  const handlePropertyAction = async (propertyId, action, reason) => {
+    if (action === 'reject' && typeof reason !== 'string') {
+      rejectionTriggerRef.current = document.activeElement;
+      setPropertyActionFeedback('');
+      setRejectionProperty(items.find((property) => property._id === propertyId) || { _id: propertyId });
+      return;
+    }
+
     setActionLoading(propertyId);
     const endpoint = `${process.env.REACT_APP_API_URL}/api/admin/${action}-property/${propertyId}`;
-    const payload = action === 'reject' ? { comment: 'Documentation insufficient' } : {};
-    console.info('Admin property action', { method: 'PUT', endpoint, propertyId, payload });
+    const payload = action === 'reject' ? { reason } : {};
+    console.info('Admin property action', { method: 'PUT', endpoint, propertyId, action });
     try {
       const token = localStorage.getItem('token');
       const response = await axios.put(endpoint, payload, { headers: { Authorization: `Bearer ${token}` } });
       console.info('Admin property action succeeded', { method: 'PUT', endpoint, propertyId, status: response.status });
       await fetchItems();
+      if (action === 'reject') {
+        if (rejectionProperty?._id === propertyId) {
+          setPropertyActionFeedback(t('Property rejected successfully.'));
+        }
+      }
+      return { success: true };
     } catch (error) {
       const status = error.response?.status || 'no response';
-      const message = error.response?.data?.message || error.message || 'Unable to update property';
-      console.error('Admin property action failed', { method: 'PUT', endpoint, propertyId, payload, status, message });
-      alert(`${message} (HTTP ${status})`);
+      const message = error.response?.data?.message || error.message || t('Unable to update property');
+      console.error('Admin property action failed', { method: 'PUT', endpoint, propertyId, action, status, message });
+      if (action !== 'reject') alert(`${message} (HTTP ${status})`);
+      return { success: false, message };
     } finally {
       setActionLoading(null);
     }
@@ -2411,6 +2431,19 @@ const AdminSectionPage = ({ type }) => {
               </button>
             </div>
           </section>
+        </div>
+      )}
+      {rejectionProperty && (
+        <RejectionReasonModal
+          onClose={() => setRejectionProperty(null)}
+          onSubmit={(reason) => handlePropertyAction(rejectionProperty._id, 'reject', reason)}
+          returnFocusRef={rejectionTriggerRef}
+          loading={actionLoading === rejectionProperty._id}
+        />
+      )}
+      {propertyActionFeedback && (
+        <div className="admin-success-banner" role="status" aria-live="polite">
+          {propertyActionFeedback}
         </div>
       )}
     </div>

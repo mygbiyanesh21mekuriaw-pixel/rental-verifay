@@ -1,6 +1,27 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+import './LandlordBankInformation.css';
+
+const getTransactionReferences = (transaction) => [
+  { label: 'Rent payment', value: transaction.paymentReference },
+  { label: 'Chapa payment', value: transaction.providerTransactionReference },
+  { label: 'Payout', value: transaction.payoutReference || transaction.providerReference },
+  { label: 'Chapa transfer', value: transaction.chapaTransferReference },
+].filter((reference) => reference.value);
+
+const shortenReference = (reference) => (
+  reference.length > 20 ? `${reference.slice(0, 9)}…${reference.slice(-7)}` : reference
+);
+
+const getLedgerStatusClass = (status) => {
+  const normalizedStatus = String(status || '').toLowerCase();
+  if (['credited', 'paid', 'completed', 'active'].includes(normalizedStatus)) return 'credited';
+  if (['pending', 'processing'].includes(normalizedStatus)) return 'pending';
+  if (['failed', 'rejected', 'cancelled', 'reverted'].includes(normalizedStatus)) return 'failed';
+  return 'neutral';
+};
 
 const getAuthConfig = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
@@ -51,9 +72,19 @@ const normalizeBanksResponse = (response) => extractBankRecords(response?.data ?
 
 const LandlordBankInformation = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [banks, setBanks] = useState([]);
   const [account, setAccount] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [search, setSearch] = useState('');
+  const [periodFilter, setPeriodFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [copyFeedback, setCopyFeedback] = useState('');
+  const [copyFailed, setCopyFailed] = useState(false);
+  const [expandedReferenceRows, setExpandedReferenceRows] = useState({});
   const [form, setForm] = useState({
     bankCode: '',
     accountName: user?.name || '',
@@ -200,6 +231,53 @@ const LandlordBankInformation = () => {
     form.accountName.trim() &&
     (form.accountNumber.trim() || (showUpdateModal && hasSavedAccountNumber))
   );
+  const periods = useMemo(
+    () => [...new Set(transactions.map((transaction) => transaction.paymentPeriod).filter(Boolean))].sort().reverse(),
+    [transactions]
+  );
+  const statuses = useMemo(
+    () => [...new Set(transactions.map((transaction) => transaction.status).filter(Boolean))].sort(),
+    [transactions]
+  );
+  const filteredTransactions = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return transactions.filter((transaction) => {
+      const direction = String(transaction.direction || '').toLowerCase();
+      const referenceText = getTransactionReferences(transaction)
+        .map((reference) => reference.value)
+        .join(' ');
+      const matchesSearch = !normalizedSearch || [
+        transaction.tenant,
+        transaction.property,
+        referenceText,
+      ].some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
+      return matchesSearch &&
+        (!periodFilter || transaction.paymentPeriod === periodFilter) &&
+        (!typeFilter || direction === typeFilter) &&
+        (!statusFilter || transaction.status === statusFilter);
+    });
+  }, [transactions, search, periodFilter, typeFilter, statusFilter]);
+  const pageCount = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
+  const visibleTransactions = filteredTransactions.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, periodFilter, typeFilter, statusFilter, pageSize]);
+
+  const copyReference = async (reference) => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable.');
+      await navigator.clipboard.writeText(reference);
+      setCopyFeedback(t('Reference copied.'));
+      setCopyFailed(false);
+    } catch {
+      setCopyFeedback(t('Unable to copy reference.'));
+      setCopyFailed(true);
+    }
+  };
 
   const renderFormFields = (isUpdate) => (
     <>
@@ -259,16 +337,23 @@ const LandlordBankInformation = () => {
 
   return (
     <section className="landlord-account-page landlord-bank-information !m-0 !w-full !max-w-none !p-0 flex flex-col gap-3">
-      <header>
-        <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">LANDLORD WORKSPACE</p>
-          <h1 className="m-0 text-2xl font-bold text-slate-800">Bank Information</h1>
-          <span className="text-sm text-slate-600">Manage your saved bank details and view rent credits.</span>
-        </div>
+      <header className="landlord-bank-information-heading">
+        <h1 className="m-0 text-2xl font-bold text-slate-800">{t('Bank Information')}</h1>
       </header>
 
-      <section className="landlord-account-card bank-account-panel !mb-0" aria-labelledby="bank-account-panel-title">
-        <h2 id="bank-account-panel-title">Bank Information</h2>
+      <div className={`bank-account-summary-grid${loading ? ' bank-account-summary-loading' : ''}`}>
+        <section className="bank-account-summary-card bank-account-balance-card" aria-labelledby="available-balance-title">
+          <h2 id="available-balance-title">{t('Available balance')}</h2>
+          {loading ? (
+            <div className="bank-account-balance-skeleton" role="status" aria-label={t('Loading balance')} />
+          ) : (
+            <p className="bank-account-balance-amount">{account?.currency || 'ETB'} {Number(account?.balance || 0).toLocaleString()}</p>
+          )}
+          <p className="bank-account-balance-caption">{t('Internal balance')}</p>
+        </section>
+
+        <section className="landlord-account-card bank-account-panel bank-account-summary-card !mb-0" aria-labelledby="bank-account-panel-title">
+        <h2 id="bank-account-panel-title">{t('Bank account')}</h2>
 
         {message && <p className="landlord-account-message" role="status">{message}</p>}
         {bankListError && <p className="landlord-account-message" role="alert">{bankListError}</p>}
@@ -288,31 +373,35 @@ const LandlordBankInformation = () => {
           <p className="landlord-account-help" role="status">Loading bank information...</p>
         ) : account ? (
           <>
-            <div className={`bank-account-active-banner${account.bankAccountNeedsUpdate ? ' bank-account-warning-banner' : ''}`}>
-              <span aria-hidden="true">{account.bankAccountNeedsUpdate ? '!' : '✓'}</span>
-              <div>
-                <strong>{account.bankAccountNeedsUpdate ? 'Please update your bank account number' : 'Your bank account is active'}</strong>
-                {account.bankAccountNeedsUpdate && (
+            {account.bankAccountNeedsUpdate && (
+              <div className="bank-account-active-banner bank-account-warning-banner" role="status">
+                <span aria-hidden="true">!</span>
+                <div>
+                  <strong>Please update your bank account number</strong>
                   <p>The saved account number can no longer be securely read. Enter your bank account number again to restore payouts. Your internal rent credits are not affected.</p>
-                )}
+                </div>
               </div>
-              <span className="bank-account-status">{account.bankAccountNeedsUpdate ? 'Update needed' : 'Active'}</span>
-            </div>
+            )}
 
             <div className="bank-account-details">
-              <h3>Bank Account Details</h3>
               <dl>
                 <div><dt>Bank</dt><dd>{account.bankName} ({account.bankCode})</dd></div>
                 <div><dt>Account Name</dt><dd>{account.accountName}</dd></div>
                 <div><dt>Account Number</dt><dd>{account.accountNumberMasked || '••••'}</dd></div>
-                <div><dt>Status</dt><dd className={account.bankAccountNeedsUpdate ? '' : 'bank-account-active-text'}>{account.bankAccountNeedsUpdate ? 'Update needed' : 'Active'}</dd></div>
-                <div><dt>Internal Available Balance</dt><dd>{account.currency || 'ETB'} {Number(account.balance || 0).toLocaleString()}</dd></div>
+                <div className="bank-account-status-row">
+                  <dt>Status</dt>
+                  <dd>
+                    <span className={`bank-account-status ${account.bankAccountNeedsUpdate ? 'bank-account-status-warning' : String(account.status || 'active').toLowerCase() === 'active' ? 'bank-account-status-active' : 'bank-account-status-other'}`}>
+                      {account.bankAccountNeedsUpdate ? t('Update needed') : String(account.status || 'active').toLowerCase() === 'active' ? t('Active') : account.status}
+                    </span>
+                  </dd>
+                </div>
               </dl>
             </div>
 
             <button
               type="button"
-              className="landlord-account-button secondary"
+              className="landlord-account-button secondary bank-account-update-button"
               onClick={openUpdateModal}
             >
               Update Bank Account
@@ -374,76 +463,176 @@ const LandlordBankInformation = () => {
           </div>
         )}
 
-        {!loadError && !loading && (
-          <section className="bank-account-transactions" aria-labelledby="bank-account-transactions-title">
-            <div className="bank-account-transactions-heading">
-              <div>
-                <h3 id="bank-account-transactions-title">Account Transactions</h3>
-                <p>Internal rent credits are separate from external bank transfers.</p>
-              </div>
-            </div>
-            {transactions.length === 0 ? (
-              <p className="landlord-account-help">No account transactions have been recorded yet.</p>
-            ) : (
-              <div className="bank-account-transactions-wrap">
-                <table className="bank-account-transactions-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Period</th>
-                      <th>Description</th>
-                      <th>Tenant</th>
-                      <th>Property</th>
-                      <th>Amount</th>
-                      <th>Credit/Debit</th>
-                      <th>Landlord Credit</th>
-                      <th>Reference</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((transaction) => (
-                      <tr key={transaction.id}>
-                        <td>{transaction.date ? new Date(transaction.date).toLocaleDateString() : '—'}</td>
-                        <td>{transaction.paymentPeriod || '—'}</td>
-                        <td>{transaction.description}</td>
-                        <td>{transaction.tenant}</td>
-                        <td>{transaction.property}</td>
-                        <td>{transaction.currency || 'ETB'} {Number(transaction.amount).toLocaleString()}</td>
-                        <td>{transaction.direction}</td>
-                        <td>{transaction.status}</td>
-                        <td>
-                          <div className="bank-account-transfer-status">
-                            {transaction.paymentReference && (
-                              <small className="bank-account-transfer-detail">
-                                Rent payment: {transaction.paymentReference}
-                              </small>
-                            )}
-                            {transaction.providerTransactionReference && (
-                              <small className="bank-account-transfer-detail">
-                                Chapa payment: {transaction.providerTransactionReference}
-                              </small>
-                            )}
-                            {transaction.payoutReference && (
-                              <small className="bank-account-transfer-detail">
-                                Payout: {transaction.payoutReference}
-                              </small>
-                            )}
-                            {transaction.chapaTransferReference && (
-                              <small className="bank-account-transfer-detail">
-                                Chapa transfer: {transaction.chapaTransferReference}
-                              </small>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
       </section>
+      </div>
+
+      {!loadError && (
+        <section className="bank-account-transactions" aria-labelledby="bank-account-transactions-title">
+          <div className="bank-account-transactions-heading">
+            <div>
+              <h2 id="bank-account-transactions-title">{t('Account Transactions')}</h2>
+              <p>{t('Internal rent credits are separate from external bank transfers.')}</p>
+            </div>
+          </div>
+          {loading ? (
+            <div className="bank-account-transactions-skeleton" role="status" aria-label={t('Loading transactions')}>
+              <span />
+              <span />
+              <span />
+            </div>
+          ) : (
+            <>
+              <div className="bank-account-transaction-controls">
+                <label>
+                  <span className="sr-only">{t('Search transactions')}</span>
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={t('Search tenant, property, or reference')}
+                  />
+                </label>
+                <label>
+                  <span className="sr-only">{t('Period')}</span>
+                  <select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
+                    <option value="">{t('All periods')}</option>
+                    {periods.map((period) => <option key={period} value={period}>{period}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span className="sr-only">{t('Type')}</span>
+                  <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                    <option value="">{t('All types')}</option>
+                    <option value="credit">{t('Credit')}</option>
+                    <option value="debit">{t('Debit')}</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="sr-only">{t('Status')}</span>
+                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                    <option value="">{t('All statuses')}</option>
+                    {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                  </select>
+                </label>
+              </div>
+              <p className="bank-account-result-count" aria-live="polite">
+                {t('Showing {start}–{end} of {count}', {
+                  start: filteredTransactions.length ? (currentPage - 1) * pageSize + 1 : 0,
+                  end: Math.min(currentPage * pageSize, filteredTransactions.length),
+                  count: filteredTransactions.length,
+                })}
+              </p>
+              {transactions.length === 0 ? (
+                <p className="landlord-account-help">{t('No transactions yet')}</p>
+              ) : filteredTransactions.length === 0 ? (
+                <p className="landlord-account-help">{t('No transactions match your filters.')}</p>
+              ) : (
+                <>
+                  <div className="bank-account-transactions-wrap">
+                    <table className="bank-account-transactions-table">
+                      <thead>
+                        <tr>
+                          {[t('Date'), t('Period'), t('Tenant'), t('Property'), t('Amount'), t('Type'), t('Status'), t('Reference')]
+                            .map((heading) => <th key={heading} scope="col">{heading}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleTransactions.map((transaction) => {
+                          const references = getTransactionReferences(transaction);
+                          const primaryReference = references[0]?.value;
+                          const direction = String(transaction.direction || '').toLowerCase();
+                          const transactionType = direction === 'debit' ? 'Debit' : direction === 'credit' ? 'Credit' : '';
+                          return (
+                            <tr key={transaction.id}>
+                              <td data-label={t('Date')}>{transaction.date ? new Date(transaction.date).toLocaleDateString() : '—'}</td>
+                              <td data-label={t('Period')}>{transaction.paymentPeriod || '—'}</td>
+                              <td data-label={t('Tenant')}>{transaction.tenant || '—'}</td>
+                              <td data-label={t('Property')}>{transaction.property || '—'}</td>
+                              <td className="bank-account-amount-cell" data-label={t('Amount')}>
+                                {transaction.currency || 'ETB'} {Number(transaction.amount).toLocaleString()}
+                              </td>
+                              <td data-label={t('Type')}>
+                                {transactionType ? (
+                                  <span className={`bank-account-ledger-status bank-account-ledger-status-${transactionType.toLowerCase()}`}>
+                                    {t(transactionType)}
+                                  </span>
+                                ) : '—'}
+                              </td>
+                              <td data-label={t('Status')}>
+                                <span className={`bank-account-ledger-status bank-account-ledger-status-${getLedgerStatusClass(transaction.status)}`}>
+                                  {transaction.status || '—'}
+                                </span>
+                              </td>
+                                            <td data-label={t('Reference')}>
+                                {primaryReference ? (
+                                  <div className="bank-account-reference-cell">
+                                                  <span>{shortenReference(primaryReference)}</span>
+                                    <button
+                                      type="button"
+                                      className="bank-account-copy-button"
+                                      aria-label={t('Copy reference {reference}', { reference: shortenReference(primaryReference) })}
+                                      onClick={() => copyReference(primaryReference)}
+                                    >
+                                      {t('Copy reference')}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="bank-account-reference-details-button"
+                                      aria-expanded={Boolean(expandedReferenceRows[transaction.id])}
+                                      aria-controls={`bank-account-references-${transaction.id}`}
+                                      onClick={() => setExpandedReferenceRows((previous) => ({
+                                        ...previous,
+                                        [transaction.id]: !previous[transaction.id],
+                                      }))}
+                                    >
+                                      {t('View reference details')}
+                                    </button>
+                                    {expandedReferenceRows[transaction.id] && (
+                                      <ul className="bank-account-reference-details" id={`bank-account-references-${transaction.id}`}>
+                                        {references.map((reference) => (
+                                          <li key={`${reference.label}-${reference.value}`}>
+                                            {t(reference.label)}: {reference.value}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                ) : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {copyFeedback && (
+                    <p className={`bank-account-copy-feedback${copyFailed ? ' is-error' : ''}`} role={copyFailed ? 'alert' : 'status'}>
+                      {copyFeedback}
+                    </p>
+                  )}
+                  <div className="bank-account-pagination">
+                    <label>
+                      {t('Rows per page')}
+                      <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+                        {[10, 25, 50].map((size) => <option key={size} value={size}>{size}</option>)}
+                      </select>
+                    </label>
+                    <nav aria-label={t('Transaction pagination')}>
+                      <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}>
+                        {t('Previous')}
+                      </button>
+                      <span>{t('Page {current} of {total}', { current: currentPage, total: pageCount })}</span>
+                      <button type="button" onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))} disabled={currentPage === pageCount}>
+                        {t('Next')}
+                      </button>
+                    </nav>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       {showUpdateModal && account && (
         <div

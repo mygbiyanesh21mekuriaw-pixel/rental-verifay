@@ -16,6 +16,7 @@ import './PropertyDetail.css';
 import { getFavoriteIds, toggleFavorite as toggleFavoriteStorage } from '../utils/favorites';
 import PropertyImage from '../components/PropertyImage';
 import PropertyOwnershipProof from '../components/PropertyOwnershipProof';
+import RejectionReasonModal from '../components/RejectionReasonModal';
 import { getPropertyImages } from '../utils/propertyMedia';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -66,6 +67,8 @@ const PropertyDetail = () => {
   // =====   =====
   const [showContact, setShowContact] = useState(false);
   const [adminActionLoading, setAdminActionLoading] = useState(false);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const rejectionTriggerRef = React.useRef(null);
 
   const returnFromPropertyDetails = () => {
     if (!isAreaAdmin) {
@@ -253,14 +256,16 @@ const PropertyDetail = () => {
     setShowContact(!showContact);
   };
 
-  const handleAdminPropertyAction = async (action) => {
+  const handleAdminPropertyAction = async (action, reason) => {
     if (!property?._id) return;
 
-    const confirmed = window.confirm(
-      action === 'verify'
-        ? 'Are you sure you want to verify this property?'
-        : 'Are you sure you want to reject this property?'
-    );
+    if (action === 'reject' && typeof reason !== 'string') {
+      rejectionTriggerRef.current = document.activeElement;
+      setShowRejectionModal(true);
+      return;
+    }
+
+    const confirmed = action !== 'verify' || window.confirm('Are you sure you want to verify this property?');
 
     if (!confirmed) return;
 
@@ -268,7 +273,7 @@ const PropertyDetail = () => {
     try {
       const token = localStorage.getItem('token');
       const endpoint = `${process.env.REACT_APP_API_URL}/api/admin/${action === 'verify' ? 'verify-property' : 'reject-property'}/${property._id}`;
-      const payload = action === 'reject' ? { comment: 'Documentation insufficient' } : {};
+      const payload = action === 'reject' ? { reason } : {};
 
       await axios.put(endpoint, payload, {
         headers: { Authorization: `Bearer ${token}` },
@@ -281,9 +286,13 @@ const PropertyDetail = () => {
             : 'Property rejected successfully.',
         },
       });
+      return { success: true };
     } catch (err) {
       console.error(`Error ${action === 'verify' ? 'verifying' : 'rejecting'} property:`, err);
-      setError(err.response?.data?.message || `Failed to ${action === 'verify' ? 'verify' : 'reject'} property.`);
+      const message = err.response?.data?.message || `Failed to ${action === 'verify' ? 'verify' : 'reject'} property.`;
+      if (action === 'reject') return { success: false, message };
+      setError(message);
+      return { success: false, message };
     } finally {
       setAdminActionLoading(false);
     }
@@ -504,6 +513,21 @@ const PropertyDetail = () => {
               ETB {property?.price?.toLocaleString()}
               <span>/ month</span>
             </p>
+            {user?.role === 'landlord' && property?.rejectionReason && (
+              <section className="property-rejection-reason" aria-labelledby="property-rejection-reason-title">
+                <h2 id="property-rejection-reason-title">{t('Reason for rejection')}</h2>
+                <p>{property.rejectionReason}</p>
+                {(property.rejectedAt || property.rejectedByName) && (
+                  <small>
+                    {property.rejectedAt && t('Rejected {date}', {
+                      date: formatDate(property.rejectedAt, { dateStyle: 'medium' }),
+                    })}
+                    {property.rejectedAt && property.rejectedByName ? ' · ' : ''}
+                    {property.rejectedByName && t('Rejected by {name}', { name: property.rejectedByName })}
+                  </small>
+                )}
+              </section>
+            )}
             <div className="property-feature-chips">
               <span className="property-feature-chip">
                 <FaBed aria-hidden="true" />
@@ -524,7 +548,10 @@ const PropertyDetail = () => {
                 <button
                   type="button"
                   className="property-modal-btn property-modal-btn-cancel"
-                  onClick={() =>handleAdminPropertyAction('reject')}
+                  onClick={(event) => {
+                    rejectionTriggerRef.current = event.currentTarget;
+                    handleAdminPropertyAction('reject');
+                  }}
                   disabled={adminActionLoading !== false}
                 >
                   {adminActionLoading === 'reject' ? 'Rejecting...' : 'Reject'}
@@ -671,6 +698,14 @@ const PropertyDetail = () => {
             </form>
           </div>
         </div>
+      )}
+      {showRejectionModal && (
+        <RejectionReasonModal
+          onClose={() => setShowRejectionModal(false)}
+          onSubmit={(reason) => handleAdminPropertyAction('reject', reason)}
+          returnFocusRef={rejectionTriggerRef}
+          loading={adminActionLoading === 'reject'}
+        />
       )}
     </div>
   );

@@ -75,7 +75,7 @@ test('Rent Payments keeps payment and landlord credit details without external t
   expect(screen.getByText('Payments received for your properties.')).toBeInTheDocument();
   expect(document.querySelector('.payment-page > p.payment-muted')).toBeNull();
   expect(screen.getAllByText('Tenant Example')).toHaveLength(3);
-  expect(screen.getAllByText('Rental Home')).toHaveLength(3);
+  expect(screen.getAllByText('Rental Home')).toHaveLength(4);
   expect(screen.getAllByText('ETB 3,000')).toHaveLength(3);
   expect(screen.getAllByText('Paid')).toHaveLength(3);
   expect(screen.getAllByText('October 2026')).toHaveLength(3);
