@@ -1088,6 +1088,30 @@
   cursor: pointer;
 }
 
+.landlord-under-review-disabled-actions {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
+.landlord-under-review-disabled-button {
+  width: 100%;
+  min-width: 120px;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.landlord-under-review-disabled-message {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 .landlord-verified-update:hover {
   border-color: #1d4ed8;
   background: #1d4ed8;

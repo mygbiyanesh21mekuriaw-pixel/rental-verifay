@@ -41,9 +41,10 @@ const renderPage = () => render(
 );
 
 beforeEach(() => {
+  user.status = 'pending';
   localStorage.setItem('token', 'platform-token');
   axios.get.mockImplementation((url) => {
-    if (url.endsWith('/api/admin/users?status=pending')) return Promise.resolve({ data: [user] });
+    if (url.endsWith('/api/admin/users?status=pending')) return Promise.resolve({ data: user.status === 'pending' ? [user] : [] });
     if (url.endsWith('/api/admin/users')) return Promise.resolve({ data: [user] });
     if (url.endsWith('/api/areas')) return Promise.resolve({ data: [] });
     if (url.includes('/permissions?role=')) {
@@ -53,7 +54,11 @@ beforeEach(() => {
     return Promise.reject(new Error(`Unexpected GET ${url}`));
   });
   axios.put.mockResolvedValue({ data: { permissions: { dashboard: true, favorites: false } } });
-  axios.post.mockResolvedValue({ data: { message: 'User approved successfully.' } });
+  axios.post.mockImplementation((url) => {
+    if (url.endsWith('/approve')) user.status = 'active';
+    if (url.endsWith('/reject')) user.status = 'rejected';
+    return Promise.resolve({ data: { message: 'User review saved.' } });
+  });
 });
 
 afterEach(() => jest.clearAllMocks());
@@ -100,27 +105,81 @@ test('changing role immediately fetches and displays the selected role catalog',
   );
 });
 
-test('pending user save and approve writes permissions before approval', async () => {
+test('pending user approval saves selected permissions and status in one request', async () => {
   renderPage();
   const favoritesCheckbox = await screen.findByLabelText(/Favorites/);
   fireEvent.click(favoritesCheckbox);
-  fireEvent.click(screen.getByRole('button', { name: 'Save & Approve' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
 
-  await waitFor(() => expect(axios.put).toHaveBeenCalledWith(
-    expect.stringContaining('/api/admin/users/tenant-id/permissions'),
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+    expect.stringContaining('/api/admin/users/tenant-id/approve'),
     {
       role: 'tenant',
-      status: 'pending',
+      status: 'active',
       permissions: { dashboard: true, favorites: false },
     },
     expect.objectContaining({ headers: { Authorization: 'Bearer platform-token' } }),
   ));
   expect(axios.post).toHaveBeenCalledWith(
     expect.stringContaining('/api/admin/users/tenant-id/approve'),
-    {},
+    {
+      role: 'tenant',
+      status: 'active',
+      permissions: { dashboard: true, favorites: false },
+    },
     expect.objectContaining({ headers: { Authorization: 'Bearer platform-token' } }),
   );
+  expect(axios.put).not.toHaveBeenCalled();
   expect(await screen.findByText('User approved and permissions saved.')).toBeInTheDocument();
+});
+
+test('pending user can be rejected and the pending counter refreshes', async () => {
+  renderPage();
+  await screen.findByRole('heading', { name: 'Tenant Example' });
+  fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+
+  await waitFor(() => expect(axios.post).toHaveBeenCalledWith(
+    expect.stringContaining('/api/admin/users/tenant-id/reject'),
+    {},
+    expect.objectContaining({ headers: { Authorization: 'Bearer platform-token' } }),
+  ));
+  expect(await screen.findByText('0 pending')).toBeInTheDocument();
+  expect(await screen.findByText('Rejected', { selector: 'span' })).toBeInTheDocument();
+});
+
+test('saving a changed role persists it and refreshes the selected user', async () => {
+  const savedUser = { ...user };
+  axios.get.mockImplementation((url) => {
+    if (url.endsWith('/api/admin/users?status=pending')) return Promise.resolve({ data: [savedUser] });
+    if (url.endsWith('/api/admin/users')) return Promise.resolve({ data: [savedUser] });
+    if (url.endsWith('/api/areas')) return Promise.resolve({ data: [] });
+    if (url.includes('/permissions?role=')) {
+      const selectedRole = new URL(url, 'http://localhost').searchParams.get('role');
+      return Promise.resolve({ data: makeRoleDetails(selectedRole) });
+    }
+    return Promise.reject(new Error(`Unexpected GET ${url}`));
+  });
+  axios.put.mockImplementation((url, payload) => {
+    savedUser.role = payload.role;
+    savedUser.status = payload.status;
+    return Promise.resolve({ data: { user: savedUser } });
+  });
+
+  renderPage();
+  fireEvent.change(await screen.findByLabelText('Role'), { target: { value: 'landlord' } });
+  await screen.findByLabelText(/My Properties/);
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+  await waitFor(() => expect(axios.put).toHaveBeenCalled());
+  const saveCall = axios.put.mock.calls.find(([url]) => url.includes('/api/admin/users/tenant-id/permissions'));
+  expect(saveCall[1]).toEqual({
+    role: 'landlord',
+    status: 'pending',
+    permissions: { dashboard: true, myProperties: true },
+  });
+  expect(await screen.findByText('Role and permissions saved.')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByLabelText('Role')).toHaveValue('landlord'));
+  expect(axios.get.mock.calls.filter(([url]) => url.endsWith('/api/admin/users')).length).toBeGreaterThan(1);
 });
 
 test('warns before switching users when there are unsaved changes', async () => {

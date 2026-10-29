@@ -10,6 +10,7 @@ const {
   getUserPermissionDetails,
   updateUserPermissions,
   approveUser,
+  rejectUser,
   createAreaAdmin,
 } = require('./adminController');
 
@@ -121,24 +122,70 @@ test('Platform Admin cannot update their own permissions', async () => {
   });
 });
 
-test('approval changes only pending users to active', async () => {
+test('pending accounts cannot be activated through the ordinary permissions save endpoint', async () => {
+  const user = makeUser({ status: 'pending' });
+  await withReplacements({ 'User.findById': async () => user }, async () => {
+    const response = createResponse();
+    await updateUserPermissions({
+      ...adminRequest({ role: 'tenant', status: 'active', permissions: {} }),
+      params: { id: targetId },
+    }, response);
+    assert.equal(response.statusCode, 409);
+    assert.equal(user.status, 'pending');
+  });
+});
+
+test('approval saves selected permissions, activates pending users, and audits the status transition', async () => {
   const user = makeUser({ status: 'pending' });
   const logs = [];
+  const permissions = { dashboard: true, favorites: true };
   await withReplacements({
     'User.findById': async () => user,
     'UserPermission.bulkWrite': async () => null,
+    'UserPermission.deleteMany': async () => null,
     'SystemLog.create': async (entry) => { logs.push(entry); return entry; },
   }, async () => {
     const response = createResponse();
-    await approveUser({ params: { id: targetId }, user: { id: adminId, role: 'admin' } }, response);
+    await approveUser({
+      params: { id: targetId },
+      body: { role: 'tenant', permissions },
+      user: { id: adminId, role: 'admin' },
+    }, response);
     assert.equal(response.statusCode, null);
     assert.equal(user.status, 'active');
     assert.equal(user.isActive, true);
     assert.equal(logs[0].action, 'USER_APPROVED');
+    assert.equal(logs[0].details.oldStatus, 'pending');
+    assert.equal(logs[0].details.newStatus, 'active');
+    assert.equal(logs[0].details.changedBy, 'System');
+    assert.match(response.body.message, /permissions saved/);
   });
 });
 
-test('area-admin endpoint creates an active area admin from the short payload', async () => {
+test('rejection marks pending users rejected and writes an audit entry', async () => {
+  const user = makeUser({ role: 'admin', adminType: 'area', status: 'pending' });
+  const logs = [];
+  await withReplacements({
+    'User.findById': async () => user,
+    'SystemLog.create': async (entry) => { logs.push(entry); return entry; },
+  }, async () => {
+    const response = createResponse();
+    await rejectUser({
+      params: { id: targetId },
+      user: { id: adminId, name: 'Platform Admin', role: 'admin' },
+    }, response);
+    assert.equal(response.statusCode, null);
+    assert.equal(user.status, 'rejected');
+    assert.equal(user.isActive, false);
+    assert.equal(logs[0].action, 'USER_REJECTED');
+    assert.equal(logs[0].details.oldStatus, 'pending');
+    assert.equal(logs[0].details.newStatus, 'rejected');
+    assert.equal(logs[0].details.changedBy, 'Platform Admin');
+    assert.ok(logs[0].details.timestamp);
+  });
+});
+
+test('area-admin endpoint creates a pending area admin from the short payload', async () => {
   let createdAdmin;
   await withReplacements({
     'User.findOne': async () => null,
@@ -148,6 +195,7 @@ test('area-admin endpoint creates an active area admin from the short payload', 
       return createdAdmin;
     },
     'Area.findOne': () => ({ select: () => ({ lean: async () => ({ name: 'North' }) }) }),
+    'SystemLog.create': async (entry) => entry,
   }, async () => {
     const response = createResponse();
     await createAreaAdmin({
@@ -156,7 +204,7 @@ test('area-admin endpoint creates an active area admin from the short payload', 
 
     assert.equal(response.statusCode, 201);
     assert.equal(createdAdmin.adminType, 'area');
-    assert.equal(createdAdmin.status, 'active');
+    assert.equal(createdAdmin.status, 'pending');
     assert.equal(createdAdmin.assignedArea, 'North');
     assert.equal(createdAdmin.role, 'admin');
   });

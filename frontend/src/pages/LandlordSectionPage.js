@@ -784,13 +784,28 @@ const LandlordSectionPage = ({ type }) => {
                       )}
 
                       <div className="landlord-verified-actions">
-                        <button
-                          type="button"
-                          className="landlord-verified-update"
-                          onClick={() => handleUpdate(property)}
-                        >
-                          {t('Update')}
-                        </button>
+                        {property.verificationStatus === 'pending' ? (
+                          <div className="landlord-under-review-disabled-actions">
+                            <button
+                              type="button"
+                              className="landlord-verified-update landlord-under-review-disabled-button"
+                              disabled
+                              aria-disabled="true"
+                              onClick={() => {}}
+                            >
+                              {t('Update')}
+                            </button>
+                            <small className="landlord-under-review-disabled-message">Cannot be changed while under review.</small>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="landlord-verified-update"
+                            onClick={() => handleUpdate(property)}
+                          >
+                            {t('Update')}
+                          </button>
+                        )}
 
                         <div className="landlord-verified-menu-wrap" />
                       </div>

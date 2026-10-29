@@ -491,7 +491,7 @@ function AppContent() {
             <Route path="/tenant/account-settings" element={<PrivateRoute allowedRoles={['tenant']}><LandlordAccountSettings /></PrivateRoute>} />
             <Route path="/tenant/rental-requests/:requestId" element={<PrivateRoute allowedRoles={['tenant']}><TenantRentalRequestDetail /></PrivateRoute>} />
             <Route path="/tenant/messages" element={<PrivateRoute allowedRoles={['tenant']}><TenantMessages /></PrivateRoute>} />
-            <Route path="/tenant/rent-payment/:propertyId" element={<PrivateRoute allowedRoles={['tenant']}><TenantRentPayment /></PrivateRoute>} />
+            <Route path="/tenant/rent-payment/:rentalId" element={<PrivateRoute allowedRoles={['tenant']}><TenantRentPayment /></PrivateRoute>} />
             <Route path="/landlord/messages" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordMessages /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/notifications" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordNotifications /></LandlordLayout></PrivateRoute>} />
             <Route path="/landlord/profile" element={<PrivateRoute allowedRoles={['landlord']}><LandlordLayout><LandlordProfile /></LandlordLayout></PrivateRoute>} />

@@ -11,6 +11,17 @@ jest.mock('axios', () => ({
   post: jest.fn(),
 }));
 
+const getPreviousPaymentPeriod = () => {
+  const date = new Date();
+  date.setMonth(date.getMonth() - 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const getCurrentPaymentPeriod = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
 const verifiedPayment = {
   _id: 'payment-1',
   isVerified: true,
@@ -19,7 +30,7 @@ const verifiedPayment = {
   provider: 'chapa',
   providerTransactionReference: 'CHAPA-transaction-1',
   paymentReference: 'RP-payment-1',
-  paymentPeriod: '2026-10',
+  paymentPeriod: getPreviousPaymentPeriod(),
   currency: 'ETB',
   amount: 2500,
   tenant: { name: 'Tenant Example' },
@@ -29,6 +40,8 @@ const verifiedPayment = {
 
 const tenantPaymentContext = {
   property: { _id: 'property-1', title: 'Rental Home', location: 'Addis Ababa', price: 2500 },
+  rentalId: 'rental-1',
+  rental: { _id: 'rental-1', moveInDate: `${getPreviousPaymentPeriod()}-01` },
   landlord: { name: 'Landlord Example' },
   landlordBankInformationComplete: true,
   payments: [verifiedPayment],
@@ -46,6 +59,7 @@ const renderTenantPayment = () => render(
 
 beforeEach(() => {
   localStorage.setItem('token', 'test-token');
+  localStorage.removeItem('rentalVerifyPaymentReturn');
   axios.get.mockReset();
   axios.post.mockReset();
 });
@@ -89,6 +103,10 @@ test('shows the exact bank name in the verified receipt header', async () => {
   renderTenantPayment();
 
   expect(await screen.findByRole('heading', { name: 'Pay Rent' })).toBeInTheDocument();
+  expect(axios.get).toHaveBeenCalledWith(
+    expect.stringMatching(/\/api\/payments\/tenant\/property\/property-1\?paymentPeriod=\d{4}-(0[1-9]|1[0-2])/),
+    expect.any(Object),
+  );
   expect(document.querySelector('.payment-page')).toHaveClass('!w-full', '!max-w-none', '!mx-0', '!p-0');
   expect(await screen.findByRole('img', { name: 'Commercial Bank of Ethiopia logo' }))
     .toHaveAttribute('src', '/images/commercial-bank-of-ethiopia.jpg');
@@ -100,6 +118,63 @@ test('shows the exact bank name in the verified receipt header', async () => {
   expect(screen.queryByText('House Rental Management System')).not.toBeInTheDocument();
 });
 
+test('marks paid rental months disabled and defaults to the earliest unpaid month', async () => {
+  axios.get.mockResolvedValue({
+    data: tenantPaymentContext,
+  });
+  renderTenantPayment();
+
+  const selector = await screen.findByLabelText('Payment period');
+  const paidPeriod = selector.querySelector(`option[value="${verifiedPayment.paymentPeriod}"]`);
+  expect(paidPeriod).toBeDisabled();
+  expect(paidPeriod).toHaveTextContent('Paid');
+  expect(selector).toHaveValue(getCurrentPaymentPeriod());
+  expect(screen.getByRole('button', { name: 'Pay Rent' })).toBeEnabled();
+  expect(screen.getByText('Unpaid')).toBeInTheDocument();
+});
+
+test('hides payment submission only when every allowed rental month is paid', async () => {
+  const currentPeriod = getCurrentPaymentPeriod();
+  const currentPeriodPayment = { ...verifiedPayment, paymentPeriod: currentPeriod };
+  axios.get.mockResolvedValue({
+    data: {
+      ...tenantPaymentContext,
+      rental: { _id: 'rental-1', moveInDate: `${currentPeriod}-01`, endDate: `${currentPeriod}-28` },
+      payments: [currentPeriodPayment],
+      currentPayment: currentPeriodPayment,
+    },
+  });
+  renderTenantPayment();
+
+  expect(await screen.findByText('This period is already paid')).toBeInTheDocument();
+  expect(screen.getByText('All allowed rental periods are already paid.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Pay Rent' })).not.toBeInTheDocument();
+});
+
+test('clears a transient load error after payment context refresh succeeds', async () => {
+  axios.get
+    .mockRejectedValueOnce({
+      response: { status: 503, data: { message: 'Temporary payment context failure' } },
+      message: 'Request failed',
+    })
+    .mockResolvedValueOnce({ data: tenantPaymentContext });
+  const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+  renderTenantPayment();
+
+  expect(await screen.findByText('Temporary payment context failure')).toBeInTheDocument();
+  expect(consoleError).toHaveBeenCalledWith('Unable to load rent payment details:', expect.objectContaining({
+    status: 503,
+    responseBody: { message: 'Temporary payment context failure' },
+  }));
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'));
+  });
+
+  await waitFor(() => expect(screen.queryByText('Temporary payment context failure')).not.toBeInTheDocument());
+  expect(await screen.findByRole('heading', { name: 'Pay Rent' })).toBeInTheDocument();
+  consoleError.mockRestore();
+});
+
 test('prints the selected verified receipt', async () => {
   axios.get.mockResolvedValue({ data: tenantPaymentContext });
   Object.defineProperty(window, 'print', {
@@ -108,7 +183,9 @@ test('prints the selected verified receipt', async () => {
   });
   renderTenantPayment();
   fireEvent.click(await screen.findByRole('button', { name: 'Print Receipt' }));
-  const receipt = screen.getByLabelText('Verified rent receipt for October 2026');
+  const receiptPeriod = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' })
+    .format(new Date(`${verifiedPayment.paymentPeriod}-01T00:00:00`));
+  const receipt = screen.getByLabelText(`Verified rent receipt for ${receiptPeriod}`);
   expect(receipt).toHaveAttribute('data-printing', 'true');
   expect(receipt.querySelector('img')).toHaveAttribute(
     'src',

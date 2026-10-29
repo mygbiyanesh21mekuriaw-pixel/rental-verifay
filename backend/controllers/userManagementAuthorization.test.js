@@ -259,7 +259,7 @@ test('Platform Admin can deactivate and reactivate a non-Platform Admin user wit
   });
 });
 
-test('Platform Admin activation approves pending registrations already marked active', async () => {
+test('Platform Admin must use Roles & Permissions to approve pending registrations', async () => {
   const user = makeUser({ status: 'pending', isActive: true });
   const response = createResponse();
   await withReplacements({
@@ -273,8 +273,8 @@ test('Platform Admin activation approves pending registrations already marked ac
     }, response);
   });
 
-  assert.equal(response.statusCode, null);
-  assert.equal(user.status, 'active');
+  assert.equal(response.statusCode, 409);
+  assert.equal(user.status, 'pending');
 });
 
 test('user status and role endpoints reject self-actions and Platform Admin targets', async () => {

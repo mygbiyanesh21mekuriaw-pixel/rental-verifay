@@ -301,7 +301,7 @@ const createAdminAccount = async (req, res) => {
       mustChangePassword: adminType === 'area',
       role: 'admin',
       adminType,
-      status: 'active',
+      status: adminType === 'area' ? 'pending' : 'active',
       assignedArea: adminType === 'area' ? areaRecord.name : '',
       adminAreas: adminType === 'area' ? [{ city: areaRecord.name }] : [],
     });
@@ -311,15 +311,15 @@ const createAdminAccount = async (req, res) => {
         req, action: 'AREA_ADMIN_CREATED', module: 'users',
         targetType: 'user', targetId: admin._id,
         targetLabel: `${admin.name} (${admin.email})`,
-        details: { assignedArea: areaRecord.name },
-        description: `Platform Admin created area admin ${admin.name} (${admin.email}) for ${areaRecord.name}.`,
+        details: { assignedArea: areaRecord.name, status: 'pending' },
+        description: `Platform Admin created area admin ${admin.name} (${admin.email}) for ${areaRecord.name}; account is pending review.`,
       });
     }
 
     const safeAdmin = admin.toObject();
     delete safeAdmin.password;
     const message = adminType === 'area'
-      ? 'Admin created. Please give the temporary password to the admin directly. They must change it on first login.'
+      ? 'Area Admin account created and is pending Platform Admin review.'
       : 'Admin account created successfully.';
     res.status(201).json({ message, user: safeAdmin });
   } catch (error) {
@@ -877,8 +877,8 @@ const getAllUsers = async (req, res) => {
   try {
     const isAreaAdmin = getAdministrativeRole(req.user) === 'area_admin';
     const queryStatus = req.query?.status;
-    if (queryStatus && !['pending', 'active', 'suspended'].includes(String(queryStatus))) {
-      return res.status(400).json({ message: 'Status must be pending, active, or suspended.' });
+    if (queryStatus && !['pending', 'active', 'suspended', 'rejected'].includes(String(queryStatus))) {
+      return res.status(400).json({ message: 'Status must be pending, active, suspended, or rejected.' });
     }
     if (queryStatus === 'pending' && getAdministrativeRole(req.user) !== 'platform_admin') {
       return res.status(403).json({ message: 'Platform Admin access required.' });
@@ -964,7 +964,7 @@ const getUserPermissionDetails = async (req, res) => {
       : getDefaultUserPermissions(role);
     return res.json({
       role,
-      status: ['pending', 'active', 'suspended'].includes(user.status) ? user.status : 'active',
+      status: ['pending', 'active', 'suspended', 'rejected'].includes(user.status) ? user.status : 'active',
       catalog: getPermissionKeys(role).map((permissionKey) => ({
         permissionKey,
         enabled: permissions[permissionKey] === true,
@@ -980,12 +980,13 @@ const getUserPermissionDetails = async (req, res) => {
 const updateUserPermissions = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid user ID.' });
-    const { role, status, permissions } = req.body || {};
-    if (!['area_admin', 'landlord', 'tenant'].includes(role)) {
+    const { role, status, permissions, area } = req.body || {};
+    const normalizedRole = typeof role === 'string' ? role.trim() : '';
+    if (!['area_admin', 'landlord', 'tenant'].includes(normalizedRole)) {
       return res.status(400).json({ message: 'Role must be area_admin, landlord, or tenant.' });
     }
-    if (!['pending', 'active', 'suspended'].includes(status)) {
-      return res.status(400).json({ message: 'Status must be pending, active, or suspended.' });
+    if (!['pending', 'active', 'suspended', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be pending, active, suspended, or rejected.' });
     }
 
     const user = await User.findById(req.params.id);
@@ -994,14 +995,10 @@ const updateUserPermissions = async (req, res) => {
     if (currentRole === 'platform_admin' || String(user._id) === String(req.user.id)) {
       return res.status(403).json({ message: 'You cannot change a Platform Admin account.' });
     }
+
     let areaRecord = null;
-    if (role === 'area_admin') {
-      if (!['tenant', 'landlord'].includes(currentRole)) {
-        if (currentRole !== 'area_admin') {
-          return res.status(400).json({ message: 'Only tenants and landlords can be promoted to Area Admin.' });
-        }
-      }
-      const assignedArea = String(req.body.area || user.assignedArea || user.area || '').trim();
+    if (normalizedRole === 'area_admin') {
+      const assignedArea = String(area || user.assignedArea || user.area || '').trim();
       if (!assignedArea) {
         return res.status(400).json({ message: 'Assign a valid area before promoting this user to Area Admin.' });
       }
@@ -1018,13 +1015,21 @@ const updateUserPermissions = async (req, res) => {
       }
     }
 
-    const oldStatus = ['pending', 'active', 'suspended'].includes(user.status) ? user.status : 'active';
+    const oldStatus = ['pending', 'active', 'suspended', 'rejected'].includes(user.status) ? user.status : 'active';
+    if (oldStatus === 'pending' && status !== 'pending' && !req.isPendingUserApproval) {
+      return res.status(409).json({ message: 'Use Approve or Reject to review a pending account.' });
+    }
+    if (req.isPendingUserApproval && oldStatus !== 'pending') {
+      return res.status(409).json({ message: 'Only pending users can be approved.' });
+    }
     const oldPermissions = await getUserPermissions(user._id, currentRole);
-    const currentPermissions = role === currentRole ? oldPermissions : getDefaultUserPermissions(role);
-    const validation = validatePermissionMap(role, permissions, currentPermissions);
+    const defaultPermissions = getDefaultUserPermissions(normalizedRole);
+    const currentPermissions = normalizedRole === currentRole ? oldPermissions : defaultPermissions;
+    const validation = validatePermissionMap(normalizedRole, permissions, currentPermissions);
     if (validation.error) return res.status(400).json({ message: validation.error });
 
-    if (role === 'area_admin') {
+    const oldRole = currentRole;
+    if (normalizedRole === 'area_admin') {
       user.role = 'admin';
       user.adminType = 'area';
       user.assignedArea = areaRecord.name;
@@ -1034,13 +1039,13 @@ const updateUserPermissions = async (req, res) => {
       user.adminType = undefined;
       user.adminAreas = [];
       user.assignedArea = '';
-      user.role = role;
+      user.role = normalizedRole;
     } else {
-      user.role = role;
+      user.role = normalizedRole;
     }
     user.status = status;
-    user.isActive = status !== 'suspended';
-    await replaceUserPermissions(user._id, role, validation.permissions, req.user.id, currentRole !== role);
+    user.isActive = !['suspended', 'rejected'].includes(status);
+    await replaceUserPermissions(user._id, normalizedRole, validation.permissions, req.user.id, currentRole !== normalizedRole);
     await user.save();
 
     const permissionKeysChanged = new Set([
@@ -1051,12 +1056,12 @@ const updateUserPermissions = async (req, res) => {
       .filter((key) => oldPermissions[key] !== validation.permissions[key])
       .map((key) => `${key}: ${oldPermissions[key] ?? 'not assigned'} -> ${validation.permissions[key] ?? 'not assigned'}`);
     const changes = [
-      ...(currentRole !== role ? [`role: ${currentRole} -> ${role}`] : []),
+      ...(oldRole !== normalizedRole ? [`role: ${oldRole} -> ${normalizedRole}`] : []),
       ...(oldStatus !== status ? [`status: ${oldStatus} -> ${status}`] : []),
       ...permissionChanges,
     ];
     const changedFields = {};
-    if (currentRole !== role) changedFields.role = { from: currentRole, to: role };
+    if (oldRole !== normalizedRole) changedFields.role = { from: oldRole, to: normalizedRole };
     if (oldStatus !== status) changedFields.status = { from: oldStatus, to: status };
     for (const key of permissionKeysChanged) {
       if (oldPermissions[key] !== validation.permissions[key]) {
@@ -1066,17 +1071,32 @@ const updateUserPermissions = async (req, res) => {
         };
       }
     }
+    const isApproval = oldStatus === 'pending' && status === 'active';
     await logAudit({
-      req, action: 'USER_PERMISSIONS_UPDATED', module: 'permissions',
-      targetType: 'user', targetId: user._id,
+      req,
+      action: isApproval ? 'USER_APPROVED' : 'USER_PERMISSIONS_UPDATED',
+      module: 'permissions',
+      targetType: 'user',
+      targetId: user._id,
       targetLabel: `${user.name} (${user.email})`,
-      details: changedFields,
-      description: `Platform Admin ${req.user?.name || 'Administrator'} updated ${user.name} (${user.email}). ${changes.join('; ') || 'No effective changes.'}`,
+      details: {
+        changedBy: req.user?.name || req.user?.email || 'System',
+        userId: String(user._id),
+        oldRole,
+        newRole: normalizedRole,
+        oldStatus,
+        newStatus: status,
+        timestamp: new Date().toISOString(),
+        ...changedFields,
+      },
+      description: isApproval
+        ? `Platform Admin ${req.user?.name || 'Administrator'} approved ${user.name} (${user.email}) and saved permissions.`
+        : `Platform Admin ${req.user?.name || 'Administrator'} updated ${user.name} (${user.email}). ${changes.join('; ') || 'No effective changes.'}`,
     });
 
     return res.json({
-      message: 'User permissions updated successfully.',
-      user: { id: String(user._id), role, status },
+      message: isApproval ? 'User approved and permissions saved.' : 'User permissions updated successfully.',
+      user: { id: String(user._id), role: normalizedRole, status },
       permissions: validation.permissions,
     });
   } catch (error) {
@@ -1094,20 +1114,52 @@ const approveUser = async (req, res) => {
       return res.status(403).json({ message: 'Platform Admin accounts cannot be approved or changed here.' });
     }
     if (user.status !== 'pending') return res.status(409).json({ message: 'Only pending users can be approved.' });
-    user.status = 'active';
-    user.isActive = true;
-    await user.save();
-    await ensureUserPermissions(user._id, permissionRoleForUser(user));
-    await logAudit({
-      req, action: 'USER_APPROVED', module: 'users',
-      targetType: 'user', targetId: user._id,
-      targetLabel: `${user.name} (${user.email})`,
-      description: `Platform Admin ${req.user?.name || 'Administrator'} approved user ${user.name} (${user.email}).`,
-    });
-    return res.json({ message: 'User approved successfully.', user: { id: String(user._id), status: user.status } });
+    const role = req.body?.role || permissionRoleForUser(user);
+    const permissions = req.body?.permissions || await getUserPermissions(user._id, role);
+    req.body = { ...req.body, role, status: 'active', permissions };
+    req.isPendingUserApproval = true;
+    return updateUserPermissions(req, res);
   } catch (error) {
     console.error('Unable to approve user:', error);
     return res.status(500).json({ message: 'Unable to approve user.' });
+  }
+};
+
+const rejectUser = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid user ID.' });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    if (permissionRoleForUser(user) === 'platform_admin') {
+      return res.status(403).json({ message: 'Platform Admin accounts cannot be rejected here.' });
+    }
+    if (user.status !== 'pending') return res.status(409).json({ message: 'Only pending users can be rejected.' });
+
+    const oldStatus = user.status;
+    user.status = 'rejected';
+    user.isActive = false;
+    await user.save();
+    const timestamp = new Date().toISOString();
+    await logAudit({
+      req,
+      action: 'USER_REJECTED',
+      module: 'users',
+      targetType: 'user',
+      targetId: user._id,
+      targetLabel: `${user.name} (${user.email})`,
+      details: {
+        changedBy: req.user?.name || req.user?.email || 'System',
+        userId: String(user._id),
+        oldStatus,
+        newStatus: user.status,
+        timestamp,
+      },
+      description: `Platform Admin ${req.user?.name || 'Administrator'} rejected ${user.name} (${user.email}).`,
+    });
+    return res.json({ message: 'User rejected successfully.', user: { id: String(user._id), status: user.status } });
+  } catch (error) {
+    console.error('Unable to reject user:', error);
+    return res.status(500).json({ message: 'Unable to reject user.' });
   }
 };
 
@@ -1500,6 +1552,9 @@ const setUserActive = async (req, res) => {
     if (targetAdministrativeRole === 'area_admin') {
       return res.status(403).json({ message: 'Area Admin accounts must be managed through Admin Management.' });
     }
+    if (req.body.isActive && user.status === 'pending') {
+      return res.status(409).json({ message: 'Approve this pending account in Roles & Permissions.' });
+    }
 
     const actorRole = getAdministrativeRole(req.user);
     if (actorRole === 'area_admin') {
@@ -1593,7 +1648,8 @@ const changeUserRole = async (req, res) => {
       user.assignedArea = area.name;
       user.adminAreas = [{ city: area.name }];
       user.isActive = true;
-      user.status = 'active';
+      const previousStatus = user.status || 'active';
+      user.status = 'pending';
       user.replacedBy = null;
       await user.save();
       await ensureUserPermissions(user._id, permissionRoleForUser(user));
@@ -1601,8 +1657,12 @@ const changeUserRole = async (req, res) => {
         req, action: 'USER_ROLE_UPDATED', module: 'users',
         targetType: 'user', targetId: user._id,
         targetLabel: `${user.name} (${user.email})`,
-        details: { role: { from: currentRole, to: 'area_admin' }, assignedArea: requestedAreaName },
-        description: `Platform Admin ${req.user?.name || 'Administrator'} promoted ${user.name} (${user.email}) to Area Admin for ${requestedAreaName}.`,
+        details: {
+          role: { from: currentRole, to: 'area_admin' },
+          assignedArea: requestedAreaName,
+          status: { from: previousStatus, to: 'pending' },
+        },
+        description: `Platform Admin ${req.user?.name || 'Administrator'} promoted ${user.name} (${user.email}) to Area Admin for ${requestedAreaName}; account is pending review.`,
       });
       const safeUser = user.toObject();
       delete safeUser.password;
@@ -1796,6 +1856,9 @@ const setAreaAdminActive = async (req, res) => {
     if (admin.isActive === req.body.isActive && !(req.body.isActive && admin.status === 'pending')) {
       return res.json({ message: req.body.isActive ? 'Area Admin is already active.' : 'Area Admin is already inactive.' });
     }
+    if (req.body.isActive && admin.status === 'pending') {
+      return res.status(409).json({ message: 'Approve this pending account in Roles & Permissions.' });
+    }
 
     const previousStatus = admin.status;
     const areaNames = getAdminAreaNames(admin);
@@ -1856,6 +1919,7 @@ module.exports = {
   getUserPermissionDetails,
   updateUserPermissions,
   approveUser,
+  rejectUser,
   createAreaAdmin,
   getStats,
   getAnalytics,

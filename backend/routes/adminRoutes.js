@@ -10,6 +10,7 @@ const {
   getUserPermissionDetails,
   updateUserPermissions,
   approveUser,
+  rejectUser,
   createAreaAdmin,
   getStats,
   getAnalytics,
@@ -36,6 +37,7 @@ router.get('/users', auth, platformAdminOnly, getAllUsers);
 router.get('/users/:id/permissions', auth, platformAdminOnly, getUserPermissionDetails);
 router.put('/users/:id/permissions', auth, platformAdminOnly, updateUserPermissions);
 router.post('/users/:id/approve', auth, platformAdminOnly, approveUser);
+router.post('/users/:id/reject', auth, platformAdminOnly, rejectUser);
 router.post('/area-admins', auth, platformAdminOnly, createAreaAdmin);
 router.get('/stats', auth, platformAdminOnly, getStats);
 router.get('/analytics', auth, platformAdminOnly, getAnalytics);

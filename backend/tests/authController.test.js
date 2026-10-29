@@ -43,7 +43,7 @@ test('status defaults active for existing user records and accepts only supporte
   const user = new User({ name: 'Existing User', email: 'status@example.com', password: 'hash' });
   const statusPath = User.schema.path('status');
   assert.equal(statusPath.options.default, 'active');
-  assert.deepEqual(statusPath.options.enum, ['pending', 'active', 'suspended']);
+  assert.deepEqual(statusPath.options.enum, ['pending', 'active', 'suspended', 'rejected']);
   assert.equal(user.status, 'active');
 });
 
@@ -184,13 +184,14 @@ test('inactive users with valid credentials receive a clear login rejection', as
   }
 });
 
-test('login rejects pending and suspended users with the account status message', async () => {
+test('login rejects pending, rejected, and suspended users with the account status message', async () => {
   const originalFind = User.find;
   const hashedPassword = await bcrypt.hash('correct-password', 4);
 
   try {
     for (const [status, message] of [
       ['pending', 'Your account is waiting for Platform Admin approval.'],
+      ['rejected', 'Your account application was rejected.'],
       ['suspended', 'Your account is suspended.'],
     ]) {
       User.find = () => ({
@@ -215,7 +216,7 @@ test('login rejects pending and suspended users with the account status message'
   }
 });
 
-test('login returns mustChangePassword for pending Area Admins', async () => {
+test('approved Area Admins must change their temporary password', async () => {
   const originals = {
     find: User.find,
     createSystemLog: SystemLog.create,
@@ -231,6 +232,7 @@ test('login returns mustChangePassword for pending Area Admins', async () => {
         password: hashedPassword,
         role: 'admin',
         adminType: 'area',
+        status: 'active',
         mustChangePassword: true,
       }],
     }),

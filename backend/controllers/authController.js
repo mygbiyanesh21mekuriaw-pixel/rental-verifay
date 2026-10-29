@@ -240,6 +240,14 @@ const login = async (req, res) => {
       });
       return res.status(403).json({ message: 'Your account is waiting for Platform Admin approval.' });
     }
+    if (!isPlatformAdmin && user.status === 'rejected') {
+      await logAudit({
+        req, actor: user, action: 'USER_LOGIN', module: 'auth', status: 'denied',
+        details: { reason: 'rejected_account' },
+        description: `Login denied for rejected user ${user.name} (${user.email}).`,
+      });
+      return res.status(403).json({ message: 'Your account application was rejected.' });
+    }
     if (!isPlatformAdmin && user.status === 'suspended') {
       await logAudit({
         req, actor: user, action: 'USER_LOGIN', module: 'auth', status: 'denied',

@@ -118,11 +118,12 @@ test('auth rejects a deactivated Area Admin even when their JWT is still valid',
   }
 });
 
-test('auth rejects existing tokens for pending and suspended accounts', async () => {
+test('auth rejects existing tokens for pending, rejected, and suspended accounts', async () => {
   const originalFindById = User.findById;
   try {
     for (const [status, message] of [
       ['pending', 'Your account is waiting for Platform Admin approval.'],
+      ['rejected', 'Your account application was rejected.'],
       ['suspended', 'Your account is suspended.'],
     ]) {
       const account = {

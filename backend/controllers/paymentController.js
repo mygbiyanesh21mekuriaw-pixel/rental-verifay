@@ -110,6 +110,50 @@ const getConfirmedRental = async (propertyId, tenantId) => {
   return request;
 };
 
+const getCurrentPaymentPeriod = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const normalizePaymentPeriod = (period) => (
+  /^\d{4}-(0[1-9]|1[0-2])$/.test(String(period || '').trim())
+    ? String(period).trim()
+    : getCurrentPaymentPeriod()
+);
+
+const getPaymentPeriodNumber = (period) => {
+  const [year, month] = String(period || '').split('-').map(Number);
+  return year * 12 + month - 1;
+};
+
+const getRentalPaymentPeriodRange = (rental) => {
+  const currentPeriod = getCurrentPaymentPeriod();
+  const normalizeDatePeriod = (value) => {
+    if (!value) return null;
+    const rawValue = String(value);
+    if (/^\d{4}-(0[1-9]|1[0-2])/.test(rawValue)) return rawValue.slice(0, 7);
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const start = normalizeDatePeriod(rental?.moveInDate) || currentPeriod;
+  const end = normalizeDatePeriod(rental?.endDate)
+    || (() => {
+      const endNumber = getPaymentPeriodNumber(currentPeriod) + 11;
+      const year = Math.floor(endNumber / 12);
+      const month = (endNumber % 12) + 1;
+      return `${year}-${String(month).padStart(2, '0')}`;
+    })();
+  return { start, end: getPaymentPeriodNumber(end) < getPaymentPeriodNumber(start) ? start : end };
+};
+
+const isAllowedRentalPaymentPeriod = (period, rental) => {
+  const range = getRentalPaymentPeriodRange(rental);
+  const periodNumber = getPaymentPeriodNumber(period);
+  return periodNumber >= getPaymentPeriodNumber(range.start)
+    && periodNumber <= getPaymentPeriodNumber(range.end);
+};
+
 const isVerifiedPayment = (payment) => Boolean(
   payment?.status === 'paid' &&
   payment?.verifiedAt &&
@@ -167,7 +211,7 @@ const verifyPaymentRelationships = async (payment) => {
 
 const createPayment = async (req, res) => {
   try {
-    const { propertyId, paymentPeriod } = req.body;
+    const { propertyId, paymentPeriod, rentalId } = req.body;
     if (req.user.role !== 'tenant') return res.status(403).json({ message: 'Only tenants can pay rent' });
     if (!propertyId || !String(paymentPeriod || '').trim()) {
       return res.status(400).json({ message: 'Property and payment period are required' });
@@ -182,10 +226,34 @@ const createPayment = async (req, res) => {
     if (!rental || String(rental.landlord) !== String(property.landlord)) {
       return res.status(403).json({ message: 'Payment is only available for your approved or confirmed rented property.' });
     }
+    if (rentalId && String(rentalId) !== String(rental._id)) {
+      return res.status(403).json({ message: 'You can only pay rent for your own rental.' });
+    }
 
     const period = String(paymentPeriod).trim();
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
       return res.status(400).json({ message: 'Payment period must be in YYYY-MM format' });
+    }
+    if (!isAllowedRentalPaymentPeriod(period, rental)) {
+      return res.status(400).json({ message: 'Payment period is outside the rental period.' });
+    }
+    let payment = await Payment.findOne({ rentalRequest: rental._id, paymentPeriod: period });
+    if (payment?.status === 'paid' && !isVerifiedPayment(payment)) {
+      payment = await reconcilePayment(payment, req);
+    }
+    if (payment?.status === 'paid') {
+      return res.status(409).json({
+        message: isVerifiedPayment(payment)
+          ? 'This payment period has already been paid.'
+          : 'The previous payment is being reverified. Please check its status before retrying.',
+        payment: await paymentView(Payment.findById(payment._id)),
+      });
+    }
+    if (payment?.status === 'pending') {
+      return res.status(409).json({
+        message: 'A payment for this rental period is already pending. Please wait for it to finish.',
+        payment: await paymentView(Payment.findById(payment._id)),
+      });
     }
     if (!property.landlord || !Number.isFinite(Number(property.price)) || Number(property.price) <= 0) {
       return res.status(409).json({ message: 'Rented property payment details are incomplete' });
@@ -204,29 +272,6 @@ const createPayment = async (req, res) => {
     if (!tenant) return res.status(403).json({ message: 'Authenticated tenant not found' });
     const paymentReference = `RP-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     const paymentMode = getPaymentMode();
-    let payment = await Payment.findOne({ tenant: req.user.id, property: propertyId, paymentPeriod: period });
-
-    if (payment?.status === 'paid' && !isVerifiedPayment(payment)) {
-      payment = await reconcilePayment(payment, req);
-    }
-    if (payment?.status === 'paid') {
-      return res.status(409).json({
-        message: isVerifiedPayment(payment)
-          ? 'This payment period has already been paid.'
-          : 'The previous payment is being reverified. Please check its status before retrying.',
-        payment: await paymentView(Payment.findById(payment._id)),
-      });
-    }
-    if (payment?.status === 'pending') {
-      if (payment.checkoutUrl) {
-        return res.status(200).json({
-          message: 'Resume the existing checkout for this payment period.',
-          checkoutUrl: payment.checkoutUrl,
-          payment: await paymentView(Payment.findById(payment._id)),
-        });
-      }
-      return res.status(409).json({ message: 'A payment is already being initialized for this period. Please try again shortly.' });
-    }
 
     if (!hasChapaConfig()) {
       const config = getProviderConfig();
@@ -281,7 +326,7 @@ const createPayment = async (req, res) => {
         { returnDocument: 'after', runValidators: true }
       );
       if (!payment) {
-        const currentPayment = await Payment.findOne({ tenant: req.user.id, property: propertyId, paymentPeriod: period });
+        const currentPayment = await Payment.findOne({ rentalRequest: rental._id, paymentPeriod: period });
         if (currentPayment?.status === 'pending' && currentPayment.checkoutUrl) {
           return res.status(200).json({
             message: 'Resume the existing checkout for this payment period.',
@@ -371,7 +416,7 @@ const createPayment = async (req, res) => {
       payment: await paymentView(Payment.findById(initializedPayment._id)),
     });
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({ message: 'A payment already exists for this period' });
+    if (error.code === 11000) return res.status(409).json({ message: 'A payment for this rental period already exists or is being processed.' });
     console.error('Create payment error:', error);
     res.status(500).json({ message: 'Server error' });
   }
@@ -524,17 +569,42 @@ const getTenantPaymentContext = async (req, res) => {
   }
 
   try {
-    const property = await Property.findOne({ _id: req.params.propertyId, rentedBy: req.user.id, availabilityStatus: 'rented' }).populate('landlord', 'name email phone');
+    const paymentPeriod = normalizePaymentPeriod(req.query?.paymentPeriod);
+    let rental = null;
+    let property = await Property.findOne({
+      _id: req.params.propertyId,
+      rentedBy: req.user.id,
+      availabilityStatus: 'rented',
+    }).populate('landlord', 'name email phone');
+    if (!property) {
+      rental = await RentalRequest.findOne({
+        _id: req.params.propertyId,
+        tenant: req.user.id,
+        status: { $in: ['approved', 'confirmed'] },
+      });
+      if (rental) {
+        property = await Property.findOne({
+          _id: rental.property,
+          rentedBy: req.user.id,
+          availabilityStatus: 'rented',
+        }).populate('landlord', 'name email phone');
+      }
+    }
     if (!property) return res.status(403).json({ message: 'You can only view payments for your rented property' });
-    const rental = await getConfirmedRental(property._id, req.user.id);
+    rental = rental || await getConfirmedRental(property._id, req.user.id);
     if (!rental) return res.status(403).json({ message: 'Payment is only available for your approved or confirmed rented property.' });
+    if (req.query?.rentalId && String(req.query.rentalId) !== String(rental._id)) {
+      return res.status(403).json({ message: 'You can only view payments for your own rental.' });
+    }
 
     const landlordProfile = await User.findById(property.landlord._id).select('+bankAccountNumber bankAccountName bankAccountNumber bankCode bankName bankAccountSource bankAccountConfigured bankAccountVerified');
     const landlordPayoutEligibility = getPayoutEligibility(landlordProfile);
-    const paymentRecords = await Payment.find({ tenant: req.user.id, property: property._id }).sort({ createdAt: -1 });
+    const paymentFilter = { tenant: req.user.id, property: property._id, rentalRequest: rental._id };
+    const paymentRecords = await Payment.find(paymentFilter).sort({ createdAt: -1 });
     for (const payment of paymentRecords) await reconcilePayment(payment, req);
-    const populatedPayments = await paymentView(Payment.find({ tenant: req.user.id, property: property._id }).sort({ createdAt: -1 }));
+    const populatedPayments = await paymentView(Payment.find(paymentFilter).sort({ createdAt: -1 }));
     const payments = populatedPayments.map(paymentResponse);
+    const currentPeriodPayment = payments.find((payment) => payment.paymentPeriod === paymentPeriod) || null;
     const canonicalPayment = payments.reduce((latest, payment) => {
       if (!latest) return payment;
       return new Date(payment.createdAt || 0).getTime() > new Date(latest.createdAt || 0).getTime() ? payment : latest;
@@ -554,6 +624,14 @@ const getTenantPaymentContext = async (req, res) => {
         ? ''
         : (landlordPayoutEligibility.message || 'Landlord payout account is not configured.'),
       payments,
+      rentalId: String(rental._id),
+      rental: {
+        _id: rental._id,
+        moveInDate: rental.moveInDate,
+        endDate: rental.endDate || null,
+      },
+      paymentPeriod,
+      currentPeriodPayment,
       currentPayment: canonicalPayment,
       latestPayment: canonicalPayment,
       paymentStatus: canonicalPayment?.status || null,

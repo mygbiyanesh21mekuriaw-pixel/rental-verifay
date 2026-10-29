@@ -1330,39 +1330,76 @@
   box-shadow: 0 5px 12px rgba(33, 90, 138, 0.18);
 }
 
-.landlord-property-edit-layout,
-.landlord-property-edit-main,
-.landlord-property-edit-basic,
-.landlord-property-edit-price,
-.landlord-property-edit-address,
-.landlord-property-edit-side {
-  display: contents;
+.landlord-property-edit-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
+  gap: 20px;
 }
 
-.landlord-property-edit-address .landlord-add-property-address-grid {
+.landlord-property-edit-main,
+.landlord-property-edit-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.landlord-property-edit-side {
+  position: sticky;
+  top: 12px;
+}
+
+.landlord-property-edit-basic,
+.landlord-property-edit-address,
+.landlord-property-edit-images,
+.landlord-property-edit-proof {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #dde5ec;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(15, 41, 64, 0.045);
+}
+
+.landlord-property-edit-form .landlord-property-edit-price {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.landlord-property-edit-form .landlord-property-edit-price .landlord-property-field {
+  margin: 0;
+}
+
+.landlord-property-edit-form .landlord-property-edit-address .landlord-add-property-address-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.landlord-property-edit-form .landlord-property-edit-address .landlord-add-property-subcity-field {
+  grid-column: 1 / -1;
+}
+
+.landlord-property-edit-form .landlord-property-edit-images,
+.landlord-property-edit-form .landlord-property-edit-proof {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
-.landlord-property-edit-form .landlord-add-property-title-field {
-  order: 1;
+.landlord-property-edit-form .landlord-property-edit-images h2,
+.landlord-property-edit-form .landlord-property-edit-proof h2 {
+  margin: 0;
+  color: #17324a;
+  font-size: 17px;
+  font-weight: 700;
 }
 
-.landlord-property-edit-form .landlord-add-property-description-field {
-  order: 2;
-}
-
-.landlord-property-edit-form .landlord-add-property-price-field {
-  order: 3;
-}
-
-.landlord-property-edit-form fieldset {
-  order: 4;
-}
-
-.landlord-property-edit-form .landlord-add-property-bedroom-field {
-  order: 5;
+.landlord-property-edit-form .landlord-property-edit-submit {
+  width: 100%;
 }
 
 .landlord-rejection-reason {

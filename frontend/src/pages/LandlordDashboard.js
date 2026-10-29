@@ -826,7 +826,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                 isEditMode ? 'landlord-property-edit-form' : 'landlord-add-property-form'
               }`}
             >
-              <div className={isEditMode ? 'landlord-property-edit-layout' : 'landlord-add-property-layout'}>
+              <div className={isEditMode ? 'landlord-add-property-layout landlord-property-edit-layout' : 'landlord-add-property-layout'}>
                 {isEditMode && rejectionDetails?.reason && (
                   <section className="landlord-rejection-reason" aria-labelledby="landlord-rejection-reason-title">
                     <h2 id="landlord-rejection-reason-title">{t('Reason for rejection')}</h2>
@@ -842,8 +842,8 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                     )}
                   </section>
                 )}
-                <div className={isEditMode ? 'landlord-property-edit-main' : 'landlord-add-property-main'}>
-                  <section className={isEditMode ? 'landlord-property-edit-basic' : 'landlord-add-property-card'}>
+                <div className={isEditMode ? 'landlord-add-property-main landlord-property-edit-main' : 'landlord-add-property-main'}>
+                  <section className={isEditMode ? 'landlord-add-property-card landlord-property-edit-basic' : 'landlord-add-property-card'}>
                     {!isEditMode && <h2>Basic information</h2>}
                     <div className="landlord-property-field landlord-add-property-title-field space-y-2">
                       <label className="block text-sm font-semibold text-slate-700">Property title *</label>
@@ -855,7 +855,7 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                       <textarea name="description" placeholder="Enter a property description" value={formData.description} onChange={handleFormChange} required className="min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
                     </div>
 
-                    <div className={isEditMode ? 'landlord-property-edit-price' : 'landlord-add-property-field-row'}>
+                    <div className={isEditMode ? 'landlord-add-property-field-row landlord-property-edit-price' : 'landlord-add-property-field-row'}>
                       <div className="landlord-property-field landlord-add-property-price-field space-y-2">
                         <label className="block text-sm font-semibold text-slate-700">Price in ETB *</label>
                         <input type="number" name="price" placeholder="Price" min="1" value={formData.price} onChange={handleFormChange} required className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
@@ -867,8 +867,8 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                     </div>
                   </section>
 
-                  <section className={isEditMode ? 'landlord-property-edit-address' : 'landlord-add-property-card landlord-add-property-address-card'}>
-                    <fieldset className={isEditMode ? 'space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4' : 'landlord-add-property-address-fields'}>
+                  <section className={isEditMode ? 'landlord-add-property-card landlord-property-edit-address' : 'landlord-add-property-card landlord-add-property-address-card'}>
+                    <fieldset className={isEditMode ? 'landlord-add-property-address-fields' : 'landlord-add-property-address-fields'}>
                       <legend className="px-2 text-base font-bold text-slate-800">Address *</legend>
                       <div className="landlord-add-property-address-grid">
                         <div className="landlord-property-field landlord-add-property-region-field space-y-2">
@@ -910,10 +910,10 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                   </section>
                 </div>
 
-                <aside className={isEditMode ? 'landlord-property-edit-side' : 'landlord-add-property-side'}>
-                  <section className={isEditMode ? 'landlord-property-edit-images space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4' : 'landlord-add-property-card'}>
+                <aside className={isEditMode ? 'landlord-add-property-side landlord-property-edit-side' : 'landlord-add-property-side'}>
+                  <section className={isEditMode ? 'landlord-add-property-card landlord-property-edit-images' : 'landlord-add-property-card'}>
                     {isEditMode ? (
-                      <label className="block text-sm font-semibold text-slate-700">Property images (up to 5)</label>
+                      <h2>Property images ({existingPropertyImages.length + imageFiles.length}/5)</h2>
                     ) : (
                       <h2>Property images ({imageFiles.length}/5)</h2>
                     )}
@@ -922,28 +922,33 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                         <p className="mb-2 text-sm font-medium text-slate-600">
                           Current house photos (kept unless you add photos below)
                         </p>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        <div className="landlord-add-property-thumbnails">
                           {existingPropertyImages.map((image, index) => (
-                            <PropertyImage
-                              key={`${image}-${index}`}
-                              src={image}
-                              alt={`${formData.title || 'Property'} photo ${index + 1}`}
-                              className="h-32 w-full rounded-lg border border-slate-200 bg-white object-cover"
-                            />
+                            <div className="landlord-add-property-thumbnail" key={`${image}-${index}`}>
+                              <img
+                                src={image}
+                                alt={`${formData.title || 'Property'} photo ${index + 1}`}
+                                className="landlord-add-property-image-preview"
+                              />
+                            </div>
                           ))}
                         </div>
                       </div>
                     )}
                     {isEditMode ? (
-                      <input
-                        type="file"
-                        name="images"
-                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                        multiple
-                        required={!isEditMode}
-                        onChange={handleFileChange}
-                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
-                      />
+                      <label className="landlord-add-property-dropzone">
+                        <span className="landlord-add-property-upload-icon" aria-hidden="true">↑</span>
+                        <span><strong>Choose property images</strong><small>JPG, PNG or WEBP · up to 5 images</small></span>
+                        <input
+                          type="file"
+                          name="images"
+                          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                          multiple
+                          required={!isEditMode}
+                          onChange={handleFileChange}
+                          className="landlord-add-property-file-input"
+                        />
+                      </label>
                     ) : (
                       <label className="landlord-add-property-dropzone">
                         <span className="landlord-add-property-upload-icon" aria-hidden="true">↑</span>
@@ -959,9 +964,8 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                         />
                       </label>
                     )}
-                    {isEditMode && imageFiles.length > 0 && <span className="block text-sm font-medium text-emerald-700"> {imageFiles.map((file) => file.name).join(', ')}</span>}
-                    {!isEditMode && imageFiles.length > 0 && (
-                      <div className="landlord-add-property-thumbnails">
+                    {isEditMode && imageFiles.length > 0 && (
+                      <div className="landlord-add-property-thumbnails mt-3">
                         {imageFiles.map((file, index) => (
                           <div className="landlord-add-property-thumbnail" key={`${file.name}-${file.lastModified}-${index}`}>
                             <PropertyImagePreview file={file} />
@@ -979,9 +983,9 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                     )}
                   </section>
 
-                  <section className={isEditMode ? 'landlord-property-edit-proof space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4' : 'landlord-add-property-card'}>
+                  <section className={isEditMode ? 'landlord-add-property-card landlord-property-edit-proof' : 'landlord-add-property-card'}>
                     {isEditMode ? (
-                      <label className="block text-sm font-semibold text-slate-700">Proof of ownership</label>
+                      <h2>Proof of ownership</h2>
                     ) : (
                       <h2>Proof of ownership</h2>
                     )}
@@ -995,38 +999,28 @@ const LandlordDashboard = ({ initialShowForm = false }) => {
                         showLabel={false}
                       />
                     )}
-                    {isEditMode ? (
+                    <label className="landlord-add-property-dropzone landlord-add-property-proof-dropzone">
+                      <span className="landlord-add-property-upload-icon" aria-hidden="true">↑</span>
+                      <span>
+                        <strong>{documentFile ? 'Proof selected' : 'Choose proof of ownership'}</strong>
+                        <small>{documentFile ? documentFile.name : 'JPG, PNG or WEBP'}</small>
+                      </span>
                       <input
                         type="file"
                         name="document"
                         accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                         onChange={handleFileChange}
-                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700"
+                        className="landlord-add-property-file-input"
                       />
-                    ) : (
-                      <label className="landlord-add-property-dropzone landlord-add-property-proof-dropzone">
-                        <span className="landlord-add-property-upload-icon" aria-hidden="true">↑</span>
-                        <span>
-                          <strong>{documentFile ? 'Proof selected' : 'Choose proof of ownership'}</strong>
-                          <small>{documentFile ? documentFile.name : 'JPG, PNG or WEBP'}</small>
-                        </span>
-                        <input
-                          type="file"
-                          name="document"
-                          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                          onChange={handleFileChange}
-                          className="landlord-add-property-file-input"
-                        />
-                      </label>
-                    )}
-                    {isEditMode && documentFile && <span className="block text-sm font-medium text-emerald-700"> {documentFile.name}</span>}
+                    </label>
+                    {isEditMode && documentFile && <span className="mt-2 block text-sm font-medium text-emerald-700"> {documentFile.name}</span>}
                   </section>
 
                   <button
                     type="submit"
-                    className={isEditMode ? 'landlord-property-edit-submit w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300' : 'landlord-add-property-submit'}
+                    className={isEditMode ? 'landlord-add-property-submit landlord-property-edit-submit' : 'landlord-add-property-submit'}
                   >
-                    {isEditMode ? 'Save changes' : 'Submit property'}
+                    {isEditMode ? 'Update property' : 'Submit property'}
                   </button>
                 </aside>
               </div>

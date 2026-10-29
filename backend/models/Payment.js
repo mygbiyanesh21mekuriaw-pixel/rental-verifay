@@ -109,6 +109,10 @@ const PaymentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 PaymentSchema.index({ tenant: 1, property: 1, paymentPeriod: 1 }, { unique: true });
+PaymentSchema.index(
+  { rentalRequest: 1, paymentPeriod: 1 },
+  { unique: true, partialFilterExpression: { status: 'paid', verifiedAt: { $type: 'date' } } }
+);
 PaymentSchema.index({ landlord: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Payment', PaymentSchema);

@@ -156,8 +156,10 @@ const UsersPermissionsPage = () => {
       const nextUser = candidates.find((user) => String(user._id) === preferredUserId)
         || candidates[0];
       setSelectedUserId(nextUser ? String(nextUser._id) : '');
+      return nextUser || null;
     } catch (error) {
       setFeedback({ type: 'error', text: error.response?.data?.message || 'Unable to load users.' });
+      return null;
     } finally {
       setLoadingUsers(false);
     }
@@ -177,18 +179,19 @@ const UsersPermissionsPage = () => {
     setBaseline(null);
   }, [selectedUser]);
 
-  useEffect(() => {
-    if (!selectedUserId || !role) return undefined;
-    if (role === 'platform_admin') {
-      setLoadingPermissions(false);
-      return undefined;
-    }
+  const loadRolePermissions = useCallback((selectedRole = role, userId = selectedUserId) => {
     let current = true;
-    const loadPermissions = async () => {
-      setLoadingPermissions(true);
+    if (!userId || !selectedRole || selectedRole === 'platform_admin'
+      || getUserRole(selectedUser) === 'platform_admin') {
+      setLoadingPermissions(false);
+      return () => { current = false; };
+    }
+
+    setLoadingPermissions(true);
+    const load = async () => {
       try {
         const response = await axios.get(
-          apiUrl(`/api/admin/users/${selectedUserId}/permissions?role=${encodeURIComponent(role)}`),
+          apiUrl(`/api/admin/users/${userId}/permissions?role=${encodeURIComponent(selectedRole)}`),
           getHeaders(),
         );
         if (!current) return;
@@ -198,21 +201,28 @@ const UsersPermissionsPage = () => {
         setCatalog(nextCatalog);
         setPermissions(nextPermissions);
         setBaseline((currentBaseline) => currentBaseline || permissionSnapshot(
-          selectedUserId,
-          role,
+          userId,
+          selectedRole,
           nextStatus,
-          selectedUser.assignedArea || selectedUser.area || '',
+          selectedUser?.assignedArea || selectedUser?.area || assignedArea || '',
           nextPermissions,
         ));
       } catch (error) {
+        console.error('Unable to load permissions for selected role:', error);
         if (current) setFeedback({ type: 'error', text: error.response?.data?.message || 'Unable to load permissions.' });
       } finally {
         if (current) setLoadingPermissions(false);
       }
     };
-    loadPermissions();
+
+    load();
     return () => { current = false; };
-  }, [selectedUserId, role, selectedUser]);
+  }, [assignedArea, role, selectedUser, selectedUserId]);
+
+  useEffect(() => {
+    if (!selectedUserId || !role) return undefined;
+    return loadRolePermissions(role, selectedUserId);
+  }, [selectedUserId, role, loadRolePermissions]);
 
   const isPlatformAdmin = getUserRole(selectedUser) === 'platform_admin';
   const isDirty = Boolean(selectedUser && baseline && baseline !== permissionSnapshot(
@@ -255,23 +265,60 @@ const UsersPermissionsPage = () => {
     setSaving(true);
     setFeedback(null);
     try {
-      const savedStatus = approve ? 'pending' : status;
-      await axios.put(apiUrl(`/api/admin/users/${selectedUserId}/permissions`), {
+      const savedStatus = approve ? 'active' : status;
+      const payload = {
         role,
         status: savedStatus,
         permissions,
         ...(role === 'area_admin' ? { area: assignedArea } : {}),
-      }, getHeaders());
-      if (approve) {
-        await axios.post(apiUrl(`/api/admin/users/${selectedUserId}/approve`), {}, getHeaders());
+      };
+      if (role === 'area_admin' && !assignedArea.trim()) {
+        setFeedback({ type: 'error', text: 'Assign an area before saving this role.' });
+        return;
       }
-      const finalStatus = approve ? 'active' : savedStatus;
+      console.log('Saving user permissions payload:', payload);
+      if (approve) {
+        await axios.post(apiUrl(`/api/admin/users/${selectedUserId}/approve`), payload, getHeaders());
+      } else {
+        await axios.put(apiUrl(`/api/admin/users/${selectedUserId}/permissions`), payload, getHeaders());
+      }
+      const finalStatus = savedStatus;
       setStatus(finalStatus);
       setBaseline(permissionSnapshot(selectedUserId, role, finalStatus, assignedArea, permissions));
-      setFeedback({ type: 'success', text: approve ? 'User approved and permissions saved.' : 'Role and permissions saved.' });
-      await loadUsers(selectedUserId);
+      const refreshedUserRecord = await loadUsers(selectedUserId);
+      if (refreshedUserRecord) {
+        const nextRole = getUserRole(refreshedUserRecord);
+        setRole(nextRole);
+        setStatus(getUserStatus(refreshedUserRecord));
+        setAssignedArea(refreshedUserRecord.assignedArea || refreshedUserRecord.area || '');
+      }
+      if (refreshedUserRecord) {
+        setFeedback({ type: 'success', text: approve ? 'User approved and permissions saved.' : 'Role and permissions saved.' });
+      }
     } catch (error) {
+      console.error('Unable to save user permissions:', error);
       setFeedback({ type: 'error', text: error.response?.data?.message || 'Unable to save user permissions.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const rejectSelectedUser = async () => {
+    if (!selectedUser || isPlatformAdmin || getUserStatus(selectedUser) !== 'pending') return;
+    setSaving(true);
+    setFeedback(null);
+    try {
+      await axios.post(apiUrl(`/api/admin/users/${selectedUserId}/reject`), {}, getHeaders());
+      const refreshedUserRecord = await loadUsers(selectedUserId);
+      if (refreshedUserRecord) {
+        setRole(getUserRole(refreshedUserRecord));
+        setStatus(getUserStatus(refreshedUserRecord));
+        setAssignedArea(refreshedUserRecord.assignedArea || refreshedUserRecord.area || '');
+        setFeedback({ type: 'success', text: 'User rejected.' });
+      }
+    } catch (error) {
+      console.error('Unable to reject user:', error);
+      setFeedback({ type: 'error', text: error.response?.data?.message || 'Unable to reject user.' });
     } finally {
       setSaving(false);
     }
@@ -427,16 +474,28 @@ const UsersPermissionsPage = () => {
                   <div className="mt-2 flex flex-wrap gap-2">
                     <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">{t(roleLabels[getUserRole(selectedUser)] || getUserRole(selectedUser))}</span>
                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status === 'active' ? 'bg-emerald-50 text-emerald-800' : status === 'pending' ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800'}`}>
-                      {t(status === 'active' ? 'Active' : status === 'pending' ? 'Pending' : 'Suspended')}
+                      {t(status === 'active' ? 'Active' : status === 'pending' ? 'Pending' : status === 'rejected' ? 'Rejected' : 'Suspended')}
                     </span>
                   </div>
                 </div>
-                <Link
-                  to={`/admin-dashboard/system-logs?userId=${encodeURIComponent(selectedUserId)}`}
-                  className="inline-flex min-h-10 items-center justify-center rounded-xl border border-emerald-700 px-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
-                >
-                  {t('View activity')}
-                </Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  {status === 'pending' && (
+                    <>
+                      <button type="button" className="min-h-10 rounded-xl bg-emerald-800 px-4 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => savePermissions(true)} disabled={saving || loadingPermissions}>
+                        {saving ? t('Approving...') : t('Approve')}
+                      </button>
+                      <button type="button" className="min-h-10 rounded-xl border border-rose-300 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50" onClick={rejectSelectedUser} disabled={saving}>
+                        {t('Reject')}
+                      </button>
+                    </>
+                  )}
+                  <Link
+                    to={`/admin-dashboard/system-logs?userId=${encodeURIComponent(selectedUserId)}`}
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-emerald-700 px-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+                  >
+                    {t('View activity')}
+                  </Link>
+                </div>
                 {isDirty && <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">{t('Unsaved changes')}</span>}
               </header>
 
@@ -446,17 +505,22 @@ const UsersPermissionsPage = () => {
                   {isPlatformAdmin ? (
                     <p className="mt-2 flex min-h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 font-normal">{t('Platform Admin')}</p>
                   ) : (
-                    <select aria-label={t('Role')} className="mt-2 block min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 font-normal focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100" value={role} onChange={(event) => setRole(event.target.value)} disabled={saving}>
+                    <select aria-label={t('Role')} className="mt-2 block min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 font-normal focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100" value={role} onChange={(event) => {
+                      const nextRole = event.target.value;
+                      setRole(nextRole);
+                      setAssignedArea('');
+                    }} disabled={saving}>
                       {Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
                     </select>
                   )}
                 </label>
                 <label className="block text-sm font-semibold text-slate-800">
                   {t('Status')}
-                  <select aria-label={t('Status')} className="mt-2 block min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 font-normal focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100" value={status} onChange={(event) => setStatus(event.target.value)} disabled={saving || isPlatformAdmin}>
+                  <select aria-label={t('Status')} className="mt-2 block min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 font-normal focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-100" value={status} onChange={(event) => setStatus(event.target.value)} disabled={saving || isPlatformAdmin || getUserStatus(selectedUser) === 'pending'}>
                     <option value="pending">{t('Pending')}</option>
                     <option value="active">{t('Active')}</option>
                     <option value="suspended">{t('Suspended')}</option>
+                    <option value="rejected">{t('Rejected')}</option>
                   </select>
                 </label>
                 {role === 'area_admin' && getUserRole(selectedUser) !== 'area_admin' && (
@@ -537,11 +601,6 @@ const UsersPermissionsPage = () => {
               <span className={isDirty ? 'font-semibold text-amber-800' : 'text-slate-500'}>{isDirty ? t('Unsaved changes') : t('No unsaved changes')}</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {status === 'pending' && (
-                <button type="button" className="min-h-10 rounded-xl border border-emerald-800 px-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-50 disabled:opacity-50" onClick={() => savePermissions(true)} disabled={saving || loadingPermissions || !isDirty}>
-                  {t('Save & Approve')}
-                </button>
-              )}
               <button type="button" className="min-h-10 rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50" onClick={resetChanges} disabled={saving || loadingPermissions || !isDirty}>
                 {t('Reset')}
               </button>

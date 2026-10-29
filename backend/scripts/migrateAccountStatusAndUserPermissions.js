@@ -18,7 +18,7 @@ const migrateAccountStatusAndUserPermissions = async ({
   let permissionRowsAdded = 0;
 
   for (const user of users) {
-    const needsStatusBackfill = !['pending', 'active', 'suspended'].includes(user.status);
+    const needsStatusBackfill = !['pending', 'active', 'suspended', 'rejected'].includes(user.status);
     if (needsStatusBackfill) statusesActivated += 1;
     const role = permissionRoleForUser(user);
     const keys = getPermissionKeys(role);
@@ -27,7 +27,7 @@ const migrateAccountStatusAndUserPermissions = async ({
 
     if (needsStatusBackfill) {
       await UserModel.updateOne(
-        { _id: user._id, status: { $nin: ['pending', 'active', 'suspended'] } },
+        { _id: user._id, status: { $nin: ['pending', 'active', 'suspended', 'rejected'] } },
         { $set: { status: 'active', isActive: true } },
       );
     }

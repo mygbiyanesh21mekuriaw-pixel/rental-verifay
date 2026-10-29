@@ -36,8 +36,8 @@ const resolveAuthenticatedUser = async (decoded) => {
     ? user.adminType || (adminAreas.length > 0 ? 'area' : 'platform')
     : undefined;
   const effectiveRole = permissionRoleForUser({ ...user, adminType });
-  const status = ['pending', 'active', 'suspended'].includes(user.status) ? user.status : 'active';
-  if (user.isActive === false && effectiveRole !== 'platform_admin' && status !== 'suspended') return null;
+  const status = ['pending', 'active', 'suspended', 'rejected'].includes(user.status) ? user.status : 'active';
+  if (user.isActive === false && effectiveRole !== 'platform_admin' && !['suspended', 'rejected'].includes(status)) return null;
   return {
     id: String(user._id),
     name: user.name,
@@ -88,6 +88,9 @@ const auth = async (req, res, next) => {
     if (!isPlatformAdmin && user.status === 'pending') {
       return res.status(403).json({ message: 'Your account is waiting for Platform Admin approval.' });
     }
+    if (!isPlatformAdmin && user.status === 'rejected') {
+      return res.status(403).json({ message: 'Your account application was rejected.' });
+    }
     if (!isPlatformAdmin && user.status === 'suspended') {
       return res.status(403).json({ message: 'Your account is suspended.' });
     }
@@ -122,6 +125,9 @@ const optionalAuth = async (req, res, next) => {
     const isPlatformAdmin = permissionRoleForUser(user) === 'platform_admin';
     if (!isPlatformAdmin && user.status === 'pending') {
       return res.status(403).json({ message: 'Your account is waiting for Platform Admin approval.' });
+    }
+    if (!isPlatformAdmin && user.status === 'rejected') {
+      return res.status(403).json({ message: 'Your account application was rejected.' });
     }
     if (!isPlatformAdmin && user.status === 'suspended') {
       return res.status(403).json({ message: 'Your account is suspended.' });

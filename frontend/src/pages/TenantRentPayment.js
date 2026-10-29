@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,18 @@ const getDefaultPaymentPeriod = () => {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   return `${year}-${month}`;
+};
+
+const getPaymentPeriodForReturn = (propertyId) => {
+  try {
+    const paymentReturn = JSON.parse(localStorage.getItem(PAYMENT_RETURN_KEY) || 'null');
+    return paymentReturn?.propertyId === propertyId
+      && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(paymentReturn.paymentPeriod || ''))
+      ? paymentReturn.paymentPeriod
+      : getDefaultPaymentPeriod();
+  } catch (error) {
+    return getDefaultPaymentPeriod();
+  }
 };
 
 const readablePaymentMessage = (value, fallback) => {
@@ -54,6 +66,44 @@ const formatPaymentPeriod = (period) => {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(period || ''))) return period || 'N/A';
   return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' })
     .format(new Date(`${period}-01T00:00:00`));
+};
+
+const paymentPeriodNumber = (period) => {
+  const [year, month] = String(period || '').split('-').map(Number);
+  return year * 12 + month - 1;
+};
+
+const periodFromDate = (value) => {
+  if (!value) return null;
+  const rawValue = String(value);
+  if (/^\d{4}-(0[1-9]|1[0-2])/.test(rawValue)) return rawValue.slice(0, 7);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const getRentalPaymentPeriods = (rental, payments = []) => {
+  const now = new Date();
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const start = periodFromDate(rental?.moveInDate) || currentPeriod;
+  const currentEndNumber = paymentPeriodNumber(currentPeriod) + 11;
+  const end = periodFromDate(rental?.endDate)
+    || `${Math.floor(currentEndNumber / 12)}-${String((currentEndNumber % 12) + 1).padStart(2, '0')}`;
+  const first = paymentPeriodNumber(start);
+  const last = Math.max(first, paymentPeriodNumber(end));
+  const paymentByPeriod = new Map(payments.map((payment) => [payment.paymentPeriod, payment]));
+
+  return Array.from({ length: last - first + 1 }, (_, index) => {
+    const periodNumber = first + index;
+    const period = `${Math.floor(periodNumber / 12)}-${String((periodNumber % 12) + 1).padStart(2, '0')}`;
+    const payment = paymentByPeriod.get(period);
+    const status = isVerifiedPayment(payment)
+      ? 'paid'
+      : payment?.status === 'pending' || payment?.status === 'paid'
+        ? 'pending'
+        : 'unpaid';
+    return { period, status };
+  });
 };
 
 const getReceiptDetails = (payment) => ([
@@ -150,14 +200,18 @@ const createReceiptPdf = (payment, logoJpegBytes) => {
 };
 
 const TenantRentPayment = () => {
-  const { propertyId } = useParams();
+  const { propertyId: propertyParam, rentalId } = useParams();
+  const propertyId = propertyParam || rentalId;
   const location = useLocation();
   const navigate = useNavigate();
   const logout = useAuth()?.logout;
   const [context, setContext] = useState(null);
-  const [paymentPeriod, setPaymentPeriod] = useState(getDefaultPaymentPeriod);
+  const [paymentPeriod, setPaymentPeriod] = useState(() =>getPaymentPeriodForReturn(propertyId));
+  const paymentPeriodRef = useRef(paymentPeriod);
+  const paymentPeriodTouchedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [paymentReturnState, setPaymentReturnState] = useState(null);
@@ -225,9 +279,13 @@ const TenantRentPayment = () => {
     if (!isCurrentPaymentReturn) setPaymentReturnState(null);
 
     const loadContext = async (showLoading = false) => {
+      const requestedPeriod = isCurrentPaymentReturn && paymentReturn?.paymentPeriod
+        ? paymentReturn.paymentPeriod
+        : paymentPeriodRef.current;
+      const requestUrl = `${process.env.REACT_APP_API_URL}/api/payments/tenant/property/${propertyId}?paymentPeriod=${encodeURIComponent(requestedPeriod)}${isCurrentPaymentReturn && paymentReturn?.rentalId ? `&rentalId=${encodeURIComponent(paymentReturn.rentalId)}` : ''}`;
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/payments/tenant/property/${propertyId}`, {
+        const response = await axios.get(requestUrl, {
           headers: { Authorization: `Bearer ${token}` },
           timeout: PAYMENT_REQUEST_TIMEOUT_MS,
         });
@@ -238,10 +296,28 @@ const TenantRentPayment = () => {
           currentPayment: response.data.currentPayment || response.data.latestPayment || response.data.payments?.[0] || null,
         };
         setContext(payload);
+        if (!paymentPeriodTouchedRef.current) {
+          const periods = getRentalPaymentPeriods(payload.rental, payload.payments);
+          const preferredPeriod = periods.find((period) => period.status === 'unpaid')
+            || periods.find((period) => period.status === 'pending')
+            || periods[0];
+          if (preferredPeriod) {
+            paymentPeriodRef.current = preferredPeriod.period;
+            setPaymentPeriod(preferredPeriod.period);
+          }
+        }
+        setError('');
         return payload;
       } catch (requestError) {
         if (cancelled) return null;
         if (handleUnauthorized(requestError)) return null;
+        console.error('Unable to load rent payment details:', {
+          url: requestUrl,
+          status: requestError.response?.status,
+          responseBody: requestError.response?.data,
+          code: requestError.code,
+          message: requestError.message,
+        });
         setError(readablePaymentMessage(
           requestError.response?.data?.message,
           'Unable to load rent payment details.'
@@ -299,7 +375,7 @@ const TenantRentPayment = () => {
         return;
       }
       if (attempt >= 14) {
-        setError('Payment is still being confirmed. Please check the payment status again shortly.');
+        setSuccess('Payment is still being confirmed. Please check the payment status again shortly.');
         finishPaymentReturn('failure');
         return;
       }
@@ -338,7 +414,10 @@ const TenantRentPayment = () => {
   const submitPayment = async (event) => {
     event.preventDefault();
     const normalizedPaymentPeriod = (paymentPeriod || '').trim() || getDefaultPaymentPeriod();
-    if (!normalizedPaymentPeriod || submitting) return;
+    const selectedPeriod = getRentalPaymentPeriods(context?.rental, context?.payments)
+      .find((period) => period.period === normalizedPaymentPeriod);
+    if (!normalizedPaymentPeriod || submittingRef.current || selectedPeriod?.status !== 'unpaid') return;
+    submittingRef.current = true;
     setPaymentPeriod(normalizedPaymentPeriod);
     setSubmitting(true);
     setError('');
@@ -347,6 +426,7 @@ const TenantRentPayment = () => {
       const token = localStorage.getItem('token');
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/payments`, {
         propertyId,
+        rentalId: context.rentalId,
         paymentPeriod: normalizedPaymentPeriod,
       }, {
         headers: { Authorization: `Bearer ${token}` },
@@ -356,13 +436,24 @@ const TenantRentPayment = () => {
         localStorage.setItem(PAYMENT_RETURN_KEY, JSON.stringify({
           propertyId,
           paymentReference: response.data.payment?.paymentReference,
+          rentalId: context.rentalId,
+          paymentPeriod: normalizedPaymentPeriod,
         }));
         window.location.assign(response.data.checkoutUrl);
         return;
       }
       setSuccess(readablePaymentMessage(response.data.message, 'Payment submitted successfully.'));
-      setContext(current => ({ ...current, payments: [response.data.payment, ...current.payments] }));
-      setPaymentPeriod('');
+      const updatedPayments = [
+        response.data.payment,
+        ...context.payments.filter((payment) => payment._id !== response.data.payment?._id),
+      ];
+      setContext((current) => ({ ...current, payments: updatedPayments }));
+      const nextPeriod = getRentalPaymentPeriods(context.rental, updatedPayments)
+        .find((period) => period.status === 'unpaid');
+      if (nextPeriod) {
+        paymentPeriodRef.current = nextPeriod.period;
+        setPaymentPeriod(nextPeriod.period);
+      }
     } catch (requestError) {
       if (handleUnauthorized(requestError)) return;
       setError(readablePaymentMessage(
@@ -370,6 +461,7 @@ const TenantRentPayment = () => {
         'Unable to submit rent payment.'
       ));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -381,11 +473,13 @@ const TenantRentPayment = () => {
   if (error && !context) return <div className="payment-page payment-page-state !m-0 !w-full !max-w-none !p-0 text-left"><p className="payment-error">{error}</p>{backButton}</div>;
   if (!context) return <div className="payment-page-state !m-0 !w-full !max-w-none !p-0 text-left">Loading rent payment details...</div>;
 
-  const latestPayment = context.currentPayment || context.latestPayment || context.payments[0] || null;
   const verifiedPayments = context.payments.filter(isVerifiedPayment);
-  const visibleStatus = latestPayment?.status === 'paid' && !isVerifiedPayment(latestPayment)
-    ? 'pending'
-    : latestPayment?.status || 'pending';
+  const paymentPeriods = getRentalPaymentPeriods(context.rental, context.payments);
+  const selectedPeriod = paymentPeriods.find((period) => period.period === paymentPeriod);
+  const periodAlreadyPaid = selectedPeriod?.status === 'paid';
+  const allPeriodsPaid = paymentPeriods.length > 0 && paymentPeriods.every((period) => period.status === 'paid');
+  const visibleStatus = selectedPeriod?.status || 'unpaid';
+  const visibleStatusClass = visibleStatus === 'unpaid' ? 'pending' : visibleStatus;
   return (
     <div className="payment-page !m-0 !w-full !max-w-none !p-0">
       {paymentReturnState === 'success' && (
@@ -410,12 +504,14 @@ const TenantRentPayment = () => {
           <p className="payment-property-location"> {context.property.location}</p>
           <div className="payment-detail-row"><span>Landlord</span><strong>{context.landlord.name}</strong></div>
           <div className="payment-detail-row"><span>Monthly rent</span><strong>ETB {Number(context.property.price).toLocaleString()}</strong></div>
-          <div className="payment-detail-row"><span>Payment status</span><strong className={`payment-status payment-status-${visibleStatus}`}>{formatStatus(visibleStatus)}</strong></div>
+          <div className="payment-detail-row"><span>Payment status</span><strong className={`payment-status payment-status-${visibleStatusClass}`}>{formatStatus(visibleStatus)}</strong></div>
         </section>
 
         <section className="payment-card">
           <h2>Submit a payment</h2>
           <p className="payment-muted">Complete the secure provider checkout to confirm this payment.</p>
+          {periodAlreadyPaid && <p className="payment-success" role="status">This period is already paid</p>}
+          {selectedPeriod?.status === 'pending' && <p className="payment-muted" role="status">A payment for this period is pending verification.</p>}
           {!context.landlordBankInformationComplete && (
             <p className="payment-error" role="alert">
               {context.landlordBankInformationMessage || 'The landlord has not completed bank information. Please contact the landlord before paying rent.'}
@@ -423,14 +519,30 @@ const TenantRentPayment = () => {
           )}
           {error && <p className="payment-error">{error}</p>}
           {success && <p className="payment-success">{success}</p>}
-          <form onSubmit={submitPayment} className="payment-form">
-            <label htmlFor="payment-period">Payment period</label>
-            <input id="payment-period" type="month" value={paymentPeriod} onChange={event =>setPaymentPeriod(event.target.value)} required />
-            <div className="payment-amount"><span>Amount due</span><strong>ETB {Number(context.property.price).toLocaleString()}</strong></div>
-            <button type="submit" disabled={submitting || !paymentPeriod || !context.landlordBankInformationComplete}>
-              {submitting ? 'Submitting...' : 'Pay Rent'}
-            </button>
-          </form>
+          {allPeriodsPaid ? (
+            <p className="payment-success" role="status">All allowed rental periods are already paid.</p>
+          ) : (
+            <form onSubmit={submitPayment} className="payment-form">
+              <label htmlFor="payment-period">Payment period</label>
+              <select id="payment-period" value={paymentPeriod} onChange={event => {
+                paymentPeriodTouchedRef.current = true;
+                paymentPeriodRef.current = event.target.value;
+                setPaymentPeriod(event.target.value);
+              }} required>
+                {paymentPeriods.map((period) => (
+                  <option key={period.period} value={period.period} disabled={period.status !== 'unpaid'}>
+                    {formatPaymentPeriod(period.period)}{period.status === 'paid' ? ' — Paid' : period.status === 'pending' ? ' — Pending' : ' — Unpaid'}
+                  </option>
+                ))}
+              </select>
+              {selectedPeriod?.status === 'unpaid' && (
+                <div className="payment-amount"><span>Amount due</span><strong>ETB {Number(context.property.price).toLocaleString()}</strong></div>
+              )}
+              <button type="submit" disabled={submitting || !paymentPeriod || selectedPeriod?.status !== 'unpaid' || !context.landlordBankInformationComplete}>
+                {submitting ? 'Submitting...' : 'Pay Rent'}
+              </button>
+            </form>
+          )}
         </section>
       </div>
 

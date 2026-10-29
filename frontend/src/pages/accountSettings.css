@@ -211,9 +211,40 @@
 
 .account-settings-card-heading {
   display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
+}
+
+.account-settings-card-heading > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-settings-card-heading > button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 180px;
+  height: 44px;
+  padding: 0 20px;
+  white-space: nowrap;
+}
+
+.account-settings-card-heading > button.account-settings-secondary,
+.account-settings-modal-actions .account-settings-button.account-settings-secondary {
+  border-color: #166534;
+  background: #166534;
+  color: #fff;
+}
+
+.account-settings-card-heading > button.account-settings-secondary:hover:not(:disabled),
+.account-settings-modal-actions .account-settings-button.account-settings-secondary:hover:not(:disabled) {
+  background: #14532d;
 }
 
 .account-settings-card-heading h2 {
@@ -335,11 +366,23 @@
 .account-settings-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
   margin-top: 4px;
 }
 
-@media (max-width: 767px) {
+.account-settings-modal-actions .account-settings-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 160px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 9px;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 640px) {
   .account-settings-page {
     padding: 18px 14px;
   }
@@ -392,6 +435,15 @@
   .account-settings-signins li {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .account-settings-card-heading {
+    gap: 12px;
+  }
+
+  .account-settings-card-heading > button {
+    width: 100%;
+    align-self: stretch;
   }
 
   .account-settings-signins time {

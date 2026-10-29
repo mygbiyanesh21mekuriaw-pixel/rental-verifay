@@ -771,8 +771,32 @@ const updateProperty = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to update this property' });
     }
 
+    if (property.verificationStatus === 'pending') {
+      return res.status(403).json({
+        message: 'This property is under review. It cannot be changed until the review is finished.',
+      });
+    }
+
     const { title, description, price, bedrooms, latitude, longitude } = req.body;
     const address = normalizeAddress(req.body);
+    const hasPriceChange = typeof price !== 'undefined' && Number(price) !== Number(property.price);
+    const hasBedroomsChange = typeof bedrooms !== 'undefined' && Number(bedrooms) !== Number(property.bedrooms);
+    const addressFields = ['region', 'zone', 'wereda', 'city', 'subCity', 'kebele', 'houseNumber'];
+    const addressChanged = addressFields.some((field) => {
+      const incoming = String(address[field] ?? '').trim();
+      const current = String(property[field] ?? '').trim();
+      return incoming !== current;
+    });
+    const proofUploaded = Boolean(req.files && req.files.document && req.files.document.length > 0);
+    const mainImagesAdded = Boolean(req.files && req.files.images && req.files.images.length > 0);
+    const criticalFieldChanged = addressChanged || proofUploaded || mainImagesAdded;
+
+    if (property.availabilityStatus === 'rented' && (hasPriceChange || hasBedroomsChange || addressChanged || proofUploaded)) {
+      return res.status(403).json({
+        message: 'This information cannot be changed while the property has a tenant.',
+      });
+    }
+
     const areaName = await resolvePropertyArea(address);
     const previousArea = property.area;
     const previousValues = {
@@ -821,11 +845,17 @@ const updateProperty = async (req, res) => {
       property.longitude = longitudeValue;
     }
 
-    // ካዘመነ በኋላ እንደገና መረጋገጥ አለበት
-    property.isVerified = false;
-    property.verificationStatus = 'pending';
-    property.rejectionReason = '';
-    property.rejectedAt = null;
+    const currentStatus = property.verificationStatus;
+    const shouldReturnToPending = currentStatus === 'approved'
+      ? criticalFieldChanged
+      : currentStatus === 'rejected';
+
+    if (shouldReturnToPending) {
+      property.isVerified = false;
+      property.verificationStatus = 'pending';
+      property.rejectionReason = '';
+      property.rejectedAt = null;
+    }
 
     await property.save();
 
